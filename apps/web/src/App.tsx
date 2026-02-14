@@ -40,7 +40,7 @@ export function App() {
   const llmState = useLLMStore();
   const { upload } = useFileUpload();
   const { itemCount } = useTextDetection(textInput);
-  const { loadCandidates } = useMapping();
+  const { loadCandidates, loadPipelineCandidates } = useMapping();
 
   const [showSettings, setShowSettings] = useState(false);
 
@@ -65,7 +65,19 @@ export function App() {
   const handleContinue = async () => {
     if (!parseResult) return;
     setScreen('mapping');
-    await loadCandidates(parseResult.items);
+
+    // Auto-detect: use LLM pipeline if active provider has a valid connection
+    const activeConfig = llmState.configs[llmState.activeProvider];
+    if (activeConfig?.connectionStatus === 'valid') {
+      await loadPipelineCandidates(parseResult.items, {
+        provider: llmState.activeProvider,
+        api_key: activeConfig.apiKey || null,
+        base_url: activeConfig.baseUrl || null,
+        model: activeConfig.model || null,
+      });
+    } else {
+      await loadCandidates(parseResult.items);
+    }
   };
 
   const handleEditFromMapping = () => {

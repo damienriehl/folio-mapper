@@ -4,6 +4,7 @@ import type {
   FolioStatus,
   MappingResponse,
   NodeStatus,
+  PipelineItemMetadata,
 } from '@folio-mapper/core';
 
 interface MappingState {
@@ -25,6 +26,9 @@ interface MappingState {
   // Detail panel
   selectedCandidateIri: string | null;
 
+  // Pipeline metadata (from LLM-enhanced path)
+  pipelineMetadata: PipelineItemMetadata[] | null;
+
   // FOLIO loading state
   folioStatus: FolioStatus;
   isLoadingCandidates: boolean;
@@ -41,6 +45,7 @@ interface MappingState {
   setThreshold: (threshold: number) => void;
   toggleBranch: (branchName: string) => void;
   selectCandidateForDetail: (iriHash: string | null) => void;
+  setPipelineMetadata: (metadata: PipelineItemMetadata[] | null) => void;
   setFolioStatus: (status: FolioStatus) => void;
   setLoadingCandidates: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -76,6 +81,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
   threshold: 45,
   enabledBranches: new Set<string>(),
   selectedCandidateIri: null,
+  pipelineMetadata: null,
   folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
   isLoadingCandidates: false,
   error: null,
@@ -180,6 +186,8 @@ export const useMappingStore = create<MappingState>((set, get) => ({
 
   selectCandidateForDetail: (iriHash) => set({ selectedCandidateIri: iriHash }),
 
+  setPipelineMetadata: (metadata) => set({ pipelineMetadata: metadata }),
+
   setFolioStatus: (status) => set({ folioStatus: status }),
 
   setLoadingCandidates: (loading) => set({ isLoadingCandidates: loading }),
@@ -229,6 +237,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       threshold: 45,
       enabledBranches: new Set<string>(),
       selectedCandidateIri: null,
+      pipelineMetadata: null,
       isLoadingCandidates: false,
       error: null,
     }),

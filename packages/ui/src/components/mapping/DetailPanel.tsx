@@ -10,15 +10,9 @@ interface DetailPanelProps {
 export function DetailPanel({ currentItem, selectedCandidate }: DetailPanelProps) {
   return (
     <div className="flex h-full flex-col">
-      {/* Current input item */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Your Input</p>
-        <p className="mt-1 text-base font-medium text-gray-900">{currentItem.item_text}</p>
-      </div>
-
       {/* Selected candidate details */}
       {selectedCandidate ? (
-        <div className="mt-4 flex-1 space-y-3 overflow-y-auto">
+        <div className="flex-1 space-y-3 overflow-y-auto">
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-gray-900">{selectedCandidate.label}</h3>
@@ -90,7 +84,7 @@ export function DetailPanel({ currentItem, selectedCandidate }: DetailPanelProps
           )}
         </div>
       ) : (
-        <div className="mt-4 flex flex-1 items-center justify-center">
+        <div className="flex flex-1 items-center justify-center">
           <p className="text-sm text-gray-400">Click a candidate to see details</p>
         </div>
       )}

@@ -31,11 +31,11 @@ export const BRANCH_COLORS: Record<string, { name: string; color: string }> = {
 
 /** Confidence score color thresholds from PRD */
 export function getConfidenceColor(score: number): string {
-  if (score >= 90) return '#228B22'; // dark green - excellent
-  if (score >= 75) return '#90EE90'; // light green - strong
-  if (score >= 60) return '#FFD700'; // yellow - moderate
-  if (score >= 45) return '#FF8C00'; // orange - weak
-  return '#D3D3D3'; // light gray - poor
+  if (score >= 90) return '#15803d'; // green-700 - excellent
+  if (score >= 75) return '#16a34a'; // green-600 - strong
+  if (score >= 60) return '#ca8a04'; // yellow-600 - moderate
+  if (score >= 45) return '#ea580c'; // orange-600 - weak
+  return '#6b7280'; // gray-500 - poor
 }
 
 export function getConfidenceLabel(score: number): string {

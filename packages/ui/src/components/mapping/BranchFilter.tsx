@@ -8,8 +8,7 @@ export function BranchFilter({ branches, enabledBranches, onToggle }: BranchFilt
   if (branches.length === 0) return null;
 
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Branch Filter</p>
+    <div>
       <div className="space-y-0.5">
         {branches.map((branch) => (
           <label
