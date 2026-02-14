@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from app.models.llm_models import LLMConfig
-from app.models.mapping_models import MappingResponse
+from app.models.mapping_models import FolioCandidate, MappingResponse
 from app.models.parse_models import ParseItem
 
 
@@ -78,3 +78,23 @@ class PipelineRequest(BaseModel):
 class PipelineResponse(BaseModel):
     mapping: MappingResponse
     pipeline_metadata: list[PipelineItemMetadata]
+
+
+# --- Mandatory Fallback ---
+
+class MandatoryFallbackRequest(BaseModel):
+    item_text: str
+    item_index: int
+    branches: list[str]
+    llm_config: LLMConfig | None = None
+
+
+class BranchFallbackResult(BaseModel):
+    branch: str
+    branch_color: str
+    candidates: list[FolioCandidate] = []
+
+
+class MandatoryFallbackResponse(BaseModel):
+    item_index: int
+    fallback_results: list[BranchFallbackResult]

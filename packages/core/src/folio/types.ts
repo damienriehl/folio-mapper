@@ -41,3 +41,14 @@ export interface FolioStatus {
   loading: boolean;
   error: string | null;
 }
+
+export interface BranchFallbackResult {
+  branch: string;
+  branch_color: string;
+  candidates: FolioCandidate[];
+}
+
+export interface MandatoryFallbackResponse {
+  item_index: number;
+  fallback_results: BranchFallbackResult[];
+}

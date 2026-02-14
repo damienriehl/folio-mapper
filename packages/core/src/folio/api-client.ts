@@ -1,5 +1,6 @@
 import type { ParseItem } from '../input/types';
-import type { BranchInfo, FolioStatus, MappingResponse } from './types';
+import type { BranchInfo, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
+import type { PipelineRequestConfig } from '../pipeline/api-client';
 
 const BASE_URL = '/api/mapping';
 
@@ -51,6 +52,38 @@ export async function fetchBranches(): Promise<BranchInfo[]> {
 
   if (!res.ok) {
     throw new Error(`Failed to fetch branches (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function fetchMandatoryFallback(
+  itemText: string,
+  itemIndex: number,
+  branches: string[],
+  llmConfig?: PipelineRequestConfig | null,
+): Promise<MandatoryFallbackResponse> {
+  const res = await fetch(`${BASE_URL}/mandatory-fallback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      item_text: itemText,
+      item_index: itemIndex,
+      branches,
+      llm_config: llmConfig
+        ? {
+            provider: llmConfig.provider,
+            api_key: llmConfig.api_key,
+            base_url: llmConfig.base_url,
+            model: llmConfig.model,
+          }
+        : null,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Mandatory fallback failed' }));
+    throw new Error(err.detail || `Mandatory fallback failed (${res.status})`);
   }
 
   return res.json();

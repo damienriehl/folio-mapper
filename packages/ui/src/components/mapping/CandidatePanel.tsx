@@ -1,39 +1,38 @@
 import { useState } from 'react';
-import type { BranchGroup } from '@folio-mapper/core';
+import type { BranchGroup, BranchState } from '@folio-mapper/core';
 import { BranchFilter } from './BranchFilter';
 import { CandidateTree } from './CandidateTree';
 
 interface CandidatePanelProps {
   branchGroups: BranchGroup[];
-  enabledBranches: Set<string>;
+  branchStates: Record<string, BranchState>;
+  allBranches: Array<{ name: string; color: string }>;
   selectedIriHashes: string[];
   selectedCandidateIri: string | null;
   threshold: number;
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string) => void;
-  onToggleBranch: (branchName: string) => void;
+  onSetBranchState: (branchName: string, state: BranchState) => void;
 }
 
 export function CandidatePanel({
   branchGroups,
-  enabledBranches,
+  branchStates,
+  allBranches,
   selectedIriHashes,
   selectedCandidateIri,
   threshold,
   onToggleCandidate,
   onSelectForDetail,
-  onToggleBranch,
+  onSetBranchState,
 }: CandidatePanelProps) {
   const [showBranchFilter, setShowBranchFilter] = useState(false);
 
-  const branches = branchGroups.map((g) => ({
-    name: g.branch,
-    color: g.branch_color,
-  }));
+  const enabledCount = Object.values(branchStates).filter((s) => s !== 'excluded').length;
 
   return (
     <div className="flex h-full flex-col">
-      {branches.length > 0 && (
+      {allBranches.length > 0 && (
         <div className="mb-2">
           <button
             type="button"
@@ -46,14 +45,14 @@ export function CandidatePanel({
             >
               &#9656;
             </span>
-            Branch Filter ({enabledBranches.size}/{branches.length})
+            Branch Filter ({enabledCount}/{allBranches.length})
           </button>
           {showBranchFilter && (
             <div className="mt-1">
               <BranchFilter
-                branches={branches}
-                enabledBranches={enabledBranches}
-                onToggle={onToggleBranch}
+                allBranches={allBranches}
+                branchStates={branchStates}
+                onSetBranchState={onSetBranchState}
               />
             </div>
           )}
@@ -63,7 +62,7 @@ export function CandidatePanel({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <CandidateTree
           branchGroups={branchGroups}
-          enabledBranches={enabledBranches}
+          branchStates={branchStates}
           selectedIriHashes={selectedIriHashes}
           selectedCandidateIri={selectedCandidateIri}
           threshold={threshold}

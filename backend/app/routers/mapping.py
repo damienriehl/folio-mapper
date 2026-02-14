@@ -6,12 +6,17 @@ from app.models.mapping_models import (
     FolioStatus,
     MappingResponse,
 )
+from app.models.pipeline_models import (
+    MandatoryFallbackRequest,
+    MandatoryFallbackResponse,
+)
 from app.services.folio_service import (
     get_all_branches,
     get_folio_status,
     search_all_items,
     warmup_folio,
 )
+from app.services.pipeline.mandatory_fallback import run_mandatory_fallback
 
 router = APIRouter(prefix="/api/mapping", tags=["mapping"])
 
@@ -49,3 +54,17 @@ async def folio_warmup() -> FolioStatus:
 async def list_branches() -> list[BranchInfo]:
     """List all FOLIO branches with colors and concept counts."""
     return get_all_branches()
+
+
+@router.post("/mandatory-fallback", response_model=MandatoryFallbackResponse)
+async def mandatory_fallback(body: MandatoryFallbackRequest) -> MandatoryFallbackResponse:
+    """Find candidates for mandatory branches with no existing results."""
+    fallback_results = await run_mandatory_fallback(
+        item_text=body.item_text,
+        branches=body.branches,
+        llm_config=body.llm_config,
+    )
+    return MandatoryFallbackResponse(
+        item_index=body.item_index,
+        fallback_results=fallback_results,
+    )

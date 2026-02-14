@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type {
+  BranchFallbackResult,
+  BranchState,
   FolioCandidate,
   FolioStatus,
   MappingResponse,
@@ -21,7 +23,7 @@ interface MappingState {
 
   // Filters
   threshold: number; // default 45
-  enabledBranches: Set<string>;
+  branchStates: Record<string, BranchState>;
 
   // Detail panel
   selectedCandidateIri: string | null;
@@ -43,7 +45,8 @@ interface MappingState {
   acceptAllDefaults: () => void;
   toggleCandidate: (itemIndex: number, iriHash: string) => void;
   setThreshold: (threshold: number) => void;
-  toggleBranch: (branchName: string) => void;
+  setBranchState: (branchName: string, state: BranchState) => void;
+  mergeFallbackResults: (itemIndex: number, fallbackResults: BranchFallbackResult[]) => void;
   selectCandidateForDetail: (iriHash: string | null) => void;
   setPipelineMetadata: (metadata: PipelineItemMetadata[] | null) => void;
   setFolioStatus: (status: FolioStatus) => void;
@@ -79,7 +82,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
   selections: {},
   nodeStatuses: {},
   threshold: 45,
-  enabledBranches: new Set<string>(),
+  branchStates: {},
   selectedCandidateIri: null,
   pipelineMetadata: null,
   folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
@@ -173,15 +176,52 @@ export const useMappingStore = create<MappingState>((set, get) => ({
 
   setThreshold: (threshold) => set({ threshold }),
 
-  toggleBranch: (branchName) => {
-    const { enabledBranches } = get();
-    const updated = new Set(enabledBranches);
-    if (updated.has(branchName)) {
-      updated.delete(branchName);
-    } else {
-      updated.add(branchName);
+  setBranchState: (branchName, state) => {
+    const { branchStates } = get();
+    set({ branchStates: { ...branchStates, [branchName]: state } });
+  },
+
+  mergeFallbackResults: (itemIndex, fallbackResults) => {
+    const { mappingResponse } = get();
+    if (!mappingResponse) return;
+
+    const items = [...mappingResponse.items];
+    const item = items[itemIndex];
+    if (!item) return;
+
+    const updatedGroups = [...item.branch_groups];
+
+    for (const fb of fallbackResults) {
+      if (fb.candidates.length === 0) continue;
+
+      const existingGroup = updatedGroups.find((g) => g.branch === fb.branch);
+      if (existingGroup) {
+        // Merge: add candidates not already present (dedupe by iri_hash)
+        const existingHashes = new Set(existingGroup.candidates.map((c) => c.iri_hash));
+        const newCandidates = fb.candidates.filter((c) => !existingHashes.has(c.iri_hash));
+        if (newCandidates.length > 0) {
+          existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
+        }
+      } else {
+        // Add new branch group
+        updatedGroups.push({
+          branch: fb.branch,
+          branch_color: fb.branch_color,
+          candidates: fb.candidates,
+        });
+      }
     }
-    set({ enabledBranches: updated });
+
+    const updatedItem = {
+      ...item,
+      branch_groups: updatedGroups,
+      total_candidates: updatedGroups.reduce((sum, g) => sum + g.candidates.length, 0),
+    };
+    items[itemIndex] = updatedItem;
+
+    set({
+      mappingResponse: { ...mappingResponse, items },
+    });
   },
 
   selectCandidateForDetail: (iriHash) => set({ selectedCandidateIri: iriHash }),
@@ -199,8 +239,12 @@ export const useMappingStore = create<MappingState>((set, get) => ({
     const selections: Record<number, string[]> = {};
     const nodeStatuses: Record<number, NodeStatus> = {};
 
-    // Enable all branches that have candidates
-    const branchNames = new Set<string>();
+    // Initialize all available branches as 'normal'
+    const branchStates: Record<string, BranchState> = {};
+    for (const b of response.branches_available) {
+      branchStates[b.name] = 'normal';
+    }
+    // Also include branches that have candidates but may not be in branches_available
     for (const item of response.items) {
       nodeStatuses[item.item_index] = 'pending';
       selections[item.item_index] = getAboveThresholdCandidates(
@@ -209,7 +253,9 @@ export const useMappingStore = create<MappingState>((set, get) => ({
         threshold,
       );
       for (const group of item.branch_groups) {
-        branchNames.add(group.branch);
+        if (!(group.branch in branchStates)) {
+          branchStates[group.branch] = 'normal';
+        }
       }
     }
 
@@ -220,7 +266,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       selections,
       nodeStatuses,
       threshold,
-      enabledBranches: branchNames,
+      branchStates,
       selectedCandidateIri: null,
       isLoadingCandidates: false,
       error: null,
@@ -235,7 +281,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       selections: {},
       nodeStatuses: {},
       threshold: 45,
-      enabledBranches: new Set<string>(),
+      branchStates: {},
       selectedCandidateIri: null,
       pipelineMetadata: null,
       isLoadingCandidates: false,

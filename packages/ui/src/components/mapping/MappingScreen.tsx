@@ -1,5 +1,6 @@
 import type {
   BranchGroup,
+  BranchState,
   FolioCandidate,
   FolioStatus,
   ItemMappingResult,
@@ -20,7 +21,8 @@ interface MappingScreenProps {
   selections: Record<number, string[]>;
   nodeStatuses: Record<number, NodeStatus>;
   threshold: number;
-  enabledBranches: Set<string>;
+  branchStates: Record<string, BranchState>;
+  allBranches: Array<{ name: string; color: string }>;
   selectedCandidateIri: string | null;
   folioStatus: FolioStatus;
   isLoadingCandidates: boolean;
@@ -35,7 +37,7 @@ interface MappingScreenProps {
   onEdit: () => void;
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string | null) => void;
-  onToggleBranch: (branchName: string) => void;
+  onSetBranchState: (branchName: string, state: BranchState) => void;
   onThresholdChange: (value: number) => void;
 }
 
@@ -46,7 +48,8 @@ export function MappingScreen({
   selections,
   nodeStatuses,
   threshold,
-  enabledBranches,
+  branchStates,
+  allBranches,
   selectedCandidateIri,
   folioStatus,
   isLoadingCandidates,
@@ -61,7 +64,7 @@ export function MappingScreen({
   onEdit,
   onToggleCandidate,
   onSelectForDetail,
-  onToggleBranch,
+  onSetBranchState,
   onThresholdChange,
 }: MappingScreenProps) {
   const currentItem: ItemMappingResult | undefined = mappingResponse.items[currentItemIndex];
@@ -82,7 +85,7 @@ export function MappingScreen({
   // Collect all visible candidate IRI hashes for current item (respecting threshold + branch filters)
   const visibleCandidateHashes: string[] = currentItem
     ? currentItem.branch_groups
-        .filter((g) => enabledBranches.has(g.branch))
+        .filter((g) => branchStates[g.branch] !== 'excluded')
         .flatMap((g) => g.candidates.filter((c) => c.score >= threshold).map((c) => c.iri_hash))
     : [];
 
@@ -105,11 +108,9 @@ export function MappingScreen({
   // Count total selected across all items
   const totalSelected = Object.values(selections).reduce((sum, arr) => sum + arr.length, 0);
 
-  // Count unique branches in current item
-  const currentBranches = currentItem?.branch_groups.map((g) => g.branch) || [];
-  const totalBranches = new Set(
-    mappingResponse.items.flatMap((item) => item.branch_groups.map((g) => g.branch)),
-  ).size;
+  // Count branches
+  const totalBranches = allBranches.length;
+  const enabledBranchCount = Object.values(branchStates).filter((s) => s !== 'excluded').length;
 
   return (
     <div className="flex h-full flex-col">
@@ -164,13 +165,14 @@ export function MappingScreen({
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <CandidatePanel
                 branchGroups={currentItem.branch_groups}
-                enabledBranches={enabledBranches}
+                branchStates={branchStates}
+                allBranches={allBranches}
                 selectedIriHashes={currentSelections}
                 selectedCandidateIri={selectedCandidateIri}
                 threshold={threshold}
                 onToggleCandidate={(iriHash) => onToggleCandidate(iriHash)}
                 onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
-                onToggleBranch={onToggleBranch}
+                onSetBranchState={onSetBranchState}
               />
             </div>
           </div>
@@ -187,7 +189,7 @@ export function MappingScreen({
         totalItems={totalItems}
         nodeStatuses={nodeStatuses}
         branchCount={totalBranches}
-        enabledBranchCount={enabledBranches.size}
+        enabledBranchCount={enabledBranchCount}
       />
 
       {showGoToDialog && (
