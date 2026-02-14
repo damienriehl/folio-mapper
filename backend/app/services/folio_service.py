@@ -346,6 +346,7 @@ def search_candidates(
     term: str,
     threshold: float = 0.3,
     max_per_branch: int = 10,
+    use_bridging: bool = False,
 ) -> list[FolioCandidate]:
     """Search FOLIO for candidates matching the given term.
 
@@ -434,6 +435,57 @@ def search_candidates(
         if parent_class:
             scored.append((parent_hash, parent_class, round(pscore, 1)))
 
+    # Phase 2.6: Cross-branch keyword bridging (non-LLM path only)
+    # When concepts are found, use their ancestor labels as additional search
+    # terms to discover related concepts in branches that had NO direct results.
+    # Skipped when LLM pipeline is active — the LLM handles semantic mapping.
+    # e.g. "DUI/DWI Defense" → finds "Driving Under the Influence" (Objectives)
+    #   → parent "Criminal Misdemeanor Offenses" → search "criminal" → "Criminal Law" (Area of Law)
+    if use_bridging:
+        existing_hashes = {h for h, _, _ in scored}
+        existing_branches = {get_branch_for_class(folio, h) for h, _, _ in scored}
+        bridged: dict[str, float] = {}
+        searched_words: set[str] = set()
+        bridge_sources = sorted(
+            [(h, c, s) for h, c, s in scored if s >= 20],
+            key=lambda x: x[2], reverse=True,
+        )[:15]
+        for iri_hash, owl_class, score in bridge_sources:
+            current = owl_class
+            for depth in range(1, 3):
+                if not current or not current.sub_class_of:
+                    break
+                parent_hash = _extract_iri_hash(current.sub_class_of[0])
+                if parent_hash in _branch_root_iris:
+                    break
+                parent_class = folio[parent_hash]
+                if not parent_class:
+                    break
+                parent_label = parent_class.label or ""
+                parent_words = _content_words(parent_label)
+                for pw in parent_words:
+                    if len(pw) < 4 or pw in searched_words:
+                        continue
+                    searched_words.add(pw)
+                    for found_class, _ in folio.search_by_label(pw, include_alt_labels=True, limit=50):
+                        fh = _extract_iri_hash(found_class.iri)
+                        if fh in existing_hashes or fh in bridged:
+                            continue
+                        found_branch = get_branch_for_class(folio, fh)
+                        if found_branch in existing_branches:
+                            continue
+                        found_label_words = _content_words(found_class.label or "")
+                        if pw in found_label_words:
+                            bridge_score = round(score * (0.85 ** depth), 1)
+                            if bridge_score >= min_score:
+                                bridged[fh] = max(bridged.get(fh, 0), bridge_score)
+                current = parent_class
+
+        for bh, bscore in bridged.items():
+            bridged_class = folio[bh]
+            if bridged_class:
+                scored.append((bh, bridged_class, bscore))
+
     # Sort by score descending
     scored.sort(key=lambda x: x[2], reverse=True)
 
@@ -476,7 +528,7 @@ def search_all_items(
     results: list[ItemMappingResult] = []
 
     for item in items:
-        candidates = search_candidates(item.text, threshold, max_per_branch)
+        candidates = search_candidates(item.text, threshold, max_per_branch, use_bridging=True)
 
         # Group candidates by branch
         branch_groups_dict: dict[str, list[FolioCandidate]] = {}
