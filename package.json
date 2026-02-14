@@ -3,11 +3,11 @@
   "private": true,
   "scripts": {
     "dev:web": "pnpm --filter @folio-mapper/web dev",
-    "dev:api": "cd backend && uvicorn app.main:app --reload --port 8000",
+    "dev:api": "cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000",
     "dev": "concurrently \"pnpm dev:api\" \"pnpm dev:web\"",
     "build": "pnpm --filter @folio-mapper/web build",
     "test": "pnpm --filter './packages/*' test && pnpm --filter @folio-mapper/web test",
-    "test:api": "cd backend && python -m pytest tests/ -v",
+    "test:api": "cd backend && .venv/bin/python -m pytest tests/ -v",
     "lint": "eslint 'packages/*/src/**/*.{ts,tsx}' 'apps/*/src/**/*.{ts,tsx}'",
     "format": "prettier --write '**/*.{ts,tsx,json,css,md}'"
   },
