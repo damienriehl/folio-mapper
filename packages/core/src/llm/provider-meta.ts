@@ -1,0 +1,87 @@
+import type { LLMProviderType, ProviderMeta } from './types';
+
+export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
+  openai: {
+    type: 'openai',
+    displayName: 'OpenAI',
+    defaultBaseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o',
+    requiresApiKey: true,
+    isLocal: false,
+  },
+  anthropic: {
+    type: 'anthropic',
+    displayName: 'Anthropic',
+    defaultBaseUrl: 'https://api.anthropic.com',
+    defaultModel: 'claude-sonnet-4-5-20250929',
+    requiresApiKey: true,
+    isLocal: false,
+  },
+  google: {
+    type: 'google',
+    displayName: 'Google Gemini',
+    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    defaultModel: 'gemini-2.0-flash',
+    requiresApiKey: true,
+    isLocal: false,
+  },
+  mistral: {
+    type: 'mistral',
+    displayName: 'Mistral',
+    defaultBaseUrl: 'https://api.mistral.ai/v1',
+    defaultModel: 'mistral-large-latest',
+    requiresApiKey: true,
+    isLocal: false,
+  },
+  cohere: {
+    type: 'cohere',
+    displayName: 'Cohere',
+    defaultBaseUrl: 'https://api.cohere.com/v2',
+    defaultModel: 'command-r-plus',
+    requiresApiKey: true,
+    isLocal: false,
+  },
+  meta_llama: {
+    type: 'meta_llama',
+    displayName: 'Meta Llama',
+    defaultBaseUrl: 'https://api.llama.com/v1',
+    defaultModel: 'llama-4-scout',
+    requiresApiKey: true,
+    isLocal: false,
+  },
+  ollama: {
+    type: 'ollama',
+    displayName: 'Ollama',
+    defaultBaseUrl: 'http://localhost:11434/v1',
+    defaultModel: '',
+    requiresApiKey: false,
+    isLocal: true,
+  },
+  lmstudio: {
+    type: 'lmstudio',
+    displayName: 'LM Studio',
+    defaultBaseUrl: 'http://localhost:1234/v1',
+    defaultModel: '',
+    requiresApiKey: false,
+    isLocal: true,
+  },
+  custom: {
+    type: 'custom',
+    displayName: 'Custom',
+    defaultBaseUrl: 'http://localhost:8080/v1',
+    defaultModel: '',
+    requiresApiKey: false,
+    isLocal: true,
+  },
+};
+
+export const CLOUD_PROVIDERS: LLMProviderType[] = [
+  'anthropic',
+  'openai',
+  'google',
+  'mistral',
+  'cohere',
+  'meta_llama',
+];
+
+export const LOCAL_PROVIDERS: LLMProviderType[] = ['ollama', 'lmstudio', 'custom'];

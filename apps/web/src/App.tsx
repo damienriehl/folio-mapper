@@ -1,4 +1,5 @@
-import { parseText } from '@folio-mapper/core';
+import { useState } from 'react';
+import { parseText, testConnection, fetchModels } from '@folio-mapper/core';
 import {
   AppShell,
   InputScreen,
@@ -6,15 +7,17 @@ import {
   FileDropZone,
   ConfirmationScreen,
   MappingScreen,
+  Header,
+  LLMSettings,
 } from '@folio-mapper/ui';
 import { useInputStore } from './store/input-store';
 import { useMappingStore } from './store/mapping-store';
+import { useLLMStore } from './store/llm-store';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useTextDetection } from './hooks/useTextDetection';
 import { useFolioWarmup } from './hooks/useFolioWarmup';
 import { useMapping } from './hooks/useMapping';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { Header } from '@folio-mapper/ui';
 
 export function App() {
   const {
@@ -34,9 +37,12 @@ export function App() {
   } = useInputStore();
 
   const mappingState = useMappingStore();
+  const llmState = useLLMStore();
   const { upload } = useFileUpload();
   const { itemCount } = useTextDetection(textInput);
   const { loadCandidates } = useMapping();
+
+  const [showSettings, setShowSettings] = useState(false);
 
   // Warmup FOLIO when on confirmation screen
   useFolioWarmup();
@@ -66,11 +72,25 @@ export function App() {
     setScreen('confirming');
   };
 
+  const settingsModal = showSettings && (
+    <LLMSettings
+      activeProvider={llmState.activeProvider}
+      configs={llmState.configs}
+      onSetActiveProvider={llmState.setActiveProvider}
+      onUpdateConfig={llmState.updateConfig}
+      onSetConnectionStatus={llmState.setConnectionStatus}
+      onClose={() => setShowSettings(false)}
+      testConnection={testConnection}
+      fetchModels={fetchModels}
+    />
+  );
+
   // Mapping screen uses full-width layout (no centering/padding)
   if (screen === 'mapping') {
     return (
       <div className="flex h-screen flex-col">
-        <Header />
+        <Header onOpenSettings={() => setShowSettings(true)} />
+        {settingsModal}
         {mappingState.mappingResponse ? (
           <MappingScreen
             mappingResponse={mappingState.mappingResponse}
@@ -117,7 +137,9 @@ export function App() {
   }
 
   return (
-    <AppShell>
+    <AppShell onOpenSettings={() => setShowSettings(true)}>
+      {settingsModal}
+
       {screen === 'input' && (
         <InputScreen
           fileDropZone={
