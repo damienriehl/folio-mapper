@@ -11,11 +11,11 @@ export function ConfidenceBadge({ score }: ConfidenceBadgeProps) {
 
   return (
     <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
       style={{
-        backgroundColor: color + '20',
-        color: score >= 60 ? color : '#6B7280',
-        border: `1px solid ${color}40`,
+        backgroundColor: color + '28',
+        color: color,
+        border: `1.5px solid ${color}70`,
       }}
       title={label}
     >

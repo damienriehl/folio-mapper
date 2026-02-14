@@ -7,3 +7,5 @@ export * from './mapping/types';
 export * from './llm/types';
 export * from './llm/api-client';
 export * from './llm/provider-meta';
+export * from './pipeline/types';
+export * from './pipeline/api-client';

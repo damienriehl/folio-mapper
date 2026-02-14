@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers.llm import router as llm_router
 from app.routers.mapping import router as mapping_router
 from app.routers.parse import router as parse_router
+from app.routers.pipeline import router as pipeline_router
 
 app = FastAPI(title="FOLIO Mapper API", version="0.1.0")
 
@@ -18,6 +19,7 @@ app.add_middleware(
 app.include_router(parse_router)
 app.include_router(mapping_router)
 app.include_router(llm_router)
+app.include_router(pipeline_router)
 
 
 @app.get("/api/health")

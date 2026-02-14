@@ -96,9 +96,14 @@ export function CandidateTree({
             <button
               type="button"
               onClick={() => toggleCollapse(branchKey)}
-              className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="flex w-full items-center gap-2 rounded-md border-l-4 px-3 py-1.5 text-left text-xs font-bold tracking-wide uppercase"
+              style={{
+                borderLeftColor: group.branch_color,
+                backgroundColor: group.branch_color + '15',
+                color: group.branch_color,
+              }}
             >
-              <span className="text-xs text-gray-400">
+              <span style={{ color: group.branch_color + '90' }}>
                 {isBranchCollapsed ? '\u25B6' : '\u25BC'}
               </span>
               <span
@@ -106,7 +111,7 @@ export function CandidateTree({
                 style={{ backgroundColor: group.branch_color }}
               />
               <span>{group.branch}</span>
-              <span className="text-xs text-gray-400">({visibleCandidates.length})</span>
+              <span style={{ color: group.branch_color + '80' }}>({visibleCandidates.length})</span>
             </button>
 
             {!isBranchCollapsed && (
@@ -177,6 +182,7 @@ function HierarchyNodeComponent({
     return (
       <CandidateLeaf
         node={node}
+        depth={depth}
         isSelected={isSelected}
         isDetailTarget={isDetailTarget}
         onToggleCandidate={onToggleCandidate}
@@ -193,14 +199,14 @@ function HierarchyNodeComponent({
           className={`flex items-center gap-1.5 rounded py-1 pr-2 text-sm ${
             isSelected
               ? 'bg-slate-700 text-white'
-              : 'bg-gray-100 text-gray-700'
+              : 'bg-gray-200 text-gray-800'
           } ${isDetailTarget ? 'ring-2 ring-blue-400' : ''}`}
           style={{ paddingLeft: `${depth * 4 + 4}px` }}
         >
           <button
             type="button"
             onClick={() => toggleCollapse(pathKey)}
-            className={`shrink-0 text-xs ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}
+            className={`shrink-0 text-xs ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}
           >
             {isCollapsed ? '\u25B6' : '\u25BC'}
           </button>
@@ -279,6 +285,7 @@ function HierarchyNodeComponent({
 
 interface CandidateLeafProps {
   node: HierarchyNode;
+  depth: number;
   isSelected: boolean;
   isDetailTarget: boolean;
   onToggleCandidate: (iriHash: string) => void;
@@ -287,6 +294,7 @@ interface CandidateLeafProps {
 
 function CandidateLeaf({
   node,
+  depth,
   isSelected,
   isDetailTarget,
   onToggleCandidate,
@@ -296,13 +304,14 @@ function CandidateLeaf({
 
   return (
     <div
-      className={`flex items-center gap-1.5 rounded px-2 py-1 text-sm ${
+      className={`flex items-center gap-1.5 rounded py-1 pr-2 text-sm ${
         isSelected
           ? 'bg-slate-700 text-white'
-          : 'bg-gray-100 text-gray-700'
+          : 'bg-gray-200 text-gray-800'
       } ${isDetailTarget ? 'ring-2 ring-blue-400' : ''}`}
+      style={{ paddingLeft: `${depth * 4 + 8}px` }}
     >
-      <span className={`text-xs ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>●</span>
+      <span className={`text-xs ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>●</span>
       <input
         type="checkbox"
         checked={isSelected}

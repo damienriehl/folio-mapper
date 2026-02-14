@@ -4,24 +4,28 @@ interface MappingToolbarProps {
   currentIndex: number;
   totalItems: number;
   nodeStatuses: Record<number, NodeStatus>;
+  threshold: number;
   onPrev: () => void;
   onNext: () => void;
   onSkip: () => void;
   onGoTo: () => void;
   onAcceptAll: () => void;
   onEdit: () => void;
+  onThresholdChange: (value: number) => void;
 }
 
 export function MappingToolbar({
   currentIndex,
   totalItems,
   nodeStatuses,
+  threshold,
   onPrev,
   onNext,
   onSkip,
   onGoTo,
   onAcceptAll,
   onEdit,
+  onThresholdChange,
 }: MappingToolbarProps) {
   const completedCount = Object.values(nodeStatuses).filter((s) => s === 'completed').length;
   const progressPercent = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
@@ -75,6 +79,22 @@ export function MappingToolbar({
             >
               Go to (G)
             </button>
+
+            <div className="ml-2 flex items-center gap-2 border-l border-gray-200 pl-3">
+              <label className="text-xs font-medium text-gray-500 whitespace-nowrap" htmlFor="toolbar-threshold">
+                Threshold
+              </label>
+              <input
+                id="toolbar-threshold"
+                type="range"
+                min={0}
+                max={100}
+                value={threshold}
+                onChange={(e) => onThresholdChange(Number(e.target.value))}
+                className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-gray-200 accent-blue-600"
+              />
+              <span className="w-6 text-right text-xs font-medium text-gray-700">{threshold}</span>
+            </div>
           </div>
         </div>
 

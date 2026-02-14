@@ -1,7 +1,7 @@
+import { useState } from 'react';
 import type { BranchGroup } from '@folio-mapper/core';
 import { BranchFilter } from './BranchFilter';
 import { CandidateTree } from './CandidateTree';
-import { ThresholdSlider } from './ThresholdSlider';
 
 interface CandidatePanelProps {
   branchGroups: BranchGroup[];
@@ -12,7 +12,6 @@ interface CandidatePanelProps {
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string) => void;
   onToggleBranch: (branchName: string) => void;
-  onThresholdChange: (value: number) => void;
 }
 
 export function CandidatePanel({
@@ -24,8 +23,9 @@ export function CandidatePanel({
   onToggleCandidate,
   onSelectForDetail,
   onToggleBranch,
-  onThresholdChange,
 }: CandidatePanelProps) {
+  const [showBranchFilter, setShowBranchFilter] = useState(false);
+
   const branches = branchGroups.map((g) => ({
     name: g.branch,
     color: g.branch_color,
@@ -33,13 +33,34 @@ export function CandidatePanel({
 
   return (
     <div className="flex h-full flex-col">
-      <BranchFilter
-        branches={branches}
-        enabledBranches={enabledBranches}
-        onToggle={onToggleBranch}
-      />
+      {branches.length > 0 && (
+        <div className="mb-2">
+          <button
+            type="button"
+            onClick={() => setShowBranchFilter(!showBranchFilter)}
+            className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 hover:text-gray-700"
+          >
+            <span
+              className="inline-block transition-transform"
+              style={{ transform: showBranchFilter ? 'rotate(90deg)' : 'rotate(0deg)' }}
+            >
+              &#9656;
+            </span>
+            Branch Filter ({enabledBranches.size}/{branches.length})
+          </button>
+          {showBranchFilter && (
+            <div className="mt-1">
+              <BranchFilter
+                branches={branches}
+                enabledBranches={enabledBranches}
+                onToggle={onToggleBranch}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <CandidateTree
           branchGroups={branchGroups}
           enabledBranches={enabledBranches}
@@ -49,10 +70,6 @@ export function CandidatePanel({
           onToggleCandidate={onToggleCandidate}
           onSelectForDetail={onSelectForDetail}
         />
-      </div>
-
-      <div className="mt-3 border-t border-gray-100 pt-3">
-        <ThresholdSlider value={threshold} onChange={onThresholdChange} />
       </div>
     </div>
   );
