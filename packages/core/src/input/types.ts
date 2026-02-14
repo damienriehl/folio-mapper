@@ -22,4 +22,4 @@ export interface ParseResult {
   raw_preview: string[][] | null;
 }
 
-export type Screen = 'input' | 'confirming';
+export type Screen = 'input' | 'confirming' | 'mapping';
