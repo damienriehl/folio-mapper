@@ -59,6 +59,8 @@ class PipelineItemMetadata(BaseModel):
     item_text: str
     prescan: PreScanResult
     stage1_candidate_count: int
+    stage1b_expanded_count: int = 0
+    stage1b_branches_expanded: list[str] = []
     stage2_candidate_count: int
     stage3_judged_count: int = 0
     stage3_boosted: int = 0
