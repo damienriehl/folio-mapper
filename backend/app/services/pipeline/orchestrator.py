@@ -30,6 +30,7 @@ from app.services.folio_service import (
 )
 from app.services.pipeline.stage0_prescan import run_stage0
 from app.services.pipeline.stage1_filter import run_stage1
+from app.services.pipeline.stage1b_expand import run_stage1b
 from app.services.pipeline.stage2_rank import run_stage2
 from app.services.pipeline.stage3_judge import run_stage3
 
@@ -135,6 +136,16 @@ async def run_pipeline(
             len(stage1_candidates), item.index,
         )
 
+        # Stage 1.5: LLM-assisted candidate expansion for underrepresented branches
+        stage1b_new = await run_stage1b(item.text, prescan, stage1_candidates, llm_config)
+        stage1b_branches = list({c.branch for c in stage1b_new}) if stage1b_new else []
+        if stage1b_new:
+            stage1_candidates = stage1_candidates + stage1b_new
+            logger.info(
+                "Pipeline: Stage 1.5 added %d candidates for item %d (branches: %s)",
+                len(stage1b_new), item.index, ", ".join(stage1b_branches),
+            )
+
         # Stage 2: LLM ranking
         ranked = await run_stage2(item.text, prescan, stage1_candidates, llm_config)
         logger.info(
@@ -168,7 +179,9 @@ async def run_pipeline(
             item_index=item.index,
             item_text=item.text,
             prescan=prescan,
-            stage1_candidate_count=len(stage1_candidates),
+            stage1_candidate_count=len(stage1_candidates) - len(stage1b_new),
+            stage1b_expanded_count=len(stage1b_new),
+            stage1b_branches_expanded=stage1b_branches,
             stage2_candidate_count=len(ranked),
             stage3_judged_count=len(judged),
             stage3_boosted=stage3_boosted,
