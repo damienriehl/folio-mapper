@@ -212,6 +212,9 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       }
     }
 
+    // Keep branch groups sorted alphabetically (matches backend order)
+    updatedGroups.sort((a, b) => a.branch.localeCompare(b.branch));
+
     const updatedItem = {
       ...item,
       branch_groups: updatedGroups,

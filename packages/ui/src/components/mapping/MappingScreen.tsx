@@ -83,10 +83,16 @@ export function MappingScreen({
   }
 
   // Collect all visible candidate IRI hashes for current item (respecting threshold + branch filters)
+  // Mandatory branches bypass the threshold — show all candidates
   const visibleCandidateHashes: string[] = currentItem
     ? currentItem.branch_groups
         .filter((g) => branchStates[g.branch] !== 'excluded')
-        .flatMap((g) => g.candidates.filter((c) => c.score >= threshold).map((c) => c.iri_hash))
+        .flatMap((g) => {
+          const isMandatory = branchStates[g.branch] === 'mandatory';
+          return g.candidates
+            .filter((c) => isMandatory || c.score >= threshold)
+            .map((c) => c.iri_hash);
+        })
     : [];
 
   const handleSelectAllVisible = () => {

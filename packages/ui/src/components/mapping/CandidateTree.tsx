@@ -87,7 +87,10 @@ export function CandidateTree({
       {visibleGroups.map((group) => {
         const branchKey = group.branch;
         const isBranchCollapsed = collapsedNodes.has(branchKey);
-        const visibleCandidates = group.candidates.filter((c) => c.score >= threshold);
+        const isMandatory = branchStates[group.branch] === 'mandatory';
+        const visibleCandidates = isMandatory
+          ? group.candidates
+          : group.candidates.filter((c) => c.score >= threshold);
         const tree = buildHierarchyTree(visibleCandidates);
 
         return (
