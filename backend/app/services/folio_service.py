@@ -208,23 +208,41 @@ def _content_words(text: str) -> set[str]:
 
 
 def _word_overlap(query_words: set[str], target_words: set[str]) -> float:
-    """Fraction of query words found in target, with prefix-match credit."""
+    """Bidirectional word overlap with prefix-match credit.
+
+    Computes both forward (query→target) and reverse (target→query) overlap.
+    Reverse overlap helps multi-concept queries (e.g. "Small Business Formation
+    (LLC / Corp)") match narrower targets (e.g. "Business Organizations Law")
+    where only a fraction of query words match but a large fraction of the
+    target's words are covered.
+    """
     if not query_words or not target_words:
         return 0.0
 
-    matched = 0.0
-    for qw in query_words:
-        best = 0.0
-        for tw in target_words:
-            if qw == tw:
-                best = 1.0
-                break
-            elif len(qw) >= 3 and len(tw) >= 3:
-                if qw.startswith(tw) or tw.startswith(qw):
-                    best = max(best, 0.8)
-        matched += best
+    def _directional_overlap(source: set[str], dest: set[str]) -> float:
+        matched = 0.0
+        for sw in source:
+            best = 0.0
+            for dw in dest:
+                if sw == dw:
+                    best = 1.0
+                    break
+                elif len(sw) >= 3 and len(dw) >= 3:
+                    if sw.startswith(dw) or dw.startswith(sw):
+                        best = max(best, 0.8)
+            matched += best
+        return matched / len(source)
 
-    return matched / len(query_words)
+    forward = _directional_overlap(query_words, target_words)
+
+    # Reverse overlap: what fraction of the target's words appear in the query.
+    # Only applied when the target has 2+ content words to avoid inflating
+    # single-word labels. Discounted by 0.75 since reverse is a weaker signal.
+    reverse = 0.0
+    if len(target_words) >= 2:
+        reverse = _directional_overlap(target_words, query_words) * 0.75
+
+    return max(forward, reverse)
 
 
 def _compute_relevance_score(
@@ -307,9 +325,9 @@ def _generate_search_terms(term: str) -> list[str]:
                 if _content_words(sub):  # Has at least one content word
                     terms.append(sub)
 
-    # Individual content words (4+ chars to reduce noise)
+    # Individual content words (3+ chars to catch abbreviations like LLC, LLP, LTD)
     for w in sorted(content, key=len, reverse=True):
-        if len(w) >= 4:
+        if len(w) >= 3:
             terms.append(w)
 
     # Deduplicate preserving order
