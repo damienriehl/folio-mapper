@@ -95,8 +95,8 @@ describe('mapping-store', () => {
     // All items should be pending
     expect(state.nodeStatuses[0]).toBe('pending');
     expect(state.nodeStatuses[1]).toBe('pending');
-    // Branches should be enabled
-    expect(state.enabledBranches.has('Area of Law')).toBe(true);
+    // Branches should be initialized as normal
+    expect(state.branchStates['Area of Law']).toBe('normal');
   });
 
   it('nextItem marks current as completed and advances', () => {
@@ -196,16 +196,20 @@ describe('mapping-store', () => {
     expect(useMappingStore.getState().threshold).toBe(70);
   });
 
-  it('toggleBranch adds and removes branches', () => {
+  it('setBranchState cycles through states', () => {
     useMappingStore.getState().startMapping(mockResponse, 45);
 
-    // Remove Area of Law
-    useMappingStore.getState().toggleBranch('Area of Law');
-    expect(useMappingStore.getState().enabledBranches.has('Area of Law')).toBe(false);
+    // Set to mandatory
+    useMappingStore.getState().setBranchState('Area of Law', 'mandatory');
+    expect(useMappingStore.getState().branchStates['Area of Law']).toBe('mandatory');
 
-    // Add it back
-    useMappingStore.getState().toggleBranch('Area of Law');
-    expect(useMappingStore.getState().enabledBranches.has('Area of Law')).toBe(true);
+    // Set to excluded
+    useMappingStore.getState().setBranchState('Area of Law', 'excluded');
+    expect(useMappingStore.getState().branchStates['Area of Law']).toBe('excluded');
+
+    // Set back to normal
+    useMappingStore.getState().setBranchState('Area of Law', 'normal');
+    expect(useMappingStore.getState().branchStates['Area of Law']).toBe('normal');
   });
 
   it('selectCandidateForDetail sets selected IRI', () => {

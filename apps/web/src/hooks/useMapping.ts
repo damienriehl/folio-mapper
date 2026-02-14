@@ -1,13 +1,21 @@
 import { useCallback } from 'react';
-import { fetchCandidates, fetchPipelineCandidates } from '@folio-mapper/core';
-import type { ParseItem, PipelineRequestConfig } from '@folio-mapper/core';
+import {
+  fetchCandidates,
+  fetchMandatoryFallback,
+  fetchPipelineCandidates,
+} from '@folio-mapper/core';
+import type {
+  BranchState,
+  ParseItem,
+  PipelineRequestConfig,
+} from '@folio-mapper/core';
 import { useMappingStore } from '../store/mapping-store';
 
 /**
  * Hook to trigger candidate fetching and initialize mapping state.
  */
 export function useMapping() {
-  const { threshold, startMapping, setPipelineMetadata, setLoadingCandidates, setError } =
+  const { threshold, startMapping, setPipelineMetadata, setLoadingCandidates, setError, mergeFallbackResults } =
     useMappingStore();
 
   const loadCandidates = useCallback(
@@ -41,5 +49,35 @@ export function useMapping() {
     [threshold, startMapping, setPipelineMetadata, setLoadingCandidates, setError],
   );
 
-  return { loadCandidates, loadPipelineCandidates };
+  const loadMandatoryFallback = useCallback(
+    async (
+      itemIndex: number,
+      itemText: string,
+      branchStates: Record<string, BranchState>,
+      existingBranchNames: string[],
+      llmConfig?: PipelineRequestConfig | null,
+    ) => {
+      // Find mandatory branches that have no existing candidates for this item
+      const mandatoryWithNoCandidates = Object.entries(branchStates)
+        .filter(([name, state]) => state === 'mandatory' && !existingBranchNames.includes(name))
+        .map(([name]) => name);
+
+      if (mandatoryWithNoCandidates.length === 0) return;
+
+      try {
+        const response = await fetchMandatoryFallback(
+          itemText,
+          itemIndex,
+          mandatoryWithNoCandidates,
+          llmConfig,
+        );
+        mergeFallbackResults(response.item_index, response.fallback_results);
+      } catch {
+        // Non-fatal: silently fail if backend/LLM unavailable
+      }
+    },
+    [mergeFallbackResults],
+  );
+
+  return { loadCandidates, loadPipelineCandidates, loadMandatoryFallback };
 }

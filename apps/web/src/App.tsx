@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { parseText, testConnection, fetchModels } from '@folio-mapper/core';
 import {
   AppShell,
@@ -40,12 +40,69 @@ export function App() {
   const llmState = useLLMStore();
   const { upload } = useFileUpload();
   const { itemCount } = useTextDetection(textInput);
-  const { loadCandidates, loadPipelineCandidates } = useMapping();
+  const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback } = useMapping();
 
   const [showSettings, setShowSettings] = useState(false);
 
   // Warmup FOLIO when on confirmation screen
   useFolioWarmup();
+
+  // Trigger mandatory fallback when a branch is set to mandatory and has no candidates
+  const fallbackInFlight = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const { mappingResponse, currentItemIndex, branchStates } = mappingState;
+    if (!mappingResponse || screen !== 'mapping') return;
+
+    const currentItem = mappingResponse.items[currentItemIndex];
+    if (!currentItem) return;
+
+    const existingBranchNames = currentItem.branch_groups.map((g) => g.branch);
+    const mandatoryMissing = Object.entries(branchStates)
+      .filter(([name, state]) => state === 'mandatory' && !existingBranchNames.includes(name))
+      .map(([name]) => name);
+
+    // Dedupe: only trigger for branches not already in-flight
+    const toFetch = mandatoryMissing.filter(
+      (b) => !fallbackInFlight.current.has(`${currentItemIndex}:${b}`),
+    );
+    if (toFetch.length === 0) return;
+
+    for (const b of toFetch) {
+      fallbackInFlight.current.add(`${currentItemIndex}:${b}`);
+    }
+
+    // Build LLM config if available
+    const activeConfig = llmState.configs[llmState.activeProvider];
+    const llmConfig =
+      activeConfig?.connectionStatus === 'valid'
+        ? {
+            provider: llmState.activeProvider,
+            api_key: activeConfig.apiKey || null,
+            base_url: activeConfig.baseUrl || null,
+            model: activeConfig.model || null,
+          }
+        : null;
+
+    loadMandatoryFallback(
+      currentItemIndex,
+      currentItem.item_text,
+      branchStates,
+      existingBranchNames,
+      llmConfig,
+    ).finally(() => {
+      for (const b of toFetch) {
+        fallbackInFlight.current.delete(`${currentItemIndex}:${b}`);
+      }
+    });
+  }, [
+    mappingState.mappingResponse,
+    mappingState.currentItemIndex,
+    mappingState.branchStates,
+    screen,
+    llmState.activeProvider,
+    llmState.configs,
+    loadMandatoryFallback,
+  ]);
 
   // Keyboard shortcuts active only on mapping screen
   const { showGoToDialog, setShowGoToDialog, handleGoTo } = useKeyboardShortcuts(
@@ -111,7 +168,13 @@ export function App() {
             selections={mappingState.selections}
             nodeStatuses={mappingState.nodeStatuses}
             threshold={mappingState.threshold}
-            enabledBranches={mappingState.enabledBranches}
+            branchStates={mappingState.branchStates}
+            allBranches={
+              mappingState.mappingResponse.branches_available.map((b) => ({
+                name: b.name,
+                color: b.color,
+              }))
+            }
             selectedCandidateIri={mappingState.selectedCandidateIri}
             folioStatus={mappingState.folioStatus}
             isLoadingCandidates={mappingState.isLoadingCandidates}
@@ -128,7 +191,7 @@ export function App() {
               mappingState.toggleCandidate(mappingState.currentItemIndex, iriHash)
             }
             onSelectForDetail={mappingState.selectCandidateForDetail}
-            onToggleBranch={mappingState.toggleBranch}
+            onSetBranchState={mappingState.setBranchState}
             onThresholdChange={mappingState.setThreshold}
           />
         ) : (

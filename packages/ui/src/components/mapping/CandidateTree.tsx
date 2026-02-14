@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { BranchGroup, FolioCandidate } from '@folio-mapper/core';
+import type { BranchGroup, BranchState, FolioCandidate } from '@folio-mapper/core';
 import { ConfidenceBadge } from './ConfidenceBadge';
 
 // --- Hierarchy tree data structure ---
@@ -41,7 +41,7 @@ function buildHierarchyTree(candidates: FolioCandidate[]): HierarchyNode[] {
 
 interface CandidateTreeProps {
   branchGroups: BranchGroup[];
-  enabledBranches: Set<string>;
+  branchStates: Record<string, BranchState>;
   selectedIriHashes: string[];
   selectedCandidateIri: string | null;
   threshold: number;
@@ -51,7 +51,7 @@ interface CandidateTreeProps {
 
 export function CandidateTree({
   branchGroups,
-  enabledBranches,
+  branchStates,
   selectedIriHashes,
   selectedCandidateIri,
   threshold,
@@ -72,7 +72,7 @@ export function CandidateTree({
     });
   }, []);
 
-  const visibleGroups = branchGroups.filter((g) => enabledBranches.has(g.branch));
+  const visibleGroups = branchGroups.filter((g) => branchStates[g.branch] !== 'excluded');
 
   if (visibleGroups.length === 0) {
     return (
