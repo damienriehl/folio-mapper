@@ -20,3 +20,7 @@ export { IriDisplay } from './components/mapping/IriDisplay';
 export { ThresholdSlider } from './components/mapping/ThresholdSlider';
 export { GoToDialog } from './components/mapping/GoToDialog';
 export { FolioLoadingOverlay } from './components/mapping/FolioLoadingOverlay';
+
+// Settings components (Stage 3)
+export { LLMSettings } from './components/settings/LLMSettings';
+export { ProviderCard } from './components/settings/ProviderCard';
