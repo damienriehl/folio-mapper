@@ -41,9 +41,10 @@ export function App() {
   const llmState = useLLMStore();
   const { upload } = useFileUpload();
   const { itemCount } = useTextDetection(textInput);
-  const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback } = useMapping();
+  const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates } = useMapping();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Full FOLIO branch list for input-page Branch Options panel
   const allFolioBranches = Object.values(BRANCH_COLORS).map((b) => ({
@@ -148,6 +149,25 @@ export function App() {
     setScreen('confirming');
   };
 
+  const handleSearch = async (query: string) => {
+    setIsSearching(true);
+    try {
+      const activeConfig = llmState.configs[llmState.activeProvider];
+      const llmConfig =
+        activeConfig?.connectionStatus === 'valid'
+          ? {
+              provider: llmState.activeProvider,
+              api_key: activeConfig.apiKey || null,
+              base_url: activeConfig.baseUrl || null,
+              model: activeConfig.model || null,
+            }
+          : null;
+      await searchCandidates(query, mappingState.currentItemIndex, llmConfig);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const settingsModal = showSettings && (
     <LLMSettings
       activeProvider={llmState.activeProvider}
@@ -207,6 +227,8 @@ export function App() {
             customBranchOrder={mappingState.customBranchOrder}
             onSetBranchSortMode={mappingState.setBranchSortMode}
             onSetCustomBranchOrder={mappingState.setCustomBranchOrder}
+            onSearch={handleSearch}
+            isSearching={isSearching}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center">

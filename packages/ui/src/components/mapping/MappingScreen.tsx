@@ -50,6 +50,8 @@ interface MappingScreenProps {
   onThresholdChange: (value: number) => void;
   onSetBranchSortMode: (mode: BranchSortMode) => void;
   onSetCustomBranchOrder: (order: string[]) => void;
+  onSearch: (query: string) => Promise<void>;
+  isSearching: boolean;
 }
 
 function sortBranchGroups(
@@ -117,8 +119,11 @@ export function MappingScreen({
   onThresholdChange,
   onSetBranchSortMode,
   onSetCustomBranchOrder,
+  onSearch,
+  isSearching,
 }: MappingScreenProps) {
   const [showBranchOptions, setShowBranchOptions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const currentItem: ItemMappingResult | undefined = mappingResponse.items[currentItemIndex];
   const currentSelections = selections[currentItemIndex] || [];
@@ -227,6 +232,36 @@ export function MappingScreen({
                 >
                   Branch Options
                 </button>
+                <form
+                  className="ml-auto flex items-center gap-1"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const q = searchQuery.trim();
+                    if (!q || isSearching) return;
+                    await onSearch(q);
+                    setSearchQuery('');
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search candidates..."
+                    disabled={isSearching}
+                    className="w-44 rounded border border-gray-300 px-2 py-1 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="flex items-center gap-1 rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    {isSearching ? (
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border border-gray-300 border-t-blue-600" />
+                    ) : (
+                      'Search'
+                    )}
+                  </button>
+                </form>
                 <span className="text-xs text-gray-400">
                   {currentSelections.length} of {visibleCandidateHashes.length} selected
                 </span>
