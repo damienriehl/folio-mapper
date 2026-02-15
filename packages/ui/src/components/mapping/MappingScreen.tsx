@@ -64,6 +64,7 @@ interface MappingScreenProps {
   onSetNote: (itemIndex: number, text: string) => void;
   onStatusFilterChange: (filter: StatusFilter) => void;
   onShowShortcuts: () => void;
+  onExport?: () => void;
 }
 
 function sortBranchGroups(
@@ -142,6 +143,7 @@ export function MappingScreen({
   onSetNote,
   onStatusFilterChange,
   onShowShortcuts,
+  onExport,
 }: MappingScreenProps) {
   const [showBranchOptions, setShowBranchOptions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -401,6 +403,7 @@ export function MappingScreen({
         nodeStatuses={nodeStatuses}
         branchCount={totalBranches}
         enabledBranchCount={enabledBranchCount}
+        onExport={onExport}
       />
 
       {showGoToDialog && (

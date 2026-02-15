@@ -6,6 +6,7 @@ interface MappingFooterProps {
   nodeStatuses: Record<number, NodeStatus>;
   branchCount: number;
   enabledBranchCount: number;
+  onExport?: () => void;
 }
 
 export function MappingFooter({
@@ -14,6 +15,7 @@ export function MappingFooter({
   nodeStatuses,
   branchCount,
   enabledBranchCount,
+  onExport,
 }: MappingFooterProps) {
   const completedCount = Object.values(nodeStatuses).filter((s) => s === 'completed').length;
   const skippedCount = Object.values(nodeStatuses).filter((s) => s === 'skipped').length;
@@ -34,8 +36,19 @@ export function MappingFooter({
           </span>
         )}
       </div>
-      <div className="text-xs text-gray-500">
-        Branches: {enabledBranchCount}/{branchCount}
+      <div className="flex items-center gap-3">
+        {onExport && (
+          <button
+            onClick={onExport}
+            className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            title="Export mappings (Ctrl+E)"
+          >
+            Export
+          </button>
+        )}
+        <span className="text-xs text-gray-500">
+          Branches: {enabledBranchCount}/{branchCount}
+        </span>
       </div>
     </div>
   );
