@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { BranchGroup, BranchState, FolioCandidate } from '@folio-mapper/core';
 import { ConfidenceBadge } from './ConfidenceBadge';
 
@@ -48,6 +48,8 @@ interface CandidateTreeProps {
   threshold: number;
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string) => void;
+  expandAllSignal?: number;
+  collapseAllSignal?: number;
 }
 
 export function CandidateTree({
@@ -58,8 +60,29 @@ export function CandidateTree({
   threshold,
   onToggleCandidate,
   onSelectForDetail,
+  expandAllSignal,
+  collapseAllSignal,
 }: CandidateTreeProps) {
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (expandAllSignal && expandAllSignal > 0) {
+      setCollapsedNodes(new Set());
+    }
+  }, [expandAllSignal]);
+
+  useEffect(() => {
+    if (collapseAllSignal && collapseAllSignal > 0) {
+      const allKeys = new Set<string>();
+      for (const g of branchGroups) {
+        if (branchStates[g.branch] !== 'excluded') {
+          allKeys.add(g.branch);
+        }
+      }
+      setCollapsedNodes(allKeys);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseAllSignal]);
 
   const toggleCollapse = useCallback((key: string) => {
     setCollapsedNodes((prev) => {
