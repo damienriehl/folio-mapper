@@ -471,7 +471,11 @@ export function MappingScreen({
                 </p>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                <DetailPanel currentItem={currentItem} selectedCandidate={selectedCandidate} />
+                <DetailPanel
+                  currentItem={currentItem}
+                  selectedCandidate={selectedCandidate}
+                  onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
+                />
               </div>
             </div>
             {/* Suggestion Queue */}

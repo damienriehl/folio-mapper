@@ -15,6 +15,14 @@ export interface FolioCandidate {
   score: number; // 0-100
 }
 
+export interface ConceptDetail extends FolioCandidate {
+  children: HierarchyPathEntry[];
+  siblings: HierarchyPathEntry[];
+  related: HierarchyPathEntry[];
+  examples: string[];
+  translations: Record<string, string>;
+}
+
 export interface BranchGroup {
   branch: string;
   branch_color: string;
