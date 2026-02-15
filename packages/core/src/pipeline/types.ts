@@ -4,6 +4,7 @@ export interface PreScanSegment {
   text: string;
   branches: string[];
   reasoning: string;
+  synonyms?: string[];
 }
 
 export interface PreScanResult {

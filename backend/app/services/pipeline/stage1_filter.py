@@ -145,15 +145,21 @@ def run_stage1(
     for segment in prescan.segments:
         segment_candidates: list[tuple[str, object, float, str]] = []  # (hash, class, score, branch)
 
+        # Build search terms: original text + synonyms from Stage 0
+        search_texts = [segment.text]
+        if segment.synonyms:
+            search_texts.extend(segment.synonyms)
+
         if segment.branches:
             for branch_name in segment.branches:
                 branch_hashes = _resolve_branch_children(folio, branch_name)
                 if branch_hashes is None:
                     continue
 
-                results = _search_within_branch(folio, segment.text, branch_hashes, threshold)
-                for iri_hash, owl_class, score in results:
-                    segment_candidates.append((iri_hash, owl_class, score, branch_name))
+                for search_text in search_texts:
+                    results = _search_within_branch(folio, search_text, branch_hashes, threshold)
+                    for iri_hash, owl_class, score in results:
+                        segment_candidates.append((iri_hash, owl_class, score, branch_name))
 
         # Fallback: if < 5 candidates for this segment, use unscoped search
         unique_hashes = {c[0] for c in segment_candidates}
