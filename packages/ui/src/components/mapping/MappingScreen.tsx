@@ -9,6 +9,7 @@ import type {
   MappingResponse,
   NodeStatus,
   PreScanSegment,
+  StatusFilter,
 } from '@folio-mapper/core';
 import { DEFAULT_BRANCH_ORDER, fetchConcept } from '@folio-mapper/core';
 import { CandidatePanel } from './CandidatePanel';
@@ -20,6 +21,7 @@ import { GoToDialog } from './GoToDialog';
 import { BranchOptionsModal } from './BranchOptionsModal';
 import { PrescanDisplay } from './PrescanDisplay';
 import { SelectionTree } from './SelectionTree';
+import { ShortcutsOverlay } from './ShortcutsOverlay';
 
 interface MappingScreenProps {
   mappingResponse: MappingResponse;
@@ -35,14 +37,20 @@ interface MappingScreenProps {
   prescanSegments?: PreScanSegment[] | null;
   isLoadingCandidates: boolean;
   showGoToDialog: boolean;
+  showShortcutsOverlay: boolean;
   branchSortMode: BranchSortMode;
   customBranchOrder: string[];
+  notes: Record<number, string>;
+  statusFilter: StatusFilter;
+  isPipeline?: boolean;
+  pipelineItemCount?: number;
   onPrev: () => void;
   onNext: () => void;
   onSkip: () => void;
   onGoTo: (index: number) => void;
   onOpenGoTo: () => void;
   onCloseGoTo: () => void;
+  onCloseShortcuts: () => void;
   onAcceptAll: () => void;
   onEdit: () => void;
   onToggleCandidate: (iriHash: string) => void;
@@ -53,6 +61,9 @@ interface MappingScreenProps {
   onSetCustomBranchOrder: (order: string[]) => void;
   onSearch: (query: string) => Promise<void>;
   isSearching: boolean;
+  onSetNote: (itemIndex: number, text: string) => void;
+  onStatusFilterChange: (filter: StatusFilter) => void;
+  onShowShortcuts: () => void;
 }
 
 function sortBranchGroups(
@@ -104,14 +115,20 @@ export function MappingScreen({
   folioStatus,
   isLoadingCandidates,
   showGoToDialog,
+  showShortcutsOverlay,
   branchSortMode,
   customBranchOrder,
+  notes,
+  statusFilter,
+  isPipeline,
+  pipelineItemCount,
   onPrev,
   onNext,
   onSkip,
   onGoTo,
   onOpenGoTo,
   onCloseGoTo,
+  onCloseShortcuts,
   onAcceptAll,
   onEdit,
   onToggleCandidate,
@@ -122,6 +139,9 @@ export function MappingScreen({
   onSetCustomBranchOrder,
   onSearch,
   isSearching,
+  onSetNote,
+  onStatusFilterChange,
+  onShowShortcuts,
 }: MappingScreenProps) {
   const [showBranchOptions, setShowBranchOptions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -202,13 +222,19 @@ export function MappingScreen({
 
   return (
     <div className="flex h-full flex-col">
-      <FolioLoadingOverlay status={folioStatus} isLoadingCandidates={isLoadingCandidates} />
+      <FolioLoadingOverlay
+        status={folioStatus}
+        isLoadingCandidates={isLoadingCandidates}
+        isPipeline={isPipeline}
+        pipelineItemCount={pipelineItemCount}
+      />
 
       <MappingToolbar
         currentIndex={currentItemIndex}
         totalItems={totalItems}
         nodeStatuses={nodeStatuses}
         threshold={threshold}
+        statusFilter={statusFilter}
         onPrev={onPrev}
         onNext={onNext}
         onSkip={onSkip}
@@ -216,6 +242,8 @@ export function MappingScreen({
         onAcceptAll={onAcceptAll}
         onEdit={onEdit}
         onThresholdChange={onThresholdChange}
+        onStatusFilterChange={onStatusFilterChange}
+        onShowShortcuts={onShowShortcuts}
       />
 
       {currentItem && (
@@ -336,6 +364,22 @@ export function MappingScreen({
                 />
               </div>
             </div>
+            {/* Notes */}
+            <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-2">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500" htmlFor="item-note">
+                Notes
+              </label>
+              <textarea
+                id="item-note"
+                value={notes[currentItemIndex] || ''}
+                onChange={(e) => onSetNote(currentItemIndex, e.target.value)}
+                placeholder="Add a note for this item..."
+                rows={notes[currentItemIndex] ? 2 : 1}
+                onFocus={(e) => { if (!notes[currentItemIndex]) (e.target as HTMLTextAreaElement).rows = 2; }}
+                onBlur={(e) => { if (!notes[currentItemIndex]) (e.target as HTMLTextAreaElement).rows = 1; }}
+                className="w-full resize-none rounded border border-gray-200 px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none"
+              />
+            </div>
             {/* Bottom half: Candidate Details */}
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="shrink-0 border-b border-gray-100 bg-white px-4 pt-3 pb-2">
@@ -361,6 +405,10 @@ export function MappingScreen({
 
       {showGoToDialog && (
         <GoToDialog totalItems={totalItems} onGoTo={onGoTo} onClose={onCloseGoTo} />
+      )}
+
+      {showShortcutsOverlay && (
+        <ShortcutsOverlay onClose={onCloseShortcuts} />
       )}
 
       {showBranchOptions && (

@@ -113,9 +113,12 @@ export function App() {
   ]);
 
   // Keyboard shortcuts active only on mapping screen
-  const { showGoToDialog, setShowGoToDialog, handleGoTo } = useKeyboardShortcuts(
+  const { showGoToDialog, setShowGoToDialog, handleGoTo, showShortcutsOverlay, setShowShortcutsOverlay } = useKeyboardShortcuts(
     screen === 'mapping',
   );
+
+  // Track whether current pipeline run is LLM-enhanced (for overlay messaging)
+  const [isPipelineRun, setIsPipelineRun] = useState(false);
 
   const handleTextSubmit = async () => {
     setLoading(true);
@@ -134,12 +137,14 @@ export function App() {
     // Auto-detect: use LLM pipeline if active provider has a valid connection
     const activeConfig = llmState.configs[llmState.activeProvider];
     if (activeConfig?.connectionStatus === 'valid') {
+      setIsPipelineRun(true);
       await loadPipelineCandidates(parseResult.items, {
         provider: llmState.activeProvider,
         api_key: activeConfig.apiKey || null,
         base_url: activeConfig.baseUrl || null,
         model: activeConfig.model || null,
       });
+      setIsPipelineRun(false);
     } else {
       await loadCandidates(parseResult.items);
     }
@@ -209,12 +214,18 @@ export function App() {
             folioStatus={mappingState.folioStatus}
             isLoadingCandidates={mappingState.isLoadingCandidates}
             showGoToDialog={showGoToDialog}
+            showShortcutsOverlay={showShortcutsOverlay}
+            notes={mappingState.notes}
+            statusFilter={mappingState.statusFilter}
+            isPipeline={isPipelineRun}
+            pipelineItemCount={parseResult?.items.length ?? 0}
             onPrev={mappingState.prevItem}
             onNext={mappingState.nextItem}
             onSkip={mappingState.skipItem}
             onGoTo={handleGoTo}
             onOpenGoTo={() => setShowGoToDialog(true)}
             onCloseGoTo={() => setShowGoToDialog(false)}
+            onCloseShortcuts={() => setShowShortcutsOverlay(false)}
             onAcceptAll={mappingState.acceptAllDefaults}
             onEdit={handleEditFromMapping}
             onToggleCandidate={(iriHash) =>
@@ -229,6 +240,9 @@ export function App() {
             onSetCustomBranchOrder={mappingState.setCustomBranchOrder}
             onSearch={handleSearch}
             isSearching={isSearching}
+            onSetNote={mappingState.setNote}
+            onStatusFilterChange={mappingState.setStatusFilter}
+            onShowShortcuts={() => setShowShortcutsOverlay(true)}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center">

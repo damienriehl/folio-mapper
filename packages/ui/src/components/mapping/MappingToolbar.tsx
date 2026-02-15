@@ -1,10 +1,11 @@
-import type { NodeStatus } from '@folio-mapper/core';
+import type { NodeStatus, StatusFilter } from '@folio-mapper/core';
 
 interface MappingToolbarProps {
   currentIndex: number;
   totalItems: number;
   nodeStatuses: Record<number, NodeStatus>;
   threshold: number;
+  statusFilter: StatusFilter;
   onPrev: () => void;
   onNext: () => void;
   onSkip: () => void;
@@ -12,6 +13,8 @@ interface MappingToolbarProps {
   onAcceptAll: () => void;
   onEdit: () => void;
   onThresholdChange: (value: number) => void;
+  onStatusFilterChange: (filter: StatusFilter) => void;
+  onShowShortcuts: () => void;
 }
 
 export function MappingToolbar({
@@ -19,6 +22,7 @@ export function MappingToolbar({
   totalItems,
   nodeStatuses,
   threshold,
+  statusFilter,
   onPrev,
   onNext,
   onSkip,
@@ -26,6 +30,8 @@ export function MappingToolbar({
   onAcceptAll,
   onEdit,
   onThresholdChange,
+  onStatusFilterChange,
+  onShowShortcuts,
 }: MappingToolbarProps) {
   const completedCount = Object.values(nodeStatuses).filter((s) => s === 'completed').length;
   const progressPercent = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
@@ -81,14 +87,35 @@ export function MappingToolbar({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onAcceptAll}
-          className="rounded border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
-          title="Accept All Defaults (Shift+A)"
-        >
-          Accept All (&#8679;A)
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => onStatusFilterChange(e.target.value as StatusFilter)}
+            className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 focus:border-blue-400 focus:outline-none"
+          >
+            <option value="all">All items</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+            <option value="skipped">Skipped</option>
+            <option value="needs_attention">Needs attention</option>
+          </select>
+          <button
+            type="button"
+            onClick={onAcceptAll}
+            className="rounded border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
+            title="Accept All Defaults (Shift+A)"
+          >
+            Accept All (&#8679;A)
+          </button>
+          <button
+            type="button"
+            onClick={onShowShortcuts}
+            className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-50"
+            title="Keyboard shortcuts (?)"
+          >
+            ?
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}
