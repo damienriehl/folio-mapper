@@ -205,16 +205,17 @@ function HierarchyNodeComponent({
     return (
       <div>
         <div
-          className={`flex items-center gap-1.5 rounded py-1 pr-2 text-sm ${
+          className={`flex cursor-pointer items-center gap-1.5 rounded py-1 pr-2 text-sm ${
             isSelected
               ? 'bg-slate-700 text-white'
               : 'bg-gray-200 text-gray-800'
           } ${isDetailTarget ? 'ring-2 ring-blue-400' : ''}`}
           style={{ paddingLeft: `${depth * 4 + 4}px` }}
+          onClick={() => { onToggleCandidate(node.candidate!.iri_hash); onSelectForDetail(node.candidate!.iri_hash); }}
         >
           <button
             type="button"
-            onClick={() => toggleCollapse(pathKey)}
+            onClick={(e) => { e.stopPropagation(); toggleCollapse(pathKey); }}
             className={`shrink-0 text-xs ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}
           >
             {isCollapsed ? '\u25B6' : '\u25BC'}
@@ -223,16 +224,13 @@ function HierarchyNodeComponent({
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggleCandidate(node.candidate!.iri_hash)}
+            onClick={(e) => e.stopPropagation()}
             className="h-3.5 w-3.5 shrink-0 rounded border-gray-300"
           />
-          <button
-            type="button"
-            onClick={() => onSelectForDetail(node.candidate!.iri_hash)}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          >
+          <span className="flex min-w-0 flex-1 items-center gap-2">
             <span className="truncate font-medium">{node.label}</span>
             <ConfidenceBadge score={node.candidate!.score} />
-          </button>
+          </span>
         </div>
         {!isCollapsed && (
           <div className="ml-2">
@@ -262,12 +260,13 @@ function HierarchyNodeComponent({
       <div
         className={`flex items-center gap-1.5 rounded py-1 text-sm ${
           isSelected ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-gray-50'
-        }`}
+        } ${nodeIriHash ? 'cursor-pointer' : ''}`}
         style={{ paddingLeft: `${depth * 4 + 4}px` }}
+        onClick={() => nodeIriHash ? onToggleCandidate(nodeIriHash) : toggleCollapse(pathKey)}
       >
         <button
           type="button"
-          onClick={() => toggleCollapse(pathKey)}
+          onClick={(e) => { e.stopPropagation(); toggleCollapse(pathKey); }}
           className={`shrink-0 text-xs ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}
         >
           {isCollapsed ? '\u25B6' : '\u25BC'}
@@ -277,16 +276,13 @@ function HierarchyNodeComponent({
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggleCandidate(nodeIriHash)}
+            onClick={(e) => e.stopPropagation()}
             className="h-3.5 w-3.5 shrink-0 rounded border-gray-300"
           />
         )}
-        <button
-          type="button"
-          onClick={() => toggleCollapse(pathKey)}
-          className="min-w-0 flex-1 text-left"
-        >
+        <span className="min-w-0 flex-1 text-left">
           {node.label}
-        </button>
+        </span>
       </div>
       {!isCollapsed && (
         <div className="ml-2">
@@ -333,28 +329,26 @@ function CandidateLeaf({
 
   return (
     <div
-      className={`flex items-center gap-1.5 rounded py-1 pr-2 text-sm ${
+      className={`flex cursor-pointer items-center gap-1.5 rounded py-1 pr-2 text-sm ${
         isSelected
           ? 'bg-slate-700 text-white'
           : 'bg-gray-200 text-gray-800'
       } ${isDetailTarget ? 'ring-2 ring-blue-400' : ''}`}
       style={{ paddingLeft: `${depth * 4 + 8}px` }}
+      onClick={() => { onToggleCandidate(candidate.iri_hash); onSelectForDetail(candidate.iri_hash); }}
     >
       <span className={`text-xs ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>●</span>
       <input
         type="checkbox"
         checked={isSelected}
         onChange={() => onToggleCandidate(candidate.iri_hash)}
+        onClick={(e) => e.stopPropagation()}
         className="h-3.5 w-3.5 shrink-0 rounded border-gray-300"
       />
-      <button
-        type="button"
-        onClick={() => onSelectForDetail(candidate.iri_hash)}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-      >
+      <span className="flex min-w-0 flex-1 items-center gap-2">
         <span className="truncate font-medium">{candidate.label}</span>
         <ConfidenceBadge score={candidate.score} />
-      </button>
+      </span>
     </div>
   );
 }
