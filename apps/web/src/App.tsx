@@ -328,7 +328,8 @@ export function App() {
             totalItems={mappingState.totalItems}
             selections={mappingState.selections}
             nodeStatuses={mappingState.nodeStatuses}
-            threshold={mappingState.threshold}
+            topN={mappingState.topN}
+            defaultTopN={mappingState.defaultTopN}
             branchStates={mappingState.branchStates}
             allBranches={
               mappingState.mappingResponse.branches_available.map((b) => ({
@@ -362,7 +363,8 @@ export function App() {
             }
             onSelectForDetail={mappingState.selectCandidateForDetail}
             onSetBranchState={mappingState.setBranchState}
-            onThresholdChange={mappingState.setThreshold}
+            onTopNChange={mappingState.setTopN}
+            onDefaultTopNChange={mappingState.setDefaultTopN}
             branchSortMode={mappingState.branchSortMode}
             customBranchOrder={mappingState.customBranchOrder}
             onSetBranchSortMode={mappingState.setBranchSortMode}

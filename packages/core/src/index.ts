@@ -5,6 +5,7 @@ export * from './folio/api-client';
 export * from './folio/branch-colors';
 export * from './folio/branch-order';
 export * from './mapping/types';
+export * from './mapping/compute-score-cutoff';
 export * from './llm/types';
 export * from './llm/api-client';
 export * from './llm/provider-meta';

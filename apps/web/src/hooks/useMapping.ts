@@ -15,7 +15,7 @@ import { useMappingStore } from '../store/mapping-store';
  * Hook to trigger candidate fetching and initialize mapping state.
  */
 export function useMapping() {
-  const { threshold, startMapping, setPipelineMetadata, setLoadingCandidates, setError, mergeFallbackResults, mergeSearchResults } =
+  const { startMapping, setPipelineMetadata, setLoadingCandidates, setError, mergeFallbackResults, mergeSearchResults } =
     useMappingStore();
 
   const loadCandidates = useCallback(
@@ -25,12 +25,12 @@ export function useMapping() {
 
       try {
         const response = await fetchCandidates(items, 0, 10);
-        startMapping(response, threshold);
+        startMapping(response);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load candidates');
       }
     },
-    [threshold, startMapping, setLoadingCandidates, setError],
+    [startMapping, setLoadingCandidates, setError],
   );
 
   const loadPipelineCandidates = useCallback(
@@ -40,13 +40,13 @@ export function useMapping() {
 
       try {
         const response = await fetchPipelineCandidates(items, llmConfig, 0, 10);
-        startMapping(response.mapping, threshold);
+        startMapping(response.mapping);
         setPipelineMetadata(response.pipeline_metadata);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Pipeline mapping failed');
       }
     },
-    [threshold, startMapping, setPipelineMetadata, setLoadingCandidates, setError],
+    [startMapping, setPipelineMetadata, setLoadingCandidates, setError],
   );
 
   const loadMandatoryFallback = useCallback(

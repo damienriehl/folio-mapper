@@ -4,7 +4,8 @@ interface MappingToolbarProps {
   currentIndex: number;
   totalItems: number;
   nodeStatuses: Record<number, NodeStatus>;
-  threshold: number;
+  topN: number;
+  defaultTopN: number;
   statusFilter: StatusFilter;
   onPrev: () => void;
   onNext: () => void;
@@ -12,7 +13,8 @@ interface MappingToolbarProps {
   onGoTo: () => void;
   onAcceptAll: () => void;
   onEdit: () => void;
-  onThresholdChange: (value: number) => void;
+  onTopNChange: (value: number) => void;
+  onDefaultTopNChange: (value: number) => void;
   onStatusFilterChange: (filter: StatusFilter) => void;
   onShowShortcuts: () => void;
 }
@@ -21,7 +23,8 @@ export function MappingToolbar({
   currentIndex,
   totalItems,
   nodeStatuses,
-  threshold,
+  topN,
+  defaultTopN,
   statusFilter,
   onPrev,
   onNext,
@@ -29,7 +32,8 @@ export function MappingToolbar({
   onGoTo,
   onAcceptAll,
   onEdit,
-  onThresholdChange,
+  onTopNChange,
+  onDefaultTopNChange,
   onStatusFilterChange,
   onShowShortcuts,
 }: MappingToolbarProps) {
@@ -70,19 +74,29 @@ export function MappingToolbar({
               Next &rarr;
             </button>
             <div className="ml-2 flex items-center gap-2 border-l border-gray-200 pl-3">
-              <label className="text-xs font-medium text-gray-500 whitespace-nowrap" htmlFor="toolbar-threshold">
-                Threshold
+              <label className="text-xs font-medium text-gray-500 whitespace-nowrap" htmlFor="toolbar-topn">
+                Top N
               </label>
               <input
-                id="toolbar-threshold"
+                id="toolbar-topn"
                 type="range"
-                min={0}
-                max={100}
-                value={threshold}
-                onChange={(e) => onThresholdChange(Number(e.target.value))}
+                min={1}
+                max={50}
+                value={topN}
+                onChange={(e) => onTopNChange(Number(e.target.value))}
                 className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-gray-200 accent-blue-600"
               />
-              <span className="w-6 text-right text-xs font-medium text-gray-700">{threshold}</span>
+              <span className="w-6 text-right text-xs font-medium text-gray-700">{topN}</span>
+              {topN !== defaultTopN && (
+                <button
+                  type="button"
+                  onClick={() => onDefaultTopNChange(topN)}
+                  className="rounded border border-blue-300 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100"
+                  title="Set current Top N as the default for all items"
+                >
+                  Set default
+                </button>
+              )}
             </div>
           </div>
         </div>
