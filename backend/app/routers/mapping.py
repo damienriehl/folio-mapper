@@ -1,8 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from app.models.mapping_models import (
     BranchInfo,
     CandidateRequest,
+    FolioCandidate,
     FolioStatus,
     MappingResponse,
 )
@@ -13,6 +14,7 @@ from app.models.pipeline_models import (
 from app.services.folio_service import (
     get_all_branches,
     get_folio_status,
+    lookup_concept,
     search_all_items,
     warmup_folio,
 )
@@ -54,6 +56,15 @@ async def folio_warmup() -> FolioStatus:
 async def list_branches() -> list[BranchInfo]:
     """List all FOLIO branches with colors and concept counts."""
     return get_all_branches()
+
+
+@router.get("/concept/{iri_hash}", response_model=FolioCandidate)
+async def get_concept(iri_hash: str) -> FolioCandidate:
+    """Look up a single FOLIO concept by IRI hash."""
+    result = lookup_concept(iri_hash)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Concept not found")
+    return result
 
 
 @router.post("/mandatory-fallback", response_model=MandatoryFallbackResponse)
