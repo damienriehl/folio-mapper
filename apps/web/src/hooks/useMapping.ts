@@ -15,7 +15,7 @@ import { useMappingStore } from '../store/mapping-store';
  * Hook to trigger candidate fetching and initialize mapping state.
  */
 export function useMapping() {
-  const { threshold, startMapping, setPipelineMetadata, setLoadingCandidates, setError, mergeFallbackResults } =
+  const { threshold, startMapping, setPipelineMetadata, setLoadingCandidates, setError, mergeFallbackResults, mergeSearchResults } =
     useMappingStore();
 
   const loadCandidates = useCallback(
@@ -79,5 +79,20 @@ export function useMapping() {
     [mergeFallbackResults],
   );
 
-  return { loadCandidates, loadPipelineCandidates, loadMandatoryFallback };
+  const searchCandidates = useCallback(
+    async (query: string, itemIndex: number, llmConfig?: PipelineRequestConfig | null) => {
+      const syntheticItem: ParseItem = { text: query, index: 0, ancestry: [] };
+
+      if (llmConfig) {
+        const response = await fetchPipelineCandidates([syntheticItem], llmConfig, 0, 10);
+        mergeSearchResults(itemIndex, response.mapping);
+      } else {
+        const response = await fetchCandidates([syntheticItem], 0, 10);
+        mergeSearchResults(itemIndex, response);
+      }
+    },
+    [mergeSearchResults],
+  );
+
+  return { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates };
 }

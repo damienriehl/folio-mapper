@@ -58,6 +58,7 @@ interface MappingState {
   setBranchSortMode: (mode: BranchSortMode) => void;
   setCustomBranchOrder: (order: string[]) => void;
   mergeFallbackResults: (itemIndex: number, fallbackResults: BranchFallbackResult[]) => void;
+  mergeSearchResults: (itemIndex: number, searchResponse: MappingResponse) => void;
   selectCandidateForDetail: (iriHash: string | null) => void;
   setPipelineMetadata: (metadata: PipelineItemMetadata[] | null) => void;
   setFolioStatus: (status: FolioStatus) => void;
@@ -255,6 +256,58 @@ export const useMappingStore = create<MappingState>((set, get) => ({
 
     set({
       mappingResponse: { ...mappingResponse, items },
+    });
+  },
+
+  mergeSearchResults: (itemIndex, searchResponse) => {
+    const { mappingResponse, branchStates } = get();
+    if (!mappingResponse) return;
+
+    const searchItem = searchResponse.items[0];
+    if (!searchItem) return;
+
+    const items = [...mappingResponse.items];
+    const item = items[itemIndex];
+    if (!item) return;
+
+    const updatedGroups = [...item.branch_groups];
+    const newBranchStates = { ...branchStates };
+
+    for (const group of searchItem.branch_groups) {
+      if (group.candidates.length === 0) continue;
+
+      const existingGroup = updatedGroups.find((g) => g.branch === group.branch);
+      if (existingGroup) {
+        const existingHashes = new Set(existingGroup.candidates.map((c) => c.iri_hash));
+        const newCandidates = group.candidates.filter((c) => !existingHashes.has(c.iri_hash));
+        if (newCandidates.length > 0) {
+          existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
+        }
+      } else {
+        updatedGroups.push({
+          branch: group.branch,
+          branch_color: group.branch_color,
+          candidates: group.candidates,
+        });
+      }
+
+      if (!(group.branch in newBranchStates)) {
+        newBranchStates[group.branch] = 'normal';
+      }
+    }
+
+    updatedGroups.sort((a, b) => a.branch.localeCompare(b.branch));
+
+    const updatedItem = {
+      ...item,
+      branch_groups: updatedGroups,
+      total_candidates: updatedGroups.reduce((sum, g) => sum + g.candidates.length, 0),
+    };
+    items[itemIndex] = updatedItem;
+
+    set({
+      mappingResponse: { ...mappingResponse, items },
+      branchStates: newBranchStates,
     });
   },
 
