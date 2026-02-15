@@ -3,6 +3,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from app.models.mapping_models import (
     BranchInfo,
     CandidateRequest,
+    ConceptDetail,
     FolioCandidate,
     FolioStatus,
     MappingResponse,
@@ -15,6 +16,7 @@ from app.services.folio_service import (
     get_all_branches,
     get_folio_status,
     lookup_concept,
+    lookup_concept_detail,
     search_all_items,
     warmup_folio,
 )
@@ -62,6 +64,15 @@ async def list_branches() -> list[BranchInfo]:
 async def get_concept(iri_hash: str) -> FolioCandidate:
     """Look up a single FOLIO concept by IRI hash."""
     result = lookup_concept(iri_hash)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Concept not found")
+    return result
+
+
+@router.get("/concept/{iri_hash}/detail", response_model=ConceptDetail)
+async def get_concept_detail(iri_hash: str) -> ConceptDetail:
+    """Look up a single FOLIO concept with extended detail (children, siblings, related, etc.)."""
+    result = lookup_concept_detail(iri_hash)
     if result is None:
         raise HTTPException(status_code=404, detail="Concept not found")
     return result

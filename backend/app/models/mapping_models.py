@@ -28,6 +28,14 @@ class FolioCandidate(BaseModel):
     score: float  # 0-100
 
 
+class ConceptDetail(FolioCandidate):
+    children: list[HierarchyPathEntry] = []
+    siblings: list[HierarchyPathEntry] = []
+    related: list[HierarchyPathEntry] = []
+    examples: list[str] = []
+    translations: dict[str, str] = {}
+
+
 class BranchGroup(BaseModel):
     branch: str
     branch_color: str

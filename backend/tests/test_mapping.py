@@ -6,7 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.models.mapping_models import BranchGroup, BranchInfo, FolioCandidate, FolioStatus, ItemMappingResult
+from app.models.mapping_models import BranchGroup, BranchInfo, ConceptDetail, FolioCandidate, FolioStatus, HierarchyPathEntry, ItemMappingResult
 from app.services.branch_config import BRANCH_CONFIG, get_branch_color, get_branch_display_name
 
 
@@ -174,3 +174,106 @@ async def test_get_branches(mock_branches, client: AsyncClient):
     data = resp.json()
     assert len(data) == 2
     assert data[0]["name"] == "Area of Law"
+
+
+# --- ConceptDetail model tests ---
+
+
+def test_concept_detail_model():
+    cd = ConceptDetail(
+        label="Contract Law",
+        iri="https://folio.openlegalstandard.org/RCIPwpgRpMs1eVz4vPid0pV",
+        iri_hash="RCIPwpgRpMs1eVz4vPid0pV",
+        definition="The law of contracts",
+        synonyms=["General Theory of Contracts"],
+        branch="Area of Law",
+        branch_color="#1A5276",
+        hierarchy_path=[
+            {"label": "Area of Law", "iri_hash": "RAoL"},
+            {"label": "Contract Law", "iri_hash": "RCIPwpgRpMs1eVz4vPid0pV"},
+        ],
+        score=-1,
+        children=[
+            HierarchyPathEntry(label="Commercial Contracts", iri_hash="Rchild1"),
+            HierarchyPathEntry(label="Consumer Contracts", iri_hash="Rchild2"),
+        ],
+        siblings=[
+            HierarchyPathEntry(label="Tort Law", iri_hash="Rsib1"),
+        ],
+        related=[
+            HierarchyPathEntry(label="Business Law", iri_hash="Rrel1"),
+        ],
+        examples=["Sale of goods", "Employment agreements"],
+        translations={"es": "Derecho Contractual", "fr": "Droit des contrats"},
+    )
+    assert cd.label == "Contract Law"
+    assert len(cd.children) == 2
+    assert cd.children[0].label == "Commercial Contracts"
+    assert len(cd.siblings) == 1
+    assert len(cd.related) == 1
+    assert len(cd.examples) == 2
+    assert cd.translations["es"] == "Derecho Contractual"
+
+
+def test_concept_detail_defaults():
+    cd = ConceptDetail(
+        label="Test",
+        iri="https://folio.openlegalstandard.org/Rtest",
+        iri_hash="Rtest",
+        branch="Area of Law",
+        branch_color="#1A5276",
+        score=-1,
+    )
+    assert cd.children == []
+    assert cd.siblings == []
+    assert cd.related == []
+    assert cd.examples == []
+    assert cd.translations == {}
+
+
+# --- /concept/{iri_hash}/detail endpoint tests ---
+
+
+MOCK_CONCEPT_DETAIL = ConceptDetail(
+    label="Animal Law",
+    iri="https://folio.openlegalstandard.org/Rtest1",
+    iri_hash="Rtest1",
+    definition="Law relating to animals",
+    synonyms=["Animal Rights Law"],
+    branch="Area of Law",
+    branch_color="#1A5276",
+    hierarchy_path=[
+        {"label": "Area of Law", "iri_hash": "RAoL"},
+        {"label": "Animal Law", "iri_hash": "Rtest1"},
+    ],
+    score=-1,
+    children=[HierarchyPathEntry(label="Wildlife Law", iri_hash="Rchild1")],
+    siblings=[HierarchyPathEntry(label="Environmental Law", iri_hash="Rsib1")],
+    related=[],
+    examples=["Animal cruelty cases"],
+    translations={"es": "Derecho Animal"},
+)
+
+
+@pytest.mark.anyio
+@patch("app.routers.mapping.lookup_concept_detail", return_value=MOCK_CONCEPT_DETAIL)
+async def test_get_concept_detail(mock_lookup, client: AsyncClient):
+    resp = await client.get("/api/mapping/concept/Rtest1/detail")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["label"] == "Animal Law"
+    assert len(data["children"]) == 1
+    assert data["children"][0]["label"] == "Wildlife Law"
+    assert len(data["siblings"]) == 1
+    assert data["siblings"][0]["label"] == "Environmental Law"
+    assert data["related"] == []
+    assert data["examples"] == ["Animal cruelty cases"]
+    assert data["translations"]["es"] == "Derecho Animal"
+
+
+@pytest.mark.anyio
+@patch("app.routers.mapping.lookup_concept_detail", return_value=None)
+async def test_get_concept_detail_not_found(mock_lookup, client: AsyncClient):
+    resp = await client.get("/api/mapping/concept/Rnonexistent/detail")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Concept not found"

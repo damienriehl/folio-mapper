@@ -1,5 +1,5 @@
 import type { ParseItem } from '../input/types';
-import type { BranchInfo, FolioCandidate, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
+import type { BranchInfo, ConceptDetail, FolioCandidate, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
 import type { PipelineRequestConfig } from '../pipeline/api-client';
 
 const BASE_URL = '/api/mapping';
@@ -63,6 +63,17 @@ export async function fetchConcept(iriHash: string): Promise<FolioCandidate> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Concept lookup failed' }));
     throw new Error(err.detail || `Concept lookup failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function fetchConceptDetail(iriHash: string): Promise<ConceptDetail> {
+  const res = await fetch(`${BASE_URL}/concept/${encodeURIComponent(iriHash)}/detail`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Concept detail lookup failed' }));
+    throw new Error(err.detail || `Concept detail lookup failed (${res.status})`);
   }
 
   return res.json();

@@ -13,6 +13,7 @@ from folio import FOLIO, FOLIO_TYPE_IRIS, FOLIOTypes
 from app.models.mapping_models import (
     BranchGroup,
     BranchInfo,
+    ConceptDetail,
     FolioCandidate,
     FolioStatus,
     HierarchyPathEntry,
@@ -376,6 +377,81 @@ def lookup_concept(iri_hash: str) -> FolioCandidate | None:
         branch_color=get_branch_color(branch_name),
         hierarchy_path=_build_hierarchy_path(folio, iri_hash),
         score=-1,
+    )
+
+
+def lookup_concept_detail(iri_hash: str) -> ConceptDetail | None:
+    """Look up a FOLIO concept with extended detail: children, siblings, related, examples, translations."""
+    folio = get_folio()
+    owl_class = folio[iri_hash]
+    if not owl_class:
+        return None
+
+    branch_name = get_branch_for_class(folio, iri_hash)
+
+    # Children: classes where this concept is the parent
+    children: list[HierarchyPathEntry] = []
+    if owl_class.parent_class_of:
+        for child_iri in owl_class.parent_class_of:
+            child_hash = _extract_iri_hash(child_iri)
+            child_class = folio[child_hash]
+            if child_class:
+                children.append(HierarchyPathEntry(
+                    label=child_class.label or child_hash,
+                    iri_hash=child_hash,
+                ))
+    children.sort(key=lambda e: e.label)
+
+    # Siblings: other children of this concept's first parent (excluding self)
+    siblings: list[HierarchyPathEntry] = []
+    if owl_class.sub_class_of:
+        parent_hash = _extract_iri_hash(owl_class.sub_class_of[0])
+        parent_class = folio[parent_hash]
+        if parent_class and parent_class.parent_class_of:
+            for sibling_iri in parent_class.parent_class_of:
+                sibling_hash = _extract_iri_hash(sibling_iri)
+                if sibling_hash == iri_hash:
+                    continue
+                sibling_class = folio[sibling_hash]
+                if sibling_class:
+                    siblings.append(HierarchyPathEntry(
+                        label=sibling_class.label or sibling_hash,
+                        iri_hash=sibling_hash,
+                    ))
+    siblings.sort(key=lambda e: e.label)
+
+    # Related: see_also links
+    related: list[HierarchyPathEntry] = []
+    if hasattr(owl_class, 'see_also') and owl_class.see_also:
+        for related_iri in owl_class.see_also:
+            related_hash = _extract_iri_hash(related_iri)
+            related_class = folio[related_hash]
+            if related_class:
+                related.append(HierarchyPathEntry(
+                    label=related_class.label or related_hash,
+                    iri_hash=related_hash,
+                ))
+    related.sort(key=lambda e: e.label)
+
+    # Examples and translations
+    examples = list(owl_class.examples) if hasattr(owl_class, 'examples') and owl_class.examples else []
+    translations = dict(owl_class.translations) if hasattr(owl_class, 'translations') and owl_class.translations else {}
+
+    return ConceptDetail(
+        label=owl_class.label or iri_hash,
+        iri=owl_class.iri,
+        iri_hash=iri_hash,
+        definition=owl_class.definition,
+        synonyms=owl_class.alternative_labels or [],
+        branch=branch_name,
+        branch_color=get_branch_color(branch_name),
+        hierarchy_path=_build_hierarchy_path(folio, iri_hash),
+        score=-1,
+        children=children,
+        siblings=siblings,
+        related=related,
+        examples=examples,
+        translations=translations,
     )
 
 
