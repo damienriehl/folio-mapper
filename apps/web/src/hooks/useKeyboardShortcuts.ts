@@ -3,9 +3,10 @@ import { useMappingStore } from '../store/mapping-store';
 
 /**
  * Keyboard shortcuts for the mapping screen.
- * Enter/ArrowRight=Next, ArrowLeft=Prev, S=Skip, Shift+A=Accept All, G=GoTo, ?=Shortcuts, Esc=Close
+ * Enter/ArrowRight=Next, ArrowLeft=Prev, S=Skip, Shift+A=Accept All,
+ * G=GoTo, ?=Shortcuts, Ctrl+E=Export, Esc=Close
  */
-export function useKeyboardShortcuts(active: boolean) {
+export function useKeyboardShortcuts(active: boolean, onExport?: () => void) {
   const { nextItem, prevItem, skipItem, acceptAllDefaults, goToItem, totalItems } =
     useMappingStore();
   const [showGoToDialog, setShowGoToDialog] = useState(false);
@@ -18,6 +19,13 @@ export function useKeyboardShortcuts(active: boolean) {
       // Don't intercept if user is in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      // Ctrl+E for export
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        onExport?.();
+        return;
+      }
 
       switch (e.key) {
         case 'Enter':
@@ -59,7 +67,7 @@ export function useKeyboardShortcuts(active: boolean) {
           break;
       }
     },
-    [active, nextItem, prevItem, skipItem, acceptAllDefaults],
+    [active, nextItem, prevItem, skipItem, acceptAllDefaults, onExport],
   );
 
   useEffect(() => {

@@ -12,6 +12,7 @@ import {
   BranchOptionsPanel,
   SessionRecoveryModal,
   NewProjectModal,
+  ExportModal,
 } from '@folio-mapper/ui';
 import { useInputStore } from './store/input-store';
 import { useMappingStore } from './store/mapping-store';
@@ -22,6 +23,7 @@ import { useFolioWarmup } from './hooks/useFolioWarmup';
 import { useMapping } from './hooks/useMapping';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useSession } from './hooks/useSession';
+import { useExport } from './hooks/useExport';
 
 export function App() {
   const {
@@ -51,6 +53,9 @@ export function App() {
 
   // Session persistence
   const session = useSession();
+
+  // Export
+  const exportState = useExport();
 
   // Full FOLIO branch list for input-page Branch Options panel
   const allFolioBranches = Object.values(BRANCH_COLORS).map((b) => ({
@@ -121,6 +126,7 @@ export function App() {
   // Keyboard shortcuts active only on mapping screen
   const { showGoToDialog, setShowGoToDialog, handleGoTo, showShortcutsOverlay, setShowShortcutsOverlay } = useKeyboardShortcuts(
     screen === 'mapping',
+    () => exportState.setShowExportModal(true),
   );
 
   // Track whether current pipeline run is LLM-enhanced (for overlay messaging)
@@ -223,6 +229,16 @@ export function App() {
             onCancel={session.handleCancelNewProject}
           />
         )}
+        {exportState.showExportModal && (
+          <ExportModal
+            totalItems={mappingState.totalItems}
+            completedCount={Object.values(mappingState.nodeStatuses).filter((s) => s === 'completed').length}
+            onExport={exportState.handleExport}
+            onPreview={exportState.handlePreview}
+            onClose={() => exportState.setShowExportModal(false)}
+            isExporting={exportState.isExporting}
+          />
+        )}
         {mappingState.mappingResponse ? (
           <MappingScreen
             mappingResponse={mappingState.mappingResponse}
@@ -274,6 +290,7 @@ export function App() {
             onSetNote={mappingState.setNote}
             onStatusFilterChange={mappingState.setStatusFilter}
             onShowShortcuts={() => setShowShortcutsOverlay(true)}
+            onExport={() => exportState.setShowExportModal(true)}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center">

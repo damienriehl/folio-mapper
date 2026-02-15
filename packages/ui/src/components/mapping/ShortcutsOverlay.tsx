@@ -11,6 +11,8 @@ const shortcuts = {
     { keys: ['Shift', 'A'], description: 'Accept all defaults' },
   ],
   general: [
+    { keys: ['Ctrl', 'S'], description: 'Save session' },
+    { keys: ['Ctrl', 'E'], description: 'Export mappings' },
     { keys: ['?'], description: 'Toggle shortcuts' },
     { keys: ['Esc'], description: 'Close dialog' },
   ],

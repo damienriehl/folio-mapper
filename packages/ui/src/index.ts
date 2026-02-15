@@ -28,6 +28,9 @@ export { ShortcutsOverlay } from './components/mapping/ShortcutsOverlay';
 export { LLMSettings } from './components/settings/LLMSettings';
 export { ProviderCard } from './components/settings/ProviderCard';
 
+// Export components (Stage 7)
+export { ExportModal } from './components/export/ExportModal';
+
 // Session components (Stage 7)
 export { SessionRecoveryModal } from './components/session/SessionRecoveryModal';
 export { NewProjectModal } from './components/session/NewProjectModal';
