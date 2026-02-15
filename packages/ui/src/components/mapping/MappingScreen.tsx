@@ -221,7 +221,7 @@ export function MappingScreen({
                   type="button"
                   onClick={handleClearAll}
                   disabled={currentSelections.length === 0}
-                  className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  className="self-stretch rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
                 >
                   Clear
                 </button>
