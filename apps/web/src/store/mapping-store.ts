@@ -8,6 +8,7 @@ import type {
   MappingResponse,
   NodeStatus,
   PipelineItemMetadata,
+  StatusFilter,
 } from '@folio-mapper/core';
 
 interface MappingState {
@@ -32,6 +33,12 @@ interface MappingState {
 
   // Input-page branch preferences (carry over to mapping)
   inputBranchStates: Record<string, BranchState>;
+
+  // Per-item notes
+  notes: Record<number, string>;
+
+  // Status filter
+  statusFilter: StatusFilter;
 
   // Detail panel
   selectedCandidateIri: string | null;
@@ -59,6 +66,8 @@ interface MappingState {
   setCustomBranchOrder: (order: string[]) => void;
   mergeFallbackResults: (itemIndex: number, fallbackResults: BranchFallbackResult[]) => void;
   mergeSearchResults: (itemIndex: number, searchResponse: MappingResponse) => void;
+  setNote: (itemIndex: number, text: string) => void;
+  setStatusFilter: (filter: StatusFilter) => void;
   selectCandidateForDetail: (iriHash: string | null) => void;
   setPipelineMetadata: (metadata: PipelineItemMetadata[] | null) => void;
   setFolioStatus: (status: FolioStatus) => void;
@@ -89,6 +98,21 @@ function getHighConfidenceCandidates(
   return iriHashes;
 }
 
+function matchesFilter(
+  index: number,
+  nodeStatuses: Record<number, NodeStatus>,
+  selections: Record<number, string[]>,
+  filter: StatusFilter,
+): boolean {
+  if (filter === 'all') return true;
+  const status = nodeStatuses[index] || 'pending';
+  if (filter === 'pending') return status === 'pending';
+  if (filter === 'completed') return status === 'completed';
+  if (filter === 'skipped') return status === 'skipped';
+  // needs_attention: pending AND zero selections
+  return status === 'pending' && (selections[index]?.length ?? 0) === 0;
+}
+
 export const useMappingStore = create<MappingState>((set, get) => ({
   mappingResponse: null,
   currentItemIndex: 0,
@@ -100,6 +124,8 @@ export const useMappingStore = create<MappingState>((set, get) => ({
   branchSortMode: 'default' as BranchSortMode,
   customBranchOrder: [] as string[],
   inputBranchStates: { 'Area of Law': 'mandatory' } as Record<string, BranchState>,
+  notes: {} as Record<number, string>,
+  statusFilter: 'all' as StatusFilter,
   selectedCandidateIri: null,
   pipelineMetadata: null,
   folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
@@ -113,7 +139,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
     }),
 
   nextItem: () => {
-    const { currentItemIndex, totalItems, nodeStatuses } = get();
+    const { currentItemIndex, totalItems, nodeStatuses, statusFilter, selections } = get();
     // Mark current as completed if pending
     const currentStatus = nodeStatuses[currentItemIndex];
     const updatedStatuses = { ...nodeStatuses };
@@ -121,7 +147,19 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       updatedStatuses[currentItemIndex] = 'completed';
     }
 
-    const nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
+    // Scan forward for next item matching filter
+    let nextIndex = currentItemIndex;
+    for (let i = currentItemIndex + 1; i < totalItems; i++) {
+      if (matchesFilter(i, updatedStatuses, selections, statusFilter)) {
+        nextIndex = i;
+        break;
+      }
+    }
+    // If nothing found forward and we're still on the same index, just go to next
+    if (nextIndex === currentItemIndex && currentItemIndex < totalItems - 1) {
+      nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
+    }
+
     set({
       nodeStatuses: updatedStatuses,
       currentItemIndex: nextIndex,
@@ -130,19 +168,43 @@ export const useMappingStore = create<MappingState>((set, get) => ({
   },
 
   prevItem: () => {
-    const { currentItemIndex } = get();
+    const { currentItemIndex, nodeStatuses, statusFilter, selections } = get();
+    // Scan backward for previous item matching filter
+    let prevIndex = currentItemIndex;
+    for (let i = currentItemIndex - 1; i >= 0; i--) {
+      if (matchesFilter(i, nodeStatuses, selections, statusFilter)) {
+        prevIndex = i;
+        break;
+      }
+    }
+    // If nothing found backward, just go to previous
+    if (prevIndex === currentItemIndex && currentItemIndex > 0) {
+      prevIndex = Math.max(currentItemIndex - 1, 0);
+    }
+
     set({
-      currentItemIndex: Math.max(currentItemIndex - 1, 0),
+      currentItemIndex: prevIndex,
       selectedCandidateIri: null,
     });
   },
 
   skipItem: () => {
-    const { currentItemIndex, totalItems, nodeStatuses } = get();
+    const { currentItemIndex, totalItems, nodeStatuses, statusFilter, selections } = get();
     const updatedStatuses = { ...nodeStatuses };
     updatedStatuses[currentItemIndex] = 'skipped';
 
-    const nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
+    // Scan forward for next item matching filter
+    let nextIndex = currentItemIndex;
+    for (let i = currentItemIndex + 1; i < totalItems; i++) {
+      if (matchesFilter(i, updatedStatuses, selections, statusFilter)) {
+        nextIndex = i;
+        break;
+      }
+    }
+    if (nextIndex === currentItemIndex && currentItemIndex < totalItems - 1) {
+      nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
+    }
+
     set({
       nodeStatuses: updatedStatuses,
       currentItemIndex: nextIndex,
@@ -322,6 +384,13 @@ export const useMappingStore = create<MappingState>((set, get) => ({
     });
   },
 
+  setNote: (itemIndex, text) => {
+    const { notes } = get();
+    set({ notes: { ...notes, [itemIndex]: text } });
+  },
+
+  setStatusFilter: (filter) => set({ statusFilter: filter }),
+
   selectCandidateForDetail: (iriHash) => set({ selectedCandidateIri: iriHash }),
 
   setPipelineMetadata: (metadata) => set({ pipelineMetadata: metadata }),
@@ -370,6 +439,8 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       branchSortMode,
       customBranchOrder,
       selectedCandidateIri: null,
+      notes: {},
+      statusFilter: 'all' as StatusFilter,
       isLoadingCandidates: false,
       error: null,
     });
@@ -388,6 +459,8 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       customBranchOrder: [],
       inputBranchStates: { 'Area of Law': 'mandatory' },
       selectedCandidateIri: null,
+      notes: {},
+      statusFilter: 'all' as StatusFilter,
       pipelineMetadata: null,
       isLoadingCandidates: false,
       error: null,

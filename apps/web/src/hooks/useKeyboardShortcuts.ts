@@ -3,12 +3,13 @@ import { useMappingStore } from '../store/mapping-store';
 
 /**
  * Keyboard shortcuts for the mapping screen.
- * Enter=Next, S=Skip, Shift+A=Accept All, G=GoTo, ArrowLeft=Prev
+ * Enter/ArrowRight=Next, ArrowLeft=Prev, S=Skip, Shift+A=Accept All, G=GoTo, ?=Shortcuts, Esc=Close
  */
 export function useKeyboardShortcuts(active: boolean) {
   const { nextItem, prevItem, skipItem, acceptAllDefaults, goToItem, totalItems } =
     useMappingStore();
   const [showGoToDialog, setShowGoToDialog] = useState(false);
+  const [showShortcutsOverlay, setShowShortcutsOverlay] = useState(false);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -20,6 +21,7 @@ export function useKeyboardShortcuts(active: boolean) {
 
       switch (e.key) {
         case 'Enter':
+        case 'ArrowRight':
           e.preventDefault();
           nextItem();
           break;
@@ -47,8 +49,13 @@ export function useKeyboardShortcuts(active: boolean) {
             setShowGoToDialog(true);
           }
           break;
+        case '?':
+          e.preventDefault();
+          setShowShortcutsOverlay((prev) => !prev);
+          break;
         case 'Escape':
           setShowGoToDialog(false);
+          setShowShortcutsOverlay(false);
           break;
       }
     },
@@ -68,5 +75,5 @@ export function useKeyboardShortcuts(active: boolean) {
     [goToItem],
   );
 
-  return { showGoToDialog, setShowGoToDialog, handleGoTo, totalItems };
+  return { showGoToDialog, setShowGoToDialog, handleGoTo, totalItems, showShortcutsOverlay, setShowShortcutsOverlay };
 }

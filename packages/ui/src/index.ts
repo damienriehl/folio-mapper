@@ -22,6 +22,7 @@ export { ThresholdSlider } from './components/mapping/ThresholdSlider';
 export { GoToDialog } from './components/mapping/GoToDialog';
 export { BranchOptionsModal } from './components/mapping/BranchOptionsModal';
 export { FolioLoadingOverlay } from './components/mapping/FolioLoadingOverlay';
+export { ShortcutsOverlay } from './components/mapping/ShortcutsOverlay';
 
 // Settings components (Stage 3)
 export { LLMSettings } from './components/settings/LLMSettings';
