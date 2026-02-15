@@ -86,7 +86,7 @@ export function MappingToolbar({
                 onChange={(e) => onTopNChange(Number(e.target.value))}
                 className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-gray-200 accent-blue-600"
               />
-              <span className="w-6 text-right text-xs font-medium text-gray-700">{topN}</span>
+              <span className="w-6 text-right text-xs font-medium text-gray-700">{topN >= 50 ? 'All' : topN}</span>
               {topN !== defaultTopN && (
                 <button
                   type="button"
