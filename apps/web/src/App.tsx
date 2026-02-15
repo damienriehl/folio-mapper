@@ -122,29 +122,17 @@ export function App() {
   // Warmup FOLIO when on confirmation screen
   useFolioWarmup();
 
-  // Trigger mandatory fallback when a branch is set to mandatory and has no candidates
-  const fallbackInFlight = useRef<Set<string>>(new Set());
+  // Trigger mandatory fallback when a branch is set to mandatory and has no candidates.
+  // Uses a persistent "attempted" set so each item+branch combo is only tried once per
+  // LLM config change (prevents infinite loops when fallback returns 0 results).
+  const fallbackAttempted = useRef<Set<string>>(new Set());
+  const prevLlmKey = useRef<string>('');
   useEffect(() => {
     const { mappingResponse, currentItemIndex, branchStates } = mappingState;
     if (!mappingResponse || screen !== 'mapping') return;
 
     const currentItem = mappingResponse.items[currentItemIndex];
     if (!currentItem) return;
-
-    const existingBranchNames = currentItem.branch_groups.map((g) => g.branch);
-    const mandatoryMissing = Object.entries(branchStates)
-      .filter(([name, state]) => state === 'mandatory' && !existingBranchNames.includes(name))
-      .map(([name]) => name);
-
-    // Dedupe: only trigger for branches not already in-flight
-    const toFetch = mandatoryMissing.filter(
-      (b) => !fallbackInFlight.current.has(`${currentItemIndex}:${b}`),
-    );
-    if (toFetch.length === 0) return;
-
-    for (const b of toFetch) {
-      fallbackInFlight.current.add(`${currentItemIndex}:${b}`);
-    }
 
     // Build LLM config if available
     const activeConfig = llmState.configs[llmState.activeProvider];
@@ -158,17 +146,37 @@ export function App() {
           }
         : null;
 
+    // Reset attempted set when LLM config changes (retry with new LLM)
+    const llmKey = llmConfig ? `${llmConfig.provider}:${llmConfig.model}` : 'none';
+    if (llmKey !== prevLlmKey.current) {
+      fallbackAttempted.current.clear();
+      prevLlmKey.current = llmKey;
+    }
+
+    const branchesWithCandidates = new Set(
+      currentItem.branch_groups.filter((g) => g.candidates.length > 0).map((g) => g.branch),
+    );
+    const mandatoryMissing = Object.entries(branchStates)
+      .filter(([name, state]) => state === 'mandatory' && !branchesWithCandidates.has(name))
+      .map(([name]) => name);
+
+    // Only attempt each item+branch combo once (prevents infinite loops)
+    const toFetch = mandatoryMissing.filter(
+      (b) => !fallbackAttempted.current.has(`${currentItemIndex}:${b}`),
+    );
+    if (toFetch.length === 0) return;
+
+    for (const b of toFetch) {
+      fallbackAttempted.current.add(`${currentItemIndex}:${b}`);
+    }
+
     loadMandatoryFallback(
       currentItemIndex,
       currentItem.item_text,
       branchStates,
-      existingBranchNames,
+      branchesWithCandidates,
       llmConfig,
-    ).finally(() => {
-      for (const b of toFetch) {
-        fallbackInFlight.current.delete(`${currentItemIndex}:${b}`);
-      }
-    });
+    );
   }, [
     mappingState.mappingResponse,
     mappingState.currentItemIndex,

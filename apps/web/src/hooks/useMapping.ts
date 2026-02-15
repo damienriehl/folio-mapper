@@ -54,12 +54,12 @@ export function useMapping() {
       itemIndex: number,
       itemText: string,
       branchStates: Record<string, BranchState>,
-      existingBranchNames: string[],
+      branchesWithCandidates: Set<string>,
       llmConfig?: PipelineRequestConfig | null,
     ) => {
       // Find mandatory branches that have no existing candidates for this item
       const mandatoryWithNoCandidates = Object.entries(branchStates)
-        .filter(([name, state]) => state === 'mandatory' && !existingBranchNames.includes(name))
+        .filter(([name, state]) => state === 'mandatory' && !branchesWithCandidates.has(name))
         .map(([name]) => name);
 
       if (mandatoryWithNoCandidates.length === 0) return;
