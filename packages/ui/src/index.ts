@@ -18,7 +18,6 @@ export { MappingToolbar } from './components/mapping/MappingToolbar';
 export { MappingFooter } from './components/mapping/MappingFooter';
 export { ConfidenceBadge } from './components/mapping/ConfidenceBadge';
 export { IriDisplay } from './components/mapping/IriDisplay';
-export { ThresholdSlider } from './components/mapping/ThresholdSlider';
 export { GoToDialog } from './components/mapping/GoToDialog';
 export { BranchOptionsModal } from './components/mapping/BranchOptionsModal';
 export { FolioLoadingOverlay } from './components/mapping/FolioLoadingOverlay';

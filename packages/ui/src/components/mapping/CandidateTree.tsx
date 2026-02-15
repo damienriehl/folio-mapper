@@ -160,7 +160,7 @@ export function CandidateTree({
               <div className="ml-4 border-l border-gray-100 pl-1">
                 {tree.length === 0 ? (
                   <p className="py-1 text-xs text-gray-400">
-                    No candidates above threshold ({threshold})
+                    No candidates in Top N filter
                   </p>
                 ) : (
                   tree.map((node) => (

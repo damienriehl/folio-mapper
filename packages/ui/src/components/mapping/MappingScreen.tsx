@@ -12,7 +12,7 @@ import type {
   StatusFilter,
   SuggestionEntry,
 } from '@folio-mapper/core';
-import { DEFAULT_BRANCH_ORDER, fetchConcept } from '@folio-mapper/core';
+import { DEFAULT_BRANCH_ORDER, fetchConcept, computeScoreCutoff } from '@folio-mapper/core';
 import { CandidatePanel } from './CandidatePanel';
 import { DetailPanel } from './DetailPanel';
 import { MappingToolbar } from './MappingToolbar';
@@ -31,7 +31,8 @@ interface MappingScreenProps {
   totalItems: number;
   selections: Record<number, string[]>;
   nodeStatuses: Record<number, NodeStatus>;
-  threshold: number;
+  topN: number;
+  defaultTopN: number;
   branchStates: Record<string, BranchState>;
   allBranches: Array<{ name: string; color: string }>;
   selectedCandidateIri: string | null;
@@ -58,7 +59,8 @@ interface MappingScreenProps {
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string | null) => void;
   onSetBranchState: (branchName: string, state: BranchState) => void;
-  onThresholdChange: (value: number) => void;
+  onTopNChange: (value: number) => void;
+  onDefaultTopNChange: (value: number) => void;
   onSetBranchSortMode: (mode: BranchSortMode) => void;
   onSetCustomBranchOrder: (order: string[]) => void;
   onSearch: (query: string) => Promise<void>;
@@ -117,7 +119,8 @@ export function MappingScreen({
   totalItems,
   selections,
   nodeStatuses,
-  threshold,
+  topN,
+  defaultTopN,
   branchStates,
   allBranches,
   selectedCandidateIri,
@@ -144,7 +147,8 @@ export function MappingScreen({
   onToggleCandidate,
   onSelectForDetail,
   onSetBranchState,
-  onThresholdChange,
+  onTopNChange,
+  onDefaultTopNChange,
   onSetBranchSortMode,
   onSetCustomBranchOrder,
   onSearch,
@@ -174,6 +178,11 @@ export function MappingScreen({
   const sortedBranchGroups = currentItem
     ? sortBranchGroups(currentItem.branch_groups, branchSortMode, customBranchOrder)
     : [];
+
+  // Compute effective threshold from Top N
+  const effectiveThreshold = searchFilterHashes
+    ? 0
+    : computeScoreCutoff(sortedBranchGroups, topN, branchStates);
 
   // Find the selected candidate for the detail panel
   let candidateFromData: FolioCandidate | null = null;
@@ -215,7 +224,7 @@ export function MappingScreen({
         })
         .flatMap((g) => {
           const isMandatory = branchStates[g.branch] === 'mandatory';
-          let candidates = g.candidates.filter((c) => isMandatory || c.score >= threshold);
+          let candidates = g.candidates.filter((c) => isMandatory || c.score >= effectiveThreshold);
           if (searchFilterSet) {
             candidates = candidates.filter((c) => searchFilterSet.has(c.iri_hash));
           }
@@ -259,7 +268,8 @@ export function MappingScreen({
         currentIndex={currentItemIndex}
         totalItems={totalItems}
         nodeStatuses={nodeStatuses}
-        threshold={threshold}
+        topN={topN}
+        defaultTopN={defaultTopN}
         statusFilter={statusFilter}
         onPrev={onPrev}
         onNext={onNext}
@@ -267,7 +277,8 @@ export function MappingScreen({
         onGoTo={onOpenGoTo}
         onAcceptAll={onAcceptAll}
         onEdit={onEdit}
-        onThresholdChange={onThresholdChange}
+        onTopNChange={onTopNChange}
+        onDefaultTopNChange={onDefaultTopNChange}
         onStatusFilterChange={onStatusFilterChange}
         onShowShortcuts={onShowShortcuts}
       />
@@ -386,7 +397,7 @@ export function MappingScreen({
                 branchStates={branchStates}
                 selectedIriHashes={currentSelections}
                 selectedCandidateIri={selectedCandidateIri}
-                threshold={threshold}
+                threshold={effectiveThreshold}
                 onToggleCandidate={(iriHash) => onToggleCandidate(iriHash)}
                 onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
                 expandAllSignal={expandAllSignal}
