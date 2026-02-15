@@ -22,7 +22,7 @@ export function SessionRecoveryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-label="Session recovery">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Session Recovery</h2>
         <p className="mb-1 text-sm text-gray-600">
           Found saved session from: <span className="font-medium text-gray-800">{formattedDate}</span>

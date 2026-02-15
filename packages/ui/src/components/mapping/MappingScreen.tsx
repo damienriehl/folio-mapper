@@ -10,6 +10,7 @@ import type {
   NodeStatus,
   PreScanSegment,
   StatusFilter,
+  SuggestionEntry,
 } from '@folio-mapper/core';
 import { DEFAULT_BRANCH_ORDER, fetchConcept } from '@folio-mapper/core';
 import { CandidatePanel } from './CandidatePanel';
@@ -22,6 +23,7 @@ import { BranchOptionsModal } from './BranchOptionsModal';
 import { PrescanDisplay } from './PrescanDisplay';
 import { SelectionTree } from './SelectionTree';
 import { ShortcutsOverlay } from './ShortcutsOverlay';
+import { SuggestionQueuePanel } from './SuggestionQueuePanel';
 
 interface MappingScreenProps {
   mappingResponse: MappingResponse;
@@ -65,6 +67,11 @@ interface MappingScreenProps {
   onStatusFilterChange: (filter: StatusFilter) => void;
   onShowShortcuts: () => void;
   onExport?: () => void;
+  suggestionQueue: SuggestionEntry[];
+  onSuggestToFolio: () => void;
+  onRemoveSuggestion: (id: string) => void;
+  onEditSuggestion: (entry: SuggestionEntry) => void;
+  onOpenSubmission: () => void;
 }
 
 function sortBranchGroups(
@@ -144,11 +151,17 @@ export function MappingScreen({
   onStatusFilterChange,
   onShowShortcuts,
   onExport,
+  suggestionQueue,
+  onSuggestToFolio,
+  onRemoveSuggestion,
+  onEditSuggestion,
+  onOpenSubmission,
 }: MappingScreenProps) {
   const [showBranchOptions, setShowBranchOptions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandAllSignal, setExpandAllSignal] = useState(0);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
+  const [allExpanded, setAllExpanded] = useState(false);
 
   const currentItem: ItemMappingResult | undefined = mappingResponse.items[currentItemIndex];
   const currentSelections = selections[currentItemIndex] || [];
@@ -313,18 +326,36 @@ export function MappingScreen({
                 </form>
                 <button
                   type="button"
-                  onClick={() => setExpandAllSignal((n) => n + 1)}
+                  onClick={() => {
+                    if (allExpanded) {
+                      setCollapseAllSignal((n) => n + 1);
+                    } else {
+                      setExpandAllSignal((n) => n + 1);
+                    }
+                    setAllExpanded((v) => !v);
+                  }}
                   className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
                 >
-                  Expand All
+                  {allExpanded ? 'Collapse All' : 'Expand All'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setCollapseAllSignal((n) => n + 1)}
-                  className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                >
-                  Collapse All
-                </button>
+                {suggestionQueue.some((s) => s.item_index === currentItemIndex) ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600"
+                  >
+                    Queued
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onSuggestToFolio}
+                    className="rounded bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-600"
+                    title="Flag this item for a new FOLIO concept suggestion (F)"
+                  >
+                    Suggest to FOLIO
+                  </button>
+                )}
               </div>
             </div>
             {/* Scrollable candidate results */}
@@ -393,6 +424,13 @@ export function MappingScreen({
                 <DetailPanel currentItem={currentItem} selectedCandidate={selectedCandidate} />
               </div>
             </div>
+            {/* Suggestion Queue */}
+            <SuggestionQueuePanel
+              queue={suggestionQueue}
+              onEdit={onEditSuggestion}
+              onRemove={onRemoveSuggestion}
+              onSubmit={onOpenSubmission}
+            />
           </div>
         </div>
       )}
@@ -403,6 +441,7 @@ export function MappingScreen({
         nodeStatuses={nodeStatuses}
         branchCount={totalBranches}
         enabledBranchCount={enabledBranchCount}
+        suggestionCount={suggestionQueue.length}
         onExport={onExport}
       />
 

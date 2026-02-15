@@ -2,6 +2,7 @@ import type { ParseResult, Screen } from '../input/types';
 import type { MappingResponse } from '../folio/types';
 import type { BranchState, BranchSortMode, NodeStatus, StatusFilter } from '../mapping/types';
 import type { PipelineItemMetadata } from '../pipeline/types';
+import type { SuggestionEntry } from '../suggestion/types';
 
 export const SESSION_VERSION = '1.2';
 
@@ -40,8 +41,8 @@ export interface SessionFile {
   custom_branch_order: string[];
   status_filter: StatusFilter;
 
-  // Placeholder for future
-  suggestion_queue: unknown[];
+  // Suggestion queue
+  suggestion_queue: SuggestionEntry[];
 }
 
 export function validateSession(data: unknown): SessionFile | null {

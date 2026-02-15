@@ -6,6 +6,7 @@ interface MappingFooterProps {
   nodeStatuses: Record<number, NodeStatus>;
   branchCount: number;
   enabledBranchCount: number;
+  suggestionCount?: number;
   onExport?: () => void;
 }
 
@@ -15,13 +16,14 @@ export function MappingFooter({
   nodeStatuses,
   branchCount,
   enabledBranchCount,
+  suggestionCount,
   onExport,
 }: MappingFooterProps) {
   const completedCount = Object.values(nodeStatuses).filter((s) => s === 'completed').length;
   const skippedCount = Object.values(nodeStatuses).filter((s) => s === 'skipped').length;
 
   return (
-    <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-2">
+    <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-2" aria-live="polite">
       <div className="flex items-center gap-4 text-xs text-gray-500">
         <span>
           <span className="font-medium text-gray-700">{selectedCount}</span> selected
@@ -37,6 +39,11 @@ export function MappingFooter({
         )}
       </div>
       <div className="flex items-center gap-3">
+        {!!suggestionCount && suggestionCount > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+            {suggestionCount} suggestion{suggestionCount !== 1 ? 's' : ''}
+          </span>
+        )}
         {onExport && (
           <button
             onClick={onExport}
