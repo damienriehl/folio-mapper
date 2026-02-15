@@ -193,6 +193,10 @@ export function App() {
             onSelectForDetail={mappingState.selectCandidateForDetail}
             onSetBranchState={mappingState.setBranchState}
             onThresholdChange={mappingState.setThreshold}
+            branchSortMode={mappingState.branchSortMode}
+            customBranchOrder={mappingState.customBranchOrder}
+            onSetBranchSortMode={mappingState.setBranchSortMode}
+            onSetCustomBranchOrder={mappingState.setCustomBranchOrder}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center">

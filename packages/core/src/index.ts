@@ -3,6 +3,7 @@ export * from './input/api-client';
 export * from './folio/types';
 export * from './folio/api-client';
 export * from './folio/branch-colors';
+export * from './folio/branch-order';
 export * from './mapping/types';
 export * from './llm/types';
 export * from './llm/api-client';
