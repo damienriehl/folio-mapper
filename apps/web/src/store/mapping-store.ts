@@ -1,15 +1,16 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
   BranchFallbackResult,
   BranchSortMode,
   BranchState,
-  FolioCandidate,
   FolioStatus,
   MappingResponse,
   NodeStatus,
   PipelineItemMetadata,
   StatusFilter,
 } from '@folio-mapper/core';
+import { createDebouncedStorage } from './session-storage';
 
 interface MappingState {
   // Data
@@ -113,341 +114,11 @@ function matchesFilter(
   return status === 'pending' && (selections[index]?.length ?? 0) === 0;
 }
 
-export const useMappingStore = create<MappingState>((set, get) => ({
-  mappingResponse: null,
-  currentItemIndex: 0,
-  totalItems: 0,
-  selections: {},
-  nodeStatuses: {},
-  threshold: 45,
-  branchStates: {},
-  branchSortMode: 'default' as BranchSortMode,
-  customBranchOrder: [] as string[],
-  inputBranchStates: { 'Area of Law': 'mandatory' } as Record<string, BranchState>,
-  notes: {} as Record<number, string>,
-  statusFilter: 'all' as StatusFilter,
-  selectedCandidateIri: null,
-  pipelineMetadata: null,
-  folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
-  isLoadingCandidates: false,
-  error: null,
+const debouncedStorage = createDebouncedStorage();
 
-  setMappingResponse: (response) =>
-    set({
-      mappingResponse: response,
-      totalItems: response.total_items,
-    }),
-
-  nextItem: () => {
-    const { currentItemIndex, totalItems, nodeStatuses, statusFilter, selections } = get();
-    // Mark current as completed if pending
-    const currentStatus = nodeStatuses[currentItemIndex];
-    const updatedStatuses = { ...nodeStatuses };
-    if (!currentStatus || currentStatus === 'pending') {
-      updatedStatuses[currentItemIndex] = 'completed';
-    }
-
-    // Scan forward for next item matching filter
-    let nextIndex = currentItemIndex;
-    for (let i = currentItemIndex + 1; i < totalItems; i++) {
-      if (matchesFilter(i, updatedStatuses, selections, statusFilter)) {
-        nextIndex = i;
-        break;
-      }
-    }
-    // If nothing found forward and we're still on the same index, just go to next
-    if (nextIndex === currentItemIndex && currentItemIndex < totalItems - 1) {
-      nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
-    }
-
-    set({
-      nodeStatuses: updatedStatuses,
-      currentItemIndex: nextIndex,
-      selectedCandidateIri: null,
-    });
-  },
-
-  prevItem: () => {
-    const { currentItemIndex, nodeStatuses, statusFilter, selections } = get();
-    // Scan backward for previous item matching filter
-    let prevIndex = currentItemIndex;
-    for (let i = currentItemIndex - 1; i >= 0; i--) {
-      if (matchesFilter(i, nodeStatuses, selections, statusFilter)) {
-        prevIndex = i;
-        break;
-      }
-    }
-    // If nothing found backward, just go to previous
-    if (prevIndex === currentItemIndex && currentItemIndex > 0) {
-      prevIndex = Math.max(currentItemIndex - 1, 0);
-    }
-
-    set({
-      currentItemIndex: prevIndex,
-      selectedCandidateIri: null,
-    });
-  },
-
-  skipItem: () => {
-    const { currentItemIndex, totalItems, nodeStatuses, statusFilter, selections } = get();
-    const updatedStatuses = { ...nodeStatuses };
-    updatedStatuses[currentItemIndex] = 'skipped';
-
-    // Scan forward for next item matching filter
-    let nextIndex = currentItemIndex;
-    for (let i = currentItemIndex + 1; i < totalItems; i++) {
-      if (matchesFilter(i, updatedStatuses, selections, statusFilter)) {
-        nextIndex = i;
-        break;
-      }
-    }
-    if (nextIndex === currentItemIndex && currentItemIndex < totalItems - 1) {
-      nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
-    }
-
-    set({
-      nodeStatuses: updatedStatuses,
-      currentItemIndex: nextIndex,
-      selectedCandidateIri: null,
-    });
-  },
-
-  goToItem: (index) => {
-    const { totalItems } = get();
-    if (index >= 0 && index < totalItems) {
-      set({ currentItemIndex: index, selectedCandidateIri: null });
-    }
-  },
-
-  acceptAllDefaults: () => {
-    const { mappingResponse, threshold, selections, nodeStatuses } = get();
-    if (!mappingResponse) return;
-
-    const updatedSelections = { ...selections };
-    const updatedStatuses = { ...nodeStatuses };
-
-    for (let i = 0; i < mappingResponse.items.length; i++) {
-      // Only auto-select for items that haven't been completed
-      if (updatedStatuses[i] === 'completed') continue;
-
-      const item = mappingResponse.items[i];
-      if (!item) continue;
-      const visible: string[] = [];
-      for (const group of item.branch_groups) {
-        for (const candidate of group.candidates) {
-          if (candidate.score >= threshold) {
-            visible.push(candidate.iri_hash);
-          }
-        }
-      }
-      updatedSelections[i] = visible;
-      updatedStatuses[i] = 'completed';
-    }
-
-    set({
-      selections: updatedSelections,
-      nodeStatuses: updatedStatuses,
-    });
-  },
-
-  toggleCandidate: (itemIndex, iriHash) => {
-    const { selections } = get();
-    const current = selections[itemIndex] || [];
-    const updated = current.includes(iriHash)
-      ? current.filter((h) => h !== iriHash)
-      : [...current, iriHash];
-
-    set({
-      selections: { ...selections, [itemIndex]: updated },
-    });
-  },
-
-  setThreshold: (threshold) => set({ threshold }),
-
-  setBranchState: (branchName, state) => {
-    const { branchStates } = get();
-    set({ branchStates: { ...branchStates, [branchName]: state } });
-  },
-
-  setInputBranchState: (branchName, state) => {
-    const { inputBranchStates } = get();
-    set({ inputBranchStates: { ...inputBranchStates, [branchName]: state } });
-  },
-
-  setBranchSortMode: (mode) => {
-    const { customBranchOrder, branchStates } = get();
-    if (mode === 'custom' && customBranchOrder.length === 0) {
-      // Initialize custom order from current branch names
-      set({ branchSortMode: mode, customBranchOrder: Object.keys(branchStates) });
-    } else {
-      set({ branchSortMode: mode });
-    }
-  },
-
-  setCustomBranchOrder: (order) => set({ customBranchOrder: order }),
-
-  mergeFallbackResults: (itemIndex, fallbackResults) => {
-    const { mappingResponse } = get();
-    if (!mappingResponse) return;
-
-    const items = [...mappingResponse.items];
-    const item = items[itemIndex];
-    if (!item) return;
-
-    const updatedGroups = [...item.branch_groups];
-
-    for (const fb of fallbackResults) {
-      if (fb.candidates.length === 0) continue;
-
-      const existingGroup = updatedGroups.find((g) => g.branch === fb.branch);
-      if (existingGroup) {
-        // Merge: add candidates not already present (dedupe by iri_hash)
-        const existingHashes = new Set(existingGroup.candidates.map((c) => c.iri_hash));
-        const newCandidates = fb.candidates.filter((c) => !existingHashes.has(c.iri_hash));
-        if (newCandidates.length > 0) {
-          existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
-        }
-      } else {
-        // Add new branch group
-        updatedGroups.push({
-          branch: fb.branch,
-          branch_color: fb.branch_color,
-          candidates: fb.candidates,
-        });
-      }
-    }
-
-    // Keep branch groups sorted alphabetically (matches backend order)
-    updatedGroups.sort((a, b) => a.branch.localeCompare(b.branch));
-
-    const updatedItem = {
-      ...item,
-      branch_groups: updatedGroups,
-      total_candidates: updatedGroups.reduce((sum, g) => sum + g.candidates.length, 0),
-    };
-    items[itemIndex] = updatedItem;
-
-    set({
-      mappingResponse: { ...mappingResponse, items },
-    });
-  },
-
-  mergeSearchResults: (itemIndex, searchResponse) => {
-    const { mappingResponse, branchStates } = get();
-    if (!mappingResponse) return;
-
-    const searchItem = searchResponse.items[0];
-    if (!searchItem) return;
-
-    const items = [...mappingResponse.items];
-    const item = items[itemIndex];
-    if (!item) return;
-
-    const updatedGroups = [...item.branch_groups];
-    const newBranchStates = { ...branchStates };
-
-    for (const group of searchItem.branch_groups) {
-      if (group.candidates.length === 0) continue;
-
-      const existingGroup = updatedGroups.find((g) => g.branch === group.branch);
-      if (existingGroup) {
-        const existingHashes = new Set(existingGroup.candidates.map((c) => c.iri_hash));
-        const newCandidates = group.candidates.filter((c) => !existingHashes.has(c.iri_hash));
-        if (newCandidates.length > 0) {
-          existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
-        }
-      } else {
-        updatedGroups.push({
-          branch: group.branch,
-          branch_color: group.branch_color,
-          candidates: group.candidates,
-        });
-      }
-
-      if (!(group.branch in newBranchStates)) {
-        newBranchStates[group.branch] = 'normal';
-      }
-    }
-
-    updatedGroups.sort((a, b) => a.branch.localeCompare(b.branch));
-
-    const updatedItem = {
-      ...item,
-      branch_groups: updatedGroups,
-      total_candidates: updatedGroups.reduce((sum, g) => sum + g.candidates.length, 0),
-    };
-    items[itemIndex] = updatedItem;
-
-    set({
-      mappingResponse: { ...mappingResponse, items },
-      branchStates: newBranchStates,
-    });
-  },
-
-  setNote: (itemIndex, text) => {
-    const { notes } = get();
-    set({ notes: { ...notes, [itemIndex]: text } });
-  },
-
-  setStatusFilter: (filter) => set({ statusFilter: filter }),
-
-  selectCandidateForDetail: (iriHash) => set({ selectedCandidateIri: iriHash }),
-
-  setPipelineMetadata: (metadata) => set({ pipelineMetadata: metadata }),
-
-  setFolioStatus: (status) => set({ folioStatus: status }),
-
-  setLoadingCandidates: (loading) => set({ isLoadingCandidates: loading }),
-
-  setError: (error) => set({ error, isLoadingCandidates: false }),
-
-  startMapping: (response, threshold) => {
-    const { inputBranchStates, branchSortMode, customBranchOrder } = get();
-
-    // Initialize selections with above-threshold candidates pre-checked
-    const selections: Record<number, string[]> = {};
-    const nodeStatuses: Record<number, NodeStatus> = {};
-
-    // Initialize all available branches — apply input-page mandatory prefs
-    const branchStates: Record<string, BranchState> = {};
-    for (const b of response.branches_available) {
-      branchStates[b.name] = inputBranchStates[b.name] === 'mandatory' ? 'mandatory' : 'normal';
-    }
-    // Also include branches that have candidates but may not be in branches_available
-    for (const item of response.items) {
-      nodeStatuses[item.item_index] = 'pending';
-      selections[item.item_index] = getHighConfidenceCandidates(
-        response,
-        item.item_index,
-      );
-      for (const group of item.branch_groups) {
-        if (!(group.branch in branchStates)) {
-          branchStates[group.branch] = inputBranchStates[group.branch] === 'mandatory' ? 'mandatory' : 'normal';
-        }
-      }
-    }
-
-    set({
-      mappingResponse: response,
-      totalItems: response.total_items,
-      currentItemIndex: 0,
-      selections,
-      nodeStatuses,
-      threshold,
-      branchStates,
-      // Preserve user's sort preferences from input page
-      branchSortMode,
-      customBranchOrder,
-      selectedCandidateIri: null,
-      notes: {},
-      statusFilter: 'all' as StatusFilter,
-      isLoadingCandidates: false,
-      error: null,
-    });
-  },
-
-  resetMapping: () =>
-    set({
+export const useMappingStore = create<MappingState>()(
+  persist(
+    (set, get) => ({
       mappingResponse: null,
       currentItemIndex: 0,
       totalItems: 0,
@@ -456,13 +127,382 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       threshold: 45,
       branchStates: {},
       branchSortMode: 'default' as BranchSortMode,
-      customBranchOrder: [],
-      inputBranchStates: { 'Area of Law': 'mandatory' },
-      selectedCandidateIri: null,
-      notes: {},
+      customBranchOrder: [] as string[],
+      inputBranchStates: { 'Area of Law': 'mandatory' } as Record<string, BranchState>,
+      notes: {} as Record<number, string>,
       statusFilter: 'all' as StatusFilter,
+      selectedCandidateIri: null,
       pipelineMetadata: null,
+      folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
       isLoadingCandidates: false,
       error: null,
+
+      setMappingResponse: (response) =>
+        set({
+          mappingResponse: response,
+          totalItems: response.total_items,
+        }),
+
+      nextItem: () => {
+        const { currentItemIndex, totalItems, nodeStatuses, statusFilter, selections } = get();
+        // Mark current as completed if pending
+        const currentStatus = nodeStatuses[currentItemIndex];
+        const updatedStatuses = { ...nodeStatuses };
+        if (!currentStatus || currentStatus === 'pending') {
+          updatedStatuses[currentItemIndex] = 'completed';
+        }
+
+        // Scan forward for next item matching filter
+        let nextIndex = currentItemIndex;
+        for (let i = currentItemIndex + 1; i < totalItems; i++) {
+          if (matchesFilter(i, updatedStatuses, selections, statusFilter)) {
+            nextIndex = i;
+            break;
+          }
+        }
+        // If nothing found forward and we're still on the same index, just go to next
+        if (nextIndex === currentItemIndex && currentItemIndex < totalItems - 1) {
+          nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
+        }
+
+        set({
+          nodeStatuses: updatedStatuses,
+          currentItemIndex: nextIndex,
+          selectedCandidateIri: null,
+        });
+      },
+
+      prevItem: () => {
+        const { currentItemIndex, nodeStatuses, statusFilter, selections } = get();
+        // Scan backward for previous item matching filter
+        let prevIndex = currentItemIndex;
+        for (let i = currentItemIndex - 1; i >= 0; i--) {
+          if (matchesFilter(i, nodeStatuses, selections, statusFilter)) {
+            prevIndex = i;
+            break;
+          }
+        }
+        // If nothing found backward, just go to previous
+        if (prevIndex === currentItemIndex && currentItemIndex > 0) {
+          prevIndex = Math.max(currentItemIndex - 1, 0);
+        }
+
+        set({
+          currentItemIndex: prevIndex,
+          selectedCandidateIri: null,
+        });
+      },
+
+      skipItem: () => {
+        const { currentItemIndex, totalItems, nodeStatuses, statusFilter, selections } = get();
+        const updatedStatuses = { ...nodeStatuses };
+        updatedStatuses[currentItemIndex] = 'skipped';
+
+        // Scan forward for next item matching filter
+        let nextIndex = currentItemIndex;
+        for (let i = currentItemIndex + 1; i < totalItems; i++) {
+          if (matchesFilter(i, updatedStatuses, selections, statusFilter)) {
+            nextIndex = i;
+            break;
+          }
+        }
+        if (nextIndex === currentItemIndex && currentItemIndex < totalItems - 1) {
+          nextIndex = Math.min(currentItemIndex + 1, totalItems - 1);
+        }
+
+        set({
+          nodeStatuses: updatedStatuses,
+          currentItemIndex: nextIndex,
+          selectedCandidateIri: null,
+        });
+      },
+
+      goToItem: (index) => {
+        const { totalItems } = get();
+        if (index >= 0 && index < totalItems) {
+          set({ currentItemIndex: index, selectedCandidateIri: null });
+        }
+      },
+
+      acceptAllDefaults: () => {
+        const { mappingResponse, threshold, selections, nodeStatuses } = get();
+        if (!mappingResponse) return;
+
+        const updatedSelections = { ...selections };
+        const updatedStatuses = { ...nodeStatuses };
+
+        for (let i = 0; i < mappingResponse.items.length; i++) {
+          // Only auto-select for items that haven't been completed
+          if (updatedStatuses[i] === 'completed') continue;
+
+          const item = mappingResponse.items[i];
+          if (!item) continue;
+          const visible: string[] = [];
+          for (const group of item.branch_groups) {
+            for (const candidate of group.candidates) {
+              if (candidate.score >= threshold) {
+                visible.push(candidate.iri_hash);
+              }
+            }
+          }
+          updatedSelections[i] = visible;
+          updatedStatuses[i] = 'completed';
+        }
+
+        set({
+          selections: updatedSelections,
+          nodeStatuses: updatedStatuses,
+        });
+      },
+
+      toggleCandidate: (itemIndex, iriHash) => {
+        const { selections } = get();
+        const current = selections[itemIndex] || [];
+        const updated = current.includes(iriHash)
+          ? current.filter((h) => h !== iriHash)
+          : [...current, iriHash];
+
+        set({
+          selections: { ...selections, [itemIndex]: updated },
+        });
+      },
+
+      setThreshold: (threshold) => set({ threshold }),
+
+      setBranchState: (branchName, state) => {
+        const { branchStates } = get();
+        set({ branchStates: { ...branchStates, [branchName]: state } });
+      },
+
+      setInputBranchState: (branchName, state) => {
+        const { inputBranchStates } = get();
+        set({ inputBranchStates: { ...inputBranchStates, [branchName]: state } });
+      },
+
+      setBranchSortMode: (mode) => {
+        const { customBranchOrder, branchStates } = get();
+        if (mode === 'custom' && customBranchOrder.length === 0) {
+          // Initialize custom order from current branch names
+          set({ branchSortMode: mode, customBranchOrder: Object.keys(branchStates) });
+        } else {
+          set({ branchSortMode: mode });
+        }
+      },
+
+      setCustomBranchOrder: (order) => set({ customBranchOrder: order }),
+
+      mergeFallbackResults: (itemIndex, fallbackResults) => {
+        const { mappingResponse } = get();
+        if (!mappingResponse) return;
+
+        const items = [...mappingResponse.items];
+        const item = items[itemIndex];
+        if (!item) return;
+
+        const updatedGroups = [...item.branch_groups];
+
+        for (const fb of fallbackResults) {
+          if (fb.candidates.length === 0) continue;
+
+          const existingGroup = updatedGroups.find((g) => g.branch === fb.branch);
+          if (existingGroup) {
+            // Merge: add candidates not already present (dedupe by iri_hash)
+            const existingHashes = new Set(existingGroup.candidates.map((c) => c.iri_hash));
+            const newCandidates = fb.candidates.filter((c) => !existingHashes.has(c.iri_hash));
+            if (newCandidates.length > 0) {
+              existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
+            }
+          } else {
+            // Add new branch group
+            updatedGroups.push({
+              branch: fb.branch,
+              branch_color: fb.branch_color,
+              candidates: fb.candidates,
+            });
+          }
+        }
+
+        // Keep branch groups sorted alphabetically (matches backend order)
+        updatedGroups.sort((a, b) => a.branch.localeCompare(b.branch));
+
+        const updatedItem = {
+          ...item,
+          branch_groups: updatedGroups,
+          total_candidates: updatedGroups.reduce((sum, g) => sum + g.candidates.length, 0),
+        };
+        items[itemIndex] = updatedItem;
+
+        set({
+          mappingResponse: { ...mappingResponse, items },
+        });
+      },
+
+      mergeSearchResults: (itemIndex, searchResponse) => {
+        const { mappingResponse, branchStates } = get();
+        if (!mappingResponse) return;
+
+        const searchItem = searchResponse.items[0];
+        if (!searchItem) return;
+
+        const items = [...mappingResponse.items];
+        const item = items[itemIndex];
+        if (!item) return;
+
+        const updatedGroups = [...item.branch_groups];
+        const newBranchStates = { ...branchStates };
+
+        for (const group of searchItem.branch_groups) {
+          if (group.candidates.length === 0) continue;
+
+          const existingGroup = updatedGroups.find((g) => g.branch === group.branch);
+          if (existingGroup) {
+            const existingHashes = new Set(existingGroup.candidates.map((c) => c.iri_hash));
+            const newCandidates = group.candidates.filter((c) => !existingHashes.has(c.iri_hash));
+            if (newCandidates.length > 0) {
+              existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
+            }
+          } else {
+            updatedGroups.push({
+              branch: group.branch,
+              branch_color: group.branch_color,
+              candidates: group.candidates,
+            });
+          }
+
+          if (!(group.branch in newBranchStates)) {
+            newBranchStates[group.branch] = 'normal';
+          }
+        }
+
+        updatedGroups.sort((a, b) => a.branch.localeCompare(b.branch));
+
+        const updatedItem = {
+          ...item,
+          branch_groups: updatedGroups,
+          total_candidates: updatedGroups.reduce((sum, g) => sum + g.candidates.length, 0),
+        };
+        items[itemIndex] = updatedItem;
+
+        set({
+          mappingResponse: { ...mappingResponse, items },
+          branchStates: newBranchStates,
+        });
+      },
+
+      setNote: (itemIndex, text) => {
+        const { notes } = get();
+        set({ notes: { ...notes, [itemIndex]: text } });
+      },
+
+      setStatusFilter: (filter) => set({ statusFilter: filter }),
+
+      selectCandidateForDetail: (iriHash) => set({ selectedCandidateIri: iriHash }),
+
+      setPipelineMetadata: (metadata) => set({ pipelineMetadata: metadata }),
+
+      setFolioStatus: (status) => set({ folioStatus: status }),
+
+      setLoadingCandidates: (loading) => set({ isLoadingCandidates: loading }),
+
+      setError: (error) => set({ error, isLoadingCandidates: false }),
+
+      startMapping: (response, threshold) => {
+        const { inputBranchStates, branchSortMode, customBranchOrder } = get();
+
+        // Initialize selections with above-threshold candidates pre-checked
+        const selections: Record<number, string[]> = {};
+        const nodeStatuses: Record<number, NodeStatus> = {};
+
+        // Initialize all available branches — apply input-page mandatory prefs
+        const branchStates: Record<string, BranchState> = {};
+        for (const b of response.branches_available) {
+          branchStates[b.name] = inputBranchStates[b.name] === 'mandatory' ? 'mandatory' : 'normal';
+        }
+        // Also include branches that have candidates but may not be in branches_available
+        for (const item of response.items) {
+          nodeStatuses[item.item_index] = 'pending';
+          selections[item.item_index] = getHighConfidenceCandidates(
+            response,
+            item.item_index,
+          );
+          for (const group of item.branch_groups) {
+            if (!(group.branch in branchStates)) {
+              branchStates[group.branch] = inputBranchStates[group.branch] === 'mandatory' ? 'mandatory' : 'normal';
+            }
+          }
+        }
+
+        set({
+          mappingResponse: response,
+          totalItems: response.total_items,
+          currentItemIndex: 0,
+          selections,
+          nodeStatuses,
+          threshold,
+          branchStates,
+          // Preserve user's sort preferences from input page
+          branchSortMode,
+          customBranchOrder,
+          selectedCandidateIri: null,
+          notes: {},
+          statusFilter: 'all' as StatusFilter,
+          isLoadingCandidates: false,
+          error: null,
+        });
+      },
+
+      resetMapping: () =>
+        set({
+          mappingResponse: null,
+          currentItemIndex: 0,
+          totalItems: 0,
+          selections: {},
+          nodeStatuses: {},
+          threshold: 45,
+          branchStates: {},
+          branchSortMode: 'default' as BranchSortMode,
+          customBranchOrder: [],
+          inputBranchStates: { 'Area of Law': 'mandatory' },
+          selectedCandidateIri: null,
+          notes: {},
+          statusFilter: 'all' as StatusFilter,
+          pipelineMetadata: null,
+          isLoadingCandidates: false,
+          error: null,
+        }),
     }),
-}));
+    {
+      name: 'folio-mapper-session-mapping',
+      storage: createJSONStorage(() => debouncedStorage),
+      partialize: (state) => ({
+        mappingResponse: state.mappingResponse,
+        currentItemIndex: state.currentItemIndex,
+        selections: state.selections,
+        nodeStatuses: state.nodeStatuses,
+        threshold: state.threshold,
+        branchStates: state.branchStates,
+        branchSortMode: state.branchSortMode,
+        customBranchOrder: state.customBranchOrder,
+        inputBranchStates: state.inputBranchStates,
+        notes: state.notes,
+        statusFilter: state.statusFilter,
+        pipelineMetadata: state.pipelineMetadata,
+      }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<MappingState> | undefined;
+        if (!p) return current;
+        return {
+          ...current,
+          ...p,
+          // Re-derive totalItems from mappingResponse
+          totalItems: p.mappingResponse?.total_items ?? 0,
+          // Reset transient fields
+          selectedCandidateIri: null,
+          folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
+          isLoadingCandidates: false,
+          error: null,
+        };
+      },
+    },
+  ),
+);

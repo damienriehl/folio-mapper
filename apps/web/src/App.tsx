@@ -10,6 +10,8 @@ import {
   Header,
   LLMSettings,
   BranchOptionsPanel,
+  SessionRecoveryModal,
+  NewProjectModal,
 } from '@folio-mapper/ui';
 import { useInputStore } from './store/input-store';
 import { useMappingStore } from './store/mapping-store';
@@ -19,6 +21,7 @@ import { useTextDetection } from './hooks/useTextDetection';
 import { useFolioWarmup } from './hooks/useFolioWarmup';
 import { useMapping } from './hooks/useMapping';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useSession } from './hooks/useSession';
 
 export function App() {
   const {
@@ -49,6 +52,9 @@ export function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Session persistence
+  const session = useSession();
 
   // Full FOLIO branch list for input-page Branch Options panel
   const allFolioBranches = Object.values(BRANCH_COLORS).map((b) => ({
@@ -177,6 +183,16 @@ export function App() {
     }
   };
 
+  // Session file load handler for input screen
+  const handleSessionFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      session.handleLoadSessionFile(file);
+    }
+    // Reset input so re-selecting same file triggers change
+    e.target.value = '';
+  };
+
   const settingsModal = showSettings && (
     <LLMSettings
       activeProvider={llmState.activeProvider}
@@ -190,6 +206,9 @@ export function App() {
     />
   );
 
+  // Recovery modal data
+  const recoveryData = session.showRecoveryModal ? session.getRecoveryData() : null;
+
   // Mapping screen uses full-width layout (no centering/padding)
   if (screen === 'mapping') {
     return (
@@ -201,8 +220,18 @@ export function App() {
             resetInput();
             setIsPipelineRun(false);
           }}
+          onSaveSession={session.downloadSession}
+          onNewProject={session.handleNewProject}
+          hasActiveSession={session.hasActiveSession}
         />
         {settingsModal}
+        {session.showNewProjectModal && (
+          <NewProjectModal
+            onSaveAndNew={session.handleSaveAndNew}
+            onDiscardAndNew={session.handleDiscardAndNew}
+            onCancel={session.handleCancelNewProject}
+          />
+        )}
         {mappingState.mappingResponse ? (
           <MappingScreen
             mappingResponse={mappingState.mappingResponse}
@@ -286,6 +315,26 @@ export function App() {
     <AppShell onOpenSettings={() => setShowSettings(true)}>
       {settingsModal}
 
+      {recoveryData && (
+        <SessionRecoveryModal
+          created={recoveryData.created}
+          totalNodes={recoveryData.totalNodes}
+          completedCount={recoveryData.completedCount}
+          skippedCount={recoveryData.skippedCount}
+          onResume={session.handleResume}
+          onStartFresh={session.handleStartFresh}
+          onDownload={session.handleDownloadSession}
+        />
+      )}
+
+      {session.showNewProjectModal && (
+        <NewProjectModal
+          onSaveAndNew={session.handleSaveAndNew}
+          onDiscardAndNew={session.handleDiscardAndNew}
+          onCancel={session.handleCancelNewProject}
+        />
+      )}
+
       {screen === 'input' && (
         <InputScreen
           fileDropZone={
@@ -314,6 +363,20 @@ export function App() {
             />
           }
           error={error}
+          sessionFileInput={
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Resume Session
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleSessionFileSelect}
+                className="hidden"
+              />
+            </label>
+          }
         />
       )}
 
