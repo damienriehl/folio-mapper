@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
   BranchFallbackResult,
+  BranchSortMode,
   BranchState,
   FolioCandidate,
   FolioStatus,
@@ -25,6 +26,10 @@ interface MappingState {
   threshold: number; // default 45
   branchStates: Record<string, BranchState>;
 
+  // Branch ordering
+  branchSortMode: BranchSortMode;
+  customBranchOrder: string[];
+
   // Detail panel
   selectedCandidateIri: string | null;
 
@@ -46,6 +51,8 @@ interface MappingState {
   toggleCandidate: (itemIndex: number, iriHash: string) => void;
   setThreshold: (threshold: number) => void;
   setBranchState: (branchName: string, state: BranchState) => void;
+  setBranchSortMode: (mode: BranchSortMode) => void;
+  setCustomBranchOrder: (order: string[]) => void;
   mergeFallbackResults: (itemIndex: number, fallbackResults: BranchFallbackResult[]) => void;
   selectCandidateForDetail: (iriHash: string | null) => void;
   setPipelineMetadata: (metadata: PipelineItemMetadata[] | null) => void;
@@ -83,6 +90,8 @@ export const useMappingStore = create<MappingState>((set, get) => ({
   nodeStatuses: {},
   threshold: 45,
   branchStates: {},
+  branchSortMode: 'default' as BranchSortMode,
+  customBranchOrder: [] as string[],
   selectedCandidateIri: null,
   pipelineMetadata: null,
   folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
@@ -181,6 +190,18 @@ export const useMappingStore = create<MappingState>((set, get) => ({
     set({ branchStates: { ...branchStates, [branchName]: state } });
   },
 
+  setBranchSortMode: (mode) => {
+    const { customBranchOrder, branchStates } = get();
+    if (mode === 'custom' && customBranchOrder.length === 0) {
+      // Initialize custom order from current branch names
+      set({ branchSortMode: mode, customBranchOrder: Object.keys(branchStates) });
+    } else {
+      set({ branchSortMode: mode });
+    }
+  },
+
+  setCustomBranchOrder: (order) => set({ customBranchOrder: order }),
+
   mergeFallbackResults: (itemIndex, fallbackResults) => {
     const { mappingResponse } = get();
     if (!mappingResponse) return;
@@ -270,6 +291,8 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       nodeStatuses,
       threshold,
       branchStates,
+      branchSortMode: 'default' as BranchSortMode,
+      customBranchOrder: [],
       selectedCandidateIri: null,
       isLoadingCandidates: false,
       error: null,
@@ -285,6 +308,8 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       nodeStatuses: {},
       threshold: 45,
       branchStates: {},
+      branchSortMode: 'default' as BranchSortMode,
+      customBranchOrder: [],
       selectedCandidateIri: null,
       pipelineMetadata: null,
       isLoadingCandidates: false,
