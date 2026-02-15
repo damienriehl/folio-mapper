@@ -15,6 +15,7 @@ class PreScanSegment(BaseModel):
     text: str
     branches: list[str] = []
     reasoning: str = ""
+    synonyms: list[str] = []
 
 
 class PreScanResult(BaseModel):

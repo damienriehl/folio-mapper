@@ -66,10 +66,17 @@ def _parse_prescan_json(raw: str, original_text: str) -> PreScanResult:
             raw_branches = []
         valid_branches = [b for b in raw_branches if b in _VALID_BRANCHES]
 
+        # Extract synonyms
+        raw_synonyms = seg.get("synonyms", [])
+        if not isinstance(raw_synonyms, list):
+            raw_synonyms = []
+        synonyms = [s.strip() for s in raw_synonyms if isinstance(s, str) and s.strip()]
+
         segments.append(PreScanSegment(
             text=text,
             branches=valid_branches,
             reasoning=seg.get("reasoning", ""),
+            synonyms=synonyms,
         ))
 
     if not segments:

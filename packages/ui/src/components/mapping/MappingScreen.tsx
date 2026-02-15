@@ -8,6 +8,7 @@ import type {
   ItemMappingResult,
   MappingResponse,
   NodeStatus,
+  PreScanSegment,
 } from '@folio-mapper/core';
 import { DEFAULT_BRANCH_ORDER } from '@folio-mapper/core';
 import { CandidatePanel } from './CandidatePanel';
@@ -17,6 +18,7 @@ import { MappingFooter } from './MappingFooter';
 import { FolioLoadingOverlay } from './FolioLoadingOverlay';
 import { GoToDialog } from './GoToDialog';
 import { BranchOptionsModal } from './BranchOptionsModal';
+import { PrescanDisplay } from './PrescanDisplay';
 
 interface MappingScreenProps {
   mappingResponse: MappingResponse;
@@ -29,6 +31,7 @@ interface MappingScreenProps {
   allBranches: Array<{ name: string; color: string }>;
   selectedCandidateIri: string | null;
   folioStatus: FolioStatus;
+  prescanSegments?: PreScanSegment[] | null;
   isLoadingCandidates: boolean;
   showGoToDialog: boolean;
   branchSortMode: BranchSortMode;
@@ -94,6 +97,7 @@ export function MappingScreen({
   branchStates,
   allBranches,
   selectedCandidateIri,
+  prescanSegments,
   folioStatus,
   isLoadingCandidates,
   showGoToDialog,
@@ -198,7 +202,7 @@ export function MappingScreen({
             <div className="shrink-0 border-b border-gray-200 bg-white px-4 pt-3 pb-3">
               <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Your Input</p>
-                <p className="mt-1 text-base font-semibold text-gray-900">{currentItem.item_text}</p>
+                <PrescanDisplay itemText={currentItem.item_text} segments={prescanSegments ?? null} />
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <button

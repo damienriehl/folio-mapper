@@ -183,6 +183,9 @@ export function App() {
               }))
             }
             selectedCandidateIri={mappingState.selectedCandidateIri}
+            prescanSegments={
+              mappingState.pipelineMetadata?.[mappingState.currentItemIndex]?.prescan?.segments
+            }
             folioStatus={mappingState.folioStatus}
             isLoadingCandidates={mappingState.isLoadingCandidates}
             showGoToDialog={showGoToDialog}

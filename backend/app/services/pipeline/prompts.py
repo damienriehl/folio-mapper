@@ -71,10 +71,12 @@ def build_prescan_prompt(text: str) -> list[dict]:
         "2. Assign 1-3 branches per segment that are most likely to contain matching FOLIO concepts.\n"
         "3. Provide brief reasoning for each segment's branch assignment.\n"
         "4. If a concept spans multiple branches, list all relevant ones.\n"
-        "5. Use EXACT branch names from the list above.\n\n"
+        "5. Use EXACT branch names from the list above.\n"
+        "6. For each segment, provide 2-5 synonyms or paraphrases that a legal ontology might use "
+        "for the same concept (e.g., legal terminology variants, formal/informal equivalents).\n\n"
         "Respond with ONLY valid JSON (no markdown fences) in this format:\n"
         '{"segments": [{"text": "segment text", "branches": ["Branch Name 1", "Branch Name 2"], '
-        '"reasoning": "why these branches"}]}'
+        '"reasoning": "why these branches", "synonyms": ["synonym1", "synonym2"]}]}'
     )
 
     user = f"Analyze and segment this legal text, tagging each segment with relevant FOLIO branches:\n\n{text}"
