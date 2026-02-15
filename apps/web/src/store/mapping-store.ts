@@ -11,6 +11,7 @@ import type {
   StatusFilter,
   SuggestionEntry,
 } from '@folio-mapper/core';
+import { computeScoreCutoff } from '@folio-mapper/core';
 import { createDebouncedStorage } from './session-storage';
 
 interface MappingState {
@@ -26,7 +27,8 @@ interface MappingState {
   nodeStatuses: Record<number, NodeStatus>;
 
   // Filters
-  threshold: number; // default 45
+  topN: number; // transient — resets to defaultTopN on navigation
+  defaultTopN: number; // persisted user preference
   branchStates: Record<string, BranchState>;
 
   // Branch ordering
@@ -67,7 +69,8 @@ interface MappingState {
   goToItem: (index: number) => void;
   acceptAllDefaults: () => void;
   toggleCandidate: (itemIndex: number, iriHash: string) => void;
-  setThreshold: (threshold: number) => void;
+  setTopN: (n: number) => void;
+  setDefaultTopN: (n: number) => void;
   setBranchState: (branchName: string, state: BranchState) => void;
   setInputBranchState: (branchName: string, state: BranchState) => void;
   setBranchSortMode: (mode: BranchSortMode) => void;
@@ -86,7 +89,7 @@ interface MappingState {
   removeSuggestion: (id: string) => void;
   updateSuggestion: (id: string, updates: Partial<SuggestionEntry>) => void;
   clearSuggestionQueue: () => void;
-  startMapping: (response: MappingResponse, threshold: number) => void;
+  startMapping: (response: MappingResponse) => void;
   resetMapping: () => void;
 }
 
@@ -136,7 +139,8 @@ export const useMappingStore = create<MappingState>()(
       totalItems: 0,
       selections: {},
       nodeStatuses: {},
-      threshold: 45,
+      topN: 5,
+      defaultTopN: 5,
       branchStates: {},
       branchSortMode: 'default' as BranchSortMode,
       customBranchOrder: [] as string[],
@@ -182,6 +186,7 @@ export const useMappingStore = create<MappingState>()(
         set({
           nodeStatuses: updatedStatuses,
           currentItemIndex: nextIndex,
+          topN: get().defaultTopN,
           selectedCandidateIri: null,
           searchFilterHashes: null,
         });
@@ -204,6 +209,7 @@ export const useMappingStore = create<MappingState>()(
 
         set({
           currentItemIndex: prevIndex,
+          topN: get().defaultTopN,
           selectedCandidateIri: null,
           searchFilterHashes: null,
         });
@@ -229,6 +235,7 @@ export const useMappingStore = create<MappingState>()(
         set({
           nodeStatuses: updatedStatuses,
           currentItemIndex: nextIndex,
+          topN: get().defaultTopN,
           selectedCandidateIri: null,
           searchFilterHashes: null,
         });
@@ -237,12 +244,12 @@ export const useMappingStore = create<MappingState>()(
       goToItem: (index) => {
         const { totalItems } = get();
         if (index >= 0 && index < totalItems) {
-          set({ currentItemIndex: index, selectedCandidateIri: null, searchFilterHashes: null });
+          set({ currentItemIndex: index, topN: get().defaultTopN, selectedCandidateIri: null, searchFilterHashes: null });
         }
       },
 
       acceptAllDefaults: () => {
-        const { mappingResponse, threshold, selections, nodeStatuses } = get();
+        const { mappingResponse, defaultTopN, branchStates, selections, nodeStatuses } = get();
         if (!mappingResponse) return;
 
         const updatedSelections = { ...selections };
@@ -254,10 +261,15 @@ export const useMappingStore = create<MappingState>()(
 
           const item = mappingResponse.items[i];
           if (!item) continue;
+
+          const cutoff = computeScoreCutoff(item.branch_groups, defaultTopN, branchStates);
           const visible: string[] = [];
           for (const group of item.branch_groups) {
+            const state = branchStates[group.branch];
+            if (state === 'excluded') continue;
+            const isMandatory = state === 'mandatory';
             for (const candidate of group.candidates) {
-              if (candidate.score >= threshold) {
+              if (isMandatory || candidate.score >= cutoff) {
                 visible.push(candidate.iri_hash);
               }
             }
@@ -284,7 +296,9 @@ export const useMappingStore = create<MappingState>()(
         });
       },
 
-      setThreshold: (threshold) => set({ threshold }),
+      setTopN: (n) => set({ topN: n }),
+
+      setDefaultTopN: (n) => set({ defaultTopN: n, topN: n }),
 
       setBranchState: (branchName, state) => {
         const { branchStates } = get();
@@ -452,10 +466,10 @@ export const useMappingStore = create<MappingState>()(
 
       clearSuggestionQueue: () => set({ suggestionQueue: [] }),
 
-      startMapping: (response, threshold) => {
-        const { inputBranchStates, branchSortMode, customBranchOrder } = get();
+      startMapping: (response) => {
+        const { inputBranchStates, branchSortMode, customBranchOrder, defaultTopN } = get();
 
-        // Initialize selections with above-threshold candidates pre-checked
+        // Initialize selections with high-confidence candidates pre-checked
         const selections: Record<number, string[]> = {};
         const nodeStatuses: Record<number, NodeStatus> = {};
 
@@ -484,7 +498,7 @@ export const useMappingStore = create<MappingState>()(
           currentItemIndex: 0,
           selections,
           nodeStatuses,
-          threshold,
+          topN: defaultTopN,
           branchStates,
           // Preserve user's sort preferences from input page
           branchSortMode,
@@ -504,7 +518,7 @@ export const useMappingStore = create<MappingState>()(
           totalItems: 0,
           selections: {},
           nodeStatuses: {},
-          threshold: 45,
+          topN: 5,
           branchStates: {},
           branchSortMode: 'default' as BranchSortMode,
           customBranchOrder: [],
@@ -527,7 +541,7 @@ export const useMappingStore = create<MappingState>()(
         currentItemIndex: state.currentItemIndex,
         selections: state.selections,
         nodeStatuses: state.nodeStatuses,
-        threshold: state.threshold,
+        defaultTopN: state.defaultTopN,
         branchStates: state.branchStates,
         branchSortMode: state.branchSortMode,
         customBranchOrder: state.customBranchOrder,
@@ -545,6 +559,8 @@ export const useMappingStore = create<MappingState>()(
           ...p,
           // Re-derive totalItems from mappingResponse
           totalItems: p.mappingResponse?.total_items ?? 0,
+          // Init topN from persisted defaultTopN (transient field)
+          topN: p.defaultTopN ?? current.defaultTopN,
           // Reset transient fields
           selectedCandidateIri: null,
           folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },

@@ -78,11 +78,12 @@ describe('mapping-store', () => {
     expect(state.mappingResponse).toBeNull();
     expect(state.currentItemIndex).toBe(0);
     expect(state.totalItems).toBe(0);
-    expect(state.threshold).toBe(45);
+    expect(state.topN).toBe(5);
+    expect(state.defaultTopN).toBe(5);
   });
 
   it('startMapping initializes state and auto-selects only high-confidence candidates', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     const state = useMappingStore.getState();
 
     expect(state.totalItems).toBe(2);
@@ -100,7 +101,7 @@ describe('mapping-store', () => {
   });
 
   it('nextItem marks current as completed and advances', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().nextItem();
 
     const state = useMappingStore.getState();
@@ -109,7 +110,7 @@ describe('mapping-store', () => {
   });
 
   it('nextItem does not go past last item', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().nextItem();
     useMappingStore.getState().nextItem();
 
@@ -117,7 +118,7 @@ describe('mapping-store', () => {
   });
 
   it('prevItem goes back', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().nextItem();
     useMappingStore.getState().prevItem();
 
@@ -125,14 +126,14 @@ describe('mapping-store', () => {
   });
 
   it('prevItem does not go below 0', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().prevItem();
 
     expect(useMappingStore.getState().currentItemIndex).toBe(0);
   });
 
   it('skipItem marks as skipped and advances', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().skipItem();
 
     const state = useMappingStore.getState();
@@ -141,21 +142,21 @@ describe('mapping-store', () => {
   });
 
   it('goToItem navigates to specific item', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().goToItem(1);
 
     expect(useMappingStore.getState().currentItemIndex).toBe(1);
   });
 
   it('goToItem rejects out of range', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().goToItem(99);
 
     expect(useMappingStore.getState().currentItemIndex).toBe(0);
   });
 
   it('toggleCandidate adds and removes candidates', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
 
     // Add Rtest2 (was not pre-selected)
     useMappingStore.getState().toggleCandidate(0, 'Rtest2');
@@ -166,8 +167,8 @@ describe('mapping-store', () => {
     expect(useMappingStore.getState().selections[0]).not.toContain('Rtest1');
   });
 
-  it('acceptAllDefaults completes all items with above-threshold candidates', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+  it('acceptAllDefaults completes all items with visible candidates', () => {
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().acceptAllDefaults();
 
     const state = useMappingStore.getState();
@@ -178,7 +179,7 @@ describe('mapping-store', () => {
   });
 
   it('acceptAllDefaults skips already completed items', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
 
     // Manually clear selections for item 0 and mark completed
     useMappingStore.getState().toggleCandidate(0, 'Rtest1'); // remove
@@ -191,13 +192,41 @@ describe('mapping-store', () => {
     expect(state.selections[0]).not.toContain('Rtest1');
   });
 
-  it('setThreshold updates threshold', () => {
-    useMappingStore.getState().setThreshold(70);
-    expect(useMappingStore.getState().threshold).toBe(70);
+  it('setTopN updates topN', () => {
+    useMappingStore.getState().setTopN(10);
+    expect(useMappingStore.getState().topN).toBe(10);
+  });
+
+  it('setDefaultTopN updates both defaultTopN and topN', () => {
+    useMappingStore.getState().setDefaultTopN(15);
+    const state = useMappingStore.getState();
+    expect(state.defaultTopN).toBe(15);
+    expect(state.topN).toBe(15);
+  });
+
+  it('navigation resets topN to defaultTopN', () => {
+    useMappingStore.getState().startMapping(mockResponse);
+    useMappingStore.getState().setDefaultTopN(10);
+    useMappingStore.getState().setTopN(20); // temporarily override
+
+    useMappingStore.getState().nextItem();
+    expect(useMappingStore.getState().topN).toBe(10);
+
+    useMappingStore.getState().setTopN(20);
+    useMappingStore.getState().prevItem();
+    expect(useMappingStore.getState().topN).toBe(10);
+
+    useMappingStore.getState().setTopN(20);
+    useMappingStore.getState().skipItem();
+    expect(useMappingStore.getState().topN).toBe(10);
+
+    useMappingStore.getState().setTopN(20);
+    useMappingStore.getState().goToItem(0);
+    expect(useMappingStore.getState().topN).toBe(10);
   });
 
   it('setBranchState cycles through states', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+    useMappingStore.getState().startMapping(mockResponse);
 
     // Set to mandatory
     useMappingStore.getState().setBranchState('Area of Law', 'mandatory');
@@ -220,13 +249,17 @@ describe('mapping-store', () => {
     expect(useMappingStore.getState().selectedCandidateIri).toBeNull();
   });
 
-  it('resetMapping clears all state', () => {
-    useMappingStore.getState().startMapping(mockResponse, 45);
+  it('resetMapping clears state but preserves defaultTopN', () => {
+    useMappingStore.getState().setDefaultTopN(15);
+    useMappingStore.getState().startMapping(mockResponse);
     useMappingStore.getState().resetMapping();
 
     const state = useMappingStore.getState();
     expect(state.mappingResponse).toBeNull();
     expect(state.totalItems).toBe(0);
     expect(state.currentItemIndex).toBe(0);
+    expect(state.topN).toBe(5);
+    // defaultTopN is a user preference — preserved across resets
+    expect(state.defaultTopN).toBe(15);
   });
 });
