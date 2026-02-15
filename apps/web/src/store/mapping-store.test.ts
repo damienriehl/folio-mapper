@@ -95,8 +95,8 @@ describe('mapping-store', () => {
     // All items should be pending
     expect(state.nodeStatuses[0]).toBe('pending');
     expect(state.nodeStatuses[1]).toBe('pending');
-    // Branches should be initialized as normal
-    expect(state.branchStates['Area of Law']).toBe('normal');
+    // Area of Law should be mandatory by default
+    expect(state.branchStates['Area of Law']).toBe('mandatory');
   });
 
   it('nextItem marks current as completed and advances', () => {
