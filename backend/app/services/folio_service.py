@@ -234,6 +234,17 @@ def _word_overlap(query_words: set[str], target_words: set[str]) -> float:
                 elif len(sw) >= 3 and len(dw) >= 3:
                     if sw.startswith(dw) or dw.startswith(sw):
                         best = max(best, 0.8)
+                    elif len(sw) >= 5 and len(dw) >= 5:
+                        # Common-stem credit for morphological variants
+                        # e.g., "defense"/"defendant" share prefix "defen"
+                        pfx = 0
+                        for c1, c2 in zip(sw, dw):
+                            if c1 == c2:
+                                pfx += 1
+                            else:
+                                break
+                        if pfx >= 4 and pfx / min(len(sw), len(dw)) >= 0.7:
+                            best = max(best, 0.7)
             matched += best
         return matched / len(source)
 
@@ -406,6 +417,16 @@ def search_candidates(
                 if h not in raw:
                     raw[h] = owl_class
 
+    # Stem prefix search: discover morphological variants by truncating content
+    # words to their likely stem.  e.g., "defense" → prefix "defen" finds "Defendant"
+    for cw in content_words:
+        if len(cw) >= 6:
+            stem = cw[: len(cw) - 2]
+            for owl_class in folio.search_by_prefix(stem)[:50]:
+                h = _extract_iri_hash(owl_class.iri)
+                if h not in raw:
+                    raw[h] = owl_class
+
     # Definition search (catches concepts that mention the term in their definition)
     def_terms = [term]
     cw_phrase = " ".join(sorted(content_words))
@@ -469,7 +490,6 @@ def search_candidates(
     #   → parent "Criminal Misdemeanor Offenses" → search "criminal" → "Criminal Law" (Area of Law)
     if use_bridging:
         existing_hashes = {h for h, _, _ in scored}
-        existing_branches = {get_branch_for_class(folio, h) for h, _, _ in scored}
         bridged: dict[str, float] = {}
         searched_words: set[str] = set()
         bridge_sources = sorted(
@@ -496,9 +516,6 @@ def search_candidates(
                     for found_class, _ in folio.search_by_label(pw, include_alt_labels=True, limit=50):
                         fh = _extract_iri_hash(found_class.iri)
                         if fh in existing_hashes or fh in bridged:
-                            continue
-                        found_branch = get_branch_for_class(folio, fh)
-                        if found_branch in existing_branches:
                             continue
                         found_label_words = _content_words(found_class.label or "")
                         if pw in found_label_words:
