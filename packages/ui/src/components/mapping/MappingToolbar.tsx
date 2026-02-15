@@ -63,23 +63,6 @@ export function MappingToolbar({
             >
               Next &rarr;
             </button>
-            <button
-              type="button"
-              onClick={onSkip}
-              className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-              title="Skip (S)"
-            >
-              Skip (S)
-            </button>
-            <button
-              type="button"
-              onClick={onGoTo}
-              className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-              title="Go to... (G)"
-            >
-              Go to (G)
-            </button>
-
             <div className="ml-2 flex items-center gap-2 border-l border-gray-200 pl-3">
               <label className="text-xs font-medium text-gray-500 whitespace-nowrap" htmlFor="toolbar-threshold">
                 Threshold
