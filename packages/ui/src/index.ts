@@ -23,6 +23,9 @@ export { GoToDialog } from './components/mapping/GoToDialog';
 export { BranchOptionsModal } from './components/mapping/BranchOptionsModal';
 export { FolioLoadingOverlay } from './components/mapping/FolioLoadingOverlay';
 export { ShortcutsOverlay } from './components/mapping/ShortcutsOverlay';
+export { SuggestionQueuePanel } from './components/mapping/SuggestionQueuePanel';
+export { SuggestionEditModal } from './components/mapping/SuggestionEditModal';
+export { SubmissionModal } from './components/mapping/SubmissionModal';
 
 // Settings components (Stage 3)
 export { LLMSettings } from './components/settings/LLMSettings';

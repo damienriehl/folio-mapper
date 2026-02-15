@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { parseText, testConnection, fetchModels, BRANCH_COLORS } from '@folio-mapper/core';
+import type { SuggestionEntry } from '@folio-mapper/core';
 import {
   AppShell,
   InputScreen,
@@ -13,6 +14,8 @@ import {
   SessionRecoveryModal,
   NewProjectModal,
   ExportModal,
+  SuggestionEditModal,
+  SubmissionModal,
 } from '@folio-mapper/ui';
 import { useInputStore } from './store/input-store';
 import { useMappingStore } from './store/mapping-store';
@@ -24,6 +27,7 @@ import { useMapping } from './hooks/useMapping';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useSession } from './hooks/useSession';
 import { useExport } from './hooks/useExport';
+import { useSuggestionSubmit } from './hooks/useSuggestionSubmit';
 
 export function App() {
   const {
@@ -56,6 +60,58 @@ export function App() {
 
   // Export
   const exportState = useExport();
+
+  // Suggestion queue + submission
+  const suggestionSubmit = useSuggestionSubmit();
+  const [editingSuggestion, setEditingSuggestion] = useState<SuggestionEntry | null>(null);
+
+  const handleSuggestToFolio = useCallback(() => {
+    const { mappingResponse, currentItemIndex, notes } = mappingState;
+    if (!mappingResponse) return;
+    const item = mappingResponse.items[currentItemIndex];
+    if (!item) return;
+
+    // Gather top 5 candidates across all branches
+    const allCandidates = item.branch_groups.flatMap((g) =>
+      g.candidates.map((c) => ({
+        iri_hash: c.iri_hash,
+        label: c.label,
+        iri: c.iri,
+        branch: g.branch,
+        score: c.score,
+      })),
+    );
+    allCandidates.sort((a, b) => b.score - a.score);
+    const top5 = allCandidates.slice(0, 5);
+
+    // Build ancestry context
+    const ancestry = parseResult?.items.find((p) => p.index === item.item_index)?.ancestry ?? [];
+    const fullContext = ancestry.length > 0
+      ? [...ancestry, item.item_text].join(' > ')
+      : item.item_text;
+
+    const topCandidate = top5[0];
+
+    const entry: SuggestionEntry = {
+      id: crypto.randomUUID(),
+      item_index: currentItemIndex,
+      original_input: item.item_text,
+      full_input_context: fullContext,
+      suggested_label: item.item_text,
+      suggested_definition: '',
+      suggested_synonyms: [],
+      suggested_example: '',
+      suggested_parent_class: topCandidate
+        ? topCandidate.label
+        : '',
+      suggested_branch: topCandidate?.branch ?? '',
+      nearest_candidates: top5,
+      user_note: notes[currentItemIndex] || '',
+      flagged_at: new Date().toISOString(),
+    };
+
+    mappingState.addSuggestion(entry);
+  }, [mappingState, parseResult]);
 
   // Full FOLIO branch list for input-page Branch Options panel
   const allFolioBranches = Object.values(BRANCH_COLORS).map((b) => ({
@@ -127,6 +183,7 @@ export function App() {
   const { showGoToDialog, setShowGoToDialog, handleGoTo, showShortcutsOverlay, setShowShortcutsOverlay } = useKeyboardShortcuts(
     screen === 'mapping',
     () => exportState.setShowExportModal(true),
+    handleSuggestToFolio,
   );
 
   // Track whether current pipeline run is LLM-enhanced (for overlay messaging)
@@ -239,6 +296,31 @@ export function App() {
             isExporting={exportState.isExporting}
           />
         )}
+        {editingSuggestion && (
+          <SuggestionEditModal
+            entry={editingSuggestion}
+            onSave={(id, updates) => {
+              mappingState.updateSuggestion(id, updates);
+              setEditingSuggestion(null);
+            }}
+            onClose={() => setEditingSuggestion(null)}
+          />
+        )}
+        {suggestionSubmit.showSubmissionModal && mappingState.suggestionQueue.length > 0 && (() => {
+          const content = suggestionSubmit.getIssueContent();
+          return (
+            <SubmissionModal
+              issueTitle={content.title}
+              issueBody={content.body}
+              onCopyAndOpen={suggestionSubmit.handleCopyAndOpen}
+              onSubmitWithToken={suggestionSubmit.handleSubmitWithToken}
+              submissionResult={suggestionSubmit.submissionResult}
+              submissionError={suggestionSubmit.submissionError}
+              isSubmitting={suggestionSubmit.isSubmitting}
+              onClose={() => suggestionSubmit.setShowSubmissionModal(false)}
+            />
+          );
+        })()}
         {mappingState.mappingResponse ? (
           <MappingScreen
             mappingResponse={mappingState.mappingResponse}
@@ -291,6 +373,14 @@ export function App() {
             onStatusFilterChange={mappingState.setStatusFilter}
             onShowShortcuts={() => setShowShortcutsOverlay(true)}
             onExport={() => exportState.setShowExportModal(true)}
+            suggestionQueue={mappingState.suggestionQueue}
+            onSuggestToFolio={handleSuggestToFolio}
+            onRemoveSuggestion={mappingState.removeSuggestion}
+            onEditSuggestion={(entry) => setEditingSuggestion(entry)}
+            onOpenSubmission={() => {
+              suggestionSubmit.resetSubmission();
+              suggestionSubmit.setShowSubmissionModal(true);
+            }}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center">

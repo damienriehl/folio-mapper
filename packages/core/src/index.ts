@@ -12,3 +12,5 @@ export * from './pipeline/types';
 export * from './pipeline/api-client';
 export * from './session/index';
 export * from './export/index';
+export * from './suggestion/types';
+export * from './suggestion/issue-body';

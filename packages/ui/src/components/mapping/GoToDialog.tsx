@@ -18,8 +18,8 @@ export function GoToDialog({ totalItems, onGoTo, onClose }: GoToDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="w-72 rounded-lg bg-white p-4 shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <div className="w-72 rounded-lg bg-white p-4 shadow-lg" role="dialog" aria-modal="true" aria-label="Go to node" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 text-sm font-medium text-gray-900">Go to node</h3>
         <form onSubmit={handleSubmit}>
           <input

@@ -6,7 +6,7 @@ import { useMappingStore } from '../store/mapping-store';
  * Enter/ArrowRight=Next, ArrowLeft=Prev, S=Skip, Shift+A=Accept All,
  * G=GoTo, ?=Shortcuts, Ctrl+E=Export, Esc=Close
  */
-export function useKeyboardShortcuts(active: boolean, onExport?: () => void) {
+export function useKeyboardShortcuts(active: boolean, onExport?: () => void, onSuggest?: () => void) {
   const { nextItem, prevItem, skipItem, acceptAllDefaults, goToItem, totalItems } =
     useMappingStore();
   const [showGoToDialog, setShowGoToDialog] = useState(false);
@@ -57,6 +57,13 @@ export function useKeyboardShortcuts(active: boolean, onExport?: () => void) {
             setShowGoToDialog(true);
           }
           break;
+        case 'f':
+        case 'F':
+          if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            e.preventDefault();
+            onSuggest?.();
+          }
+          break;
         case '?':
           e.preventDefault();
           setShowShortcutsOverlay((prev) => !prev);
@@ -67,7 +74,7 @@ export function useKeyboardShortcuts(active: boolean, onExport?: () => void) {
           break;
       }
     },
-    [active, nextItem, prevItem, skipItem, acceptAllDefaults, onExport],
+    [active, nextItem, prevItem, skipItem, acceptAllDefaults, onExport, onSuggest],
   );
 
   useEffect(() => {

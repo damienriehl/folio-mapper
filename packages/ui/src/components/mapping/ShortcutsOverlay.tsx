@@ -9,6 +9,7 @@ const shortcuts = {
     { keys: ['S'], description: 'Skip item' },
     { keys: ['G'], description: 'Go to item' },
     { keys: ['Shift', 'A'], description: 'Accept all defaults' },
+    { keys: ['F'], description: 'Suggest to FOLIO' },
   ],
   general: [
     { keys: ['Ctrl', 'S'], description: 'Save session' },
@@ -34,6 +35,9 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
     >
       <div
         className="w-96 rounded-lg bg-white p-5 shadow-lg"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Keyboard shortcuts"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 text-sm font-semibold text-gray-900">Keyboard Shortcuts</h3>

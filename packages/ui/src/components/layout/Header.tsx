@@ -15,6 +15,7 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, hasActiveS
             onClick={onSaveSession}
             className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             title="Save Session (Ctrl+S)"
+            aria-label="Save session"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -40,6 +41,7 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, hasActiveS
             onClick={onOpenSettings}
             className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             title="LLM Settings"
+            aria-label="LLM settings"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

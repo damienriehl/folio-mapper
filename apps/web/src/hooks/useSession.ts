@@ -123,7 +123,7 @@ export function useSession() {
       custom_branch_order: mapping.customBranchOrder,
       status_filter: mapping.statusFilter,
 
-      suggestion_queue: [],
+      suggestion_queue: mapping.suggestionQueue,
     };
   }, []);
 
@@ -212,6 +212,7 @@ export function useSession() {
           customBranchOrder: session.custom_branch_order ?? [],
           statusFilter: session.status_filter ?? 'all',
           pipelineMetadata: session.pipeline_metadata ?? null,
+          suggestionQueue: session.suggestion_queue ?? [],
         });
       }
     } catch (err) {

@@ -9,6 +9,7 @@ import type {
   NodeStatus,
   PipelineItemMetadata,
   StatusFilter,
+  SuggestionEntry,
 } from '@folio-mapper/core';
 import { createDebouncedStorage } from './session-storage';
 
@@ -47,6 +48,9 @@ interface MappingState {
   // Pipeline metadata (from LLM-enhanced path)
   pipelineMetadata: PipelineItemMetadata[] | null;
 
+  // Suggestion queue for ALEA submissions
+  suggestionQueue: SuggestionEntry[];
+
   // FOLIO loading state
   folioStatus: FolioStatus;
   isLoadingCandidates: boolean;
@@ -74,6 +78,10 @@ interface MappingState {
   setFolioStatus: (status: FolioStatus) => void;
   setLoadingCandidates: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  addSuggestion: (entry: SuggestionEntry) => void;
+  removeSuggestion: (id: string) => void;
+  updateSuggestion: (id: string, updates: Partial<SuggestionEntry>) => void;
+  clearSuggestionQueue: () => void;
   startMapping: (response: MappingResponse, threshold: number) => void;
   resetMapping: () => void;
 }
@@ -133,6 +141,7 @@ export const useMappingStore = create<MappingState>()(
       statusFilter: 'all' as StatusFilter,
       selectedCandidateIri: null,
       pipelineMetadata: null,
+      suggestionQueue: [] as SuggestionEntry[],
       folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
       isLoadingCandidates: false,
       error: null,
@@ -406,6 +415,29 @@ export const useMappingStore = create<MappingState>()(
 
       setError: (error) => set({ error, isLoadingCandidates: false }),
 
+      addSuggestion: (entry) => {
+        const { suggestionQueue } = get();
+        // Prevent duplicate for same item
+        if (suggestionQueue.some((s) => s.item_index === entry.item_index)) return;
+        set({ suggestionQueue: [...suggestionQueue, entry] });
+      },
+
+      removeSuggestion: (id) => {
+        const { suggestionQueue } = get();
+        set({ suggestionQueue: suggestionQueue.filter((s) => s.id !== id) });
+      },
+
+      updateSuggestion: (id, updates) => {
+        const { suggestionQueue } = get();
+        set({
+          suggestionQueue: suggestionQueue.map((s) =>
+            s.id === id ? { ...s, ...updates } : s,
+          ),
+        });
+      },
+
+      clearSuggestionQueue: () => set({ suggestionQueue: [] }),
+
       startMapping: (response, threshold) => {
         const { inputBranchStates, branchSortMode, customBranchOrder } = get();
 
@@ -467,6 +499,7 @@ export const useMappingStore = create<MappingState>()(
           notes: {},
           statusFilter: 'all' as StatusFilter,
           pipelineMetadata: null,
+          suggestionQueue: [],
           isLoadingCandidates: false,
           error: null,
         }),
@@ -487,6 +520,7 @@ export const useMappingStore = create<MappingState>()(
         notes: state.notes,
         statusFilter: state.statusFilter,
         pipelineMetadata: state.pipelineMetadata,
+        suggestionQueue: state.suggestionQueue,
       }),
       merge: (persisted, current) => {
         const p = persisted as Partial<MappingState> | undefined;

@@ -11,7 +11,7 @@ export function NewProjectModal({
 }: NewProjectModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-label="Start new project">
         <h2 className="mb-2 text-lg font-semibold text-gray-900">Start New Project?</h2>
         <p className="mb-6 text-sm text-gray-600">
           You have an active session. Would you like to save it before starting fresh?
