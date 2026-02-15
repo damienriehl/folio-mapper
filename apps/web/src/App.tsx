@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { parseText, testConnection, fetchModels } from '@folio-mapper/core';
+import { parseText, testConnection, fetchModels, BRANCH_COLORS } from '@folio-mapper/core';
 import {
   AppShell,
   InputScreen,
@@ -9,6 +9,7 @@ import {
   MappingScreen,
   Header,
   LLMSettings,
+  BranchOptionsModal,
 } from '@folio-mapper/ui';
 import { useInputStore } from './store/input-store';
 import { useMappingStore } from './store/mapping-store';
@@ -43,6 +44,13 @@ export function App() {
   const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback } = useMapping();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showInputBranchOptions, setShowInputBranchOptions] = useState(false);
+
+  // Full FOLIO branch list for input-page Branch Options modal
+  const allFolioBranches = Object.values(BRANCH_COLORS).map((b) => ({
+    name: b.name,
+    color: b.color,
+  }));
 
   // Warmup FOLIO when on confirmation screen
   useFolioWarmup();
@@ -220,25 +228,49 @@ export function App() {
       {settingsModal}
 
       {screen === 'input' && (
-        <InputScreen
-          fileDropZone={
-            <FileDropZone
-              onFile={upload}
-              isLoading={isLoading}
-              selectedFileName={selectedFile?.name}
+        <>
+          <InputScreen
+            fileDropZone={
+              <FileDropZone
+                onFile={upload}
+                isLoading={isLoading}
+                selectedFileName={selectedFile?.name}
+              />
+            }
+            textInput={
+              <TextInput
+                value={textInput}
+                onChange={setTextInput}
+                itemCount={itemCount}
+                onSubmit={handleTextSubmit}
+                disabled={isLoading}
+              />
+            }
+            branchOptions={
+              <button
+                type="button"
+                onClick={() => setShowInputBranchOptions(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Branch Options
+              </button>
+            }
+            error={error}
+          />
+          {showInputBranchOptions && (
+            <BranchOptionsModal
+              allBranches={allFolioBranches}
+              branchStates={mappingState.inputBranchStates}
+              branchSortMode={mappingState.branchSortMode}
+              customBranchOrder={mappingState.customBranchOrder}
+              onSetBranchState={mappingState.setInputBranchState}
+              onSetBranchSortMode={mappingState.setBranchSortMode}
+              onSetCustomBranchOrder={mappingState.setCustomBranchOrder}
+              onClose={() => setShowInputBranchOptions(false)}
+              allowExclude={false}
             />
-          }
-          textInput={
-            <TextInput
-              value={textInput}
-              onChange={setTextInput}
-              itemCount={itemCount}
-              onSubmit={handleTextSubmit}
-              disabled={isLoading}
-            />
-          }
-          error={error}
-        />
+          )}
+        </>
       )}
 
       {screen === 'confirming' && parseResult && (

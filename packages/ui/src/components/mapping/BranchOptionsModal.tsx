@@ -11,11 +11,15 @@ interface BranchOptionsModalProps {
   onSetBranchSortMode: (mode: BranchSortMode) => void;
   onSetCustomBranchOrder: (order: string[]) => void;
   onClose: () => void;
+  allowExclude?: boolean;
 }
 
 const CYCLE_ORDER: BranchState[] = ['normal', 'mandatory', 'excluded'];
 
-function nextState(current: BranchState): BranchState {
+function nextState(current: BranchState, allowExclude: boolean): BranchState {
+  if (!allowExclude) {
+    return current === 'normal' ? 'mandatory' : 'normal';
+  }
   const idx = CYCLE_ORDER.indexOf(current);
   return CYCLE_ORDER[(idx + 1) % CYCLE_ORDER.length];
 }
@@ -66,6 +70,7 @@ export function BranchOptionsModal({
   onSetBranchSortMode,
   onSetCustomBranchOrder,
   onClose,
+  allowExclude = true,
 }: BranchOptionsModalProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -155,7 +160,9 @@ export function BranchOptionsModal({
         {/* Branch list */}
         <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
           <p className="mb-1.5 text-xs text-gray-400">
-            Click to cycle: Normal &rarr; Mandatory &rarr; Excluded
+            {allowExclude
+              ? 'Click to cycle: Normal \u2192 Mandatory \u2192 Excluded'
+              : 'Click to toggle: Normal / Mandatory'}
           </p>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="space-y-0.5">
@@ -192,7 +199,7 @@ export function BranchOptionsModal({
                     {/* Click-to-cycle button */}
                     <button
                       type="button"
-                      onClick={() => onSetBranchState(branch.name, nextState(state))}
+                      onClick={() => onSetBranchState(branch.name, nextState(state, allowExclude))}
                       className="flex flex-1 cursor-pointer items-center gap-2 text-left"
                     >
                       {/* State indicator */}
