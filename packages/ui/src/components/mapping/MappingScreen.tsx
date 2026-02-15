@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type {
   BranchGroup,
   BranchSortMode,
@@ -10,7 +10,7 @@ import type {
   NodeStatus,
   PreScanSegment,
 } from '@folio-mapper/core';
-import { DEFAULT_BRANCH_ORDER } from '@folio-mapper/core';
+import { DEFAULT_BRANCH_ORDER, fetchConcept } from '@folio-mapper/core';
 import { CandidatePanel } from './CandidatePanel';
 import { DetailPanel } from './DetailPanel';
 import { MappingToolbar } from './MappingToolbar';
@@ -19,6 +19,7 @@ import { FolioLoadingOverlay } from './FolioLoadingOverlay';
 import { GoToDialog } from './GoToDialog';
 import { BranchOptionsModal } from './BranchOptionsModal';
 import { PrescanDisplay } from './PrescanDisplay';
+import { SelectionTree } from './SelectionTree';
 
 interface MappingScreenProps {
   mappingResponse: MappingResponse;
@@ -134,16 +135,32 @@ export function MappingScreen({
     : [];
 
   // Find the selected candidate for the detail panel
-  let selectedCandidate: FolioCandidate | null = null;
+  let candidateFromData: FolioCandidate | null = null;
   if (selectedCandidateIri && currentItem) {
     for (const group of currentItem.branch_groups) {
       const found = group.candidates.find((c) => c.iri_hash === selectedCandidateIri);
       if (found) {
-        selectedCandidate = found;
+        candidateFromData = found;
         break;
       }
     }
   }
+
+  // Fetch full concept details for structural nodes (not in candidates list)
+  const [fetchedConcept, setFetchedConcept] = useState<FolioCandidate | null>(null);
+  useEffect(() => {
+    if (!selectedCandidateIri || candidateFromData) {
+      setFetchedConcept(null);
+      return;
+    }
+    let cancelled = false;
+    fetchConcept(selectedCandidateIri).then((concept) => {
+      if (!cancelled) setFetchedConcept(concept);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedCandidateIri, candidateFromData]);
+
+  const selectedCandidate = candidateFromData ?? fetchedConcept;
 
   // Collect all visible candidate IRI hashes for current item (respecting threshold + branch filters)
   // Mandatory branches bypass the threshold — show all candidates
@@ -281,9 +298,35 @@ export function MappingScreen({
             </div>
           </div>
 
-          {/* Right column: Detail Panel */}
-          <div className="w-1/2 overflow-y-auto p-4">
-            <DetailPanel currentItem={currentItem} selectedCandidate={selectedCandidate} />
+          {/* Right column: Selection Tree + Detail Panel */}
+          <div className="flex w-1/2 flex-col">
+            {/* Top half: Current Selection(s) */}
+            <div className="flex min-h-0 flex-1 flex-col border-b border-gray-200">
+              <div className="shrink-0 border-b border-gray-100 bg-white px-4 pt-3 pb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Current Selection(s)
+                </p>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <SelectionTree
+                  branchGroups={sortedBranchGroups}
+                  selectedIriHashes={currentSelections}
+                  selectedCandidateIri={selectedCandidateIri}
+                  onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
+                />
+              </div>
+            </div>
+            {/* Bottom half: Candidate Details */}
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="shrink-0 border-b border-gray-100 bg-white px-4 pt-3 pb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Candidate Details
+                </p>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <DetailPanel currentItem={currentItem} selectedCandidate={selectedCandidate} />
+              </div>
+            </div>
           </div>
         </div>
       )}

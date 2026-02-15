@@ -346,6 +346,28 @@ def _generate_search_terms(term: str) -> list[str]:
     return result
 
 
+def lookup_concept(iri_hash: str) -> FolioCandidate | None:
+    """Look up a single FOLIO concept by IRI hash and return full details."""
+    folio = get_folio()
+    owl_class = folio[iri_hash]
+    if not owl_class:
+        return None
+
+    branch_name = get_branch_for_class(folio, iri_hash)
+
+    return FolioCandidate(
+        label=owl_class.label or iri_hash,
+        iri=owl_class.iri,
+        iri_hash=iri_hash,
+        definition=owl_class.definition,
+        synonyms=owl_class.alternative_labels or [],
+        branch=branch_name,
+        branch_color=get_branch_color(branch_name),
+        hierarchy_path=_build_hierarchy_path(folio, iri_hash),
+        score=-1,
+    )
+
+
 def search_candidates(
     term: str,
     threshold: float = 0.3,

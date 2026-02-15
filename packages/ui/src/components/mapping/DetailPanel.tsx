@@ -16,7 +16,7 @@ export function DetailPanel({ currentItem, selectedCandidate }: DetailPanelProps
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-gray-900">{selectedCandidate.label}</h3>
-              <ConfidenceBadge score={selectedCandidate.score} />
+              {selectedCandidate.score >= 0 && <ConfidenceBadge score={selectedCandidate.score} />}
             </div>
             <div className="mt-1 flex items-center gap-2">
               <span
@@ -35,10 +35,12 @@ export function DetailPanel({ currentItem, selectedCandidate }: DetailPanelProps
             </div>
           </div>
 
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">IRI</p>
-            <IriDisplay iri={selectedCandidate.iri} iriHash={selectedCandidate.iri_hash} />
-          </div>
+          {selectedCandidate.iri && (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">IRI</p>
+              <IriDisplay iri={selectedCandidate.iri} iriHash={selectedCandidate.iri_hash} />
+            </div>
+          )}
 
           {selectedCandidate.definition && (
             <div>

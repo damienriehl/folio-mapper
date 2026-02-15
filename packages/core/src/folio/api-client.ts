@@ -1,5 +1,5 @@
 import type { ParseItem } from '../input/types';
-import type { BranchInfo, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
+import type { BranchInfo, FolioCandidate, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
 import type { PipelineRequestConfig } from '../pipeline/api-client';
 
 const BASE_URL = '/api/mapping';
@@ -52,6 +52,17 @@ export async function fetchBranches(): Promise<BranchInfo[]> {
 
   if (!res.ok) {
     throw new Error(`Failed to fetch branches (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function fetchConcept(iriHash: string): Promise<FolioCandidate> {
+  const res = await fetch(`${BASE_URL}/concept/${encodeURIComponent(iriHash)}`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Concept lookup failed' }));
+    throw new Error(err.detail || `Concept lookup failed (${res.status})`);
   }
 
   return res.json();
