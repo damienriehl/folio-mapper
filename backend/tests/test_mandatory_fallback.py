@@ -86,7 +86,7 @@ def test_branch_fallback_result_model():
                 synonyms=[],
                 branch="Area of Law",
                 branch_color="#1A5276",
-                hierarchy_path=["Area of Law", "Business Law"],
+                hierarchy_path=[{"label": "Area of Law", "iri_hash": "RAoL"}, {"label": "Business Law", "iri_hash": "RBL"}],
                 score=75.0,
             )
         ],
@@ -165,7 +165,7 @@ async def test_run_mandatory_fallback_local_only():
             "app.services.pipeline.mandatory_fallback._search_within_branch",
             return_value=[("RBOL", owl1, 65.0), ("RCF", owl2, 50.0)],
         ),
-        patch("app.services.pipeline.mandatory_fallback._build_hierarchy_path", return_value=["Area of Law", "Business Organizations Law"]),
+        patch("app.services.pipeline.mandatory_fallback._build_hierarchy_path", return_value=[{"label": "Area of Law", "iri_hash": "RAoL"}, {"label": "Business Organizations Law", "iri_hash": "RBOL"}]),
         patch("app.services.pipeline.mandatory_fallback.get_branch_for_class", return_value="Area of Law"),
     ):
         results = await run_mandatory_fallback(
@@ -212,7 +212,7 @@ async def test_run_mandatory_fallback_with_llm():
             new_callable=AsyncMock,
             return_value=["Business Law"],
         ),
-        patch("app.services.pipeline.mandatory_fallback._build_hierarchy_path", return_value=["Area of Law", "Business Law"]),
+        patch("app.services.pipeline.mandatory_fallback._build_hierarchy_path", return_value=[{"label": "Area of Law", "iri_hash": "RAoL"}, {"label": "Business Law", "iri_hash": "RBL"}]),
         patch("app.services.pipeline.mandatory_fallback.get_branch_for_class", return_value="Area of Law"),
         patch("app.services.pipeline.mandatory_fallback._content_words", return_value={"business", "formation"}),
         patch("app.services.pipeline.mandatory_fallback._compute_relevance_score", return_value=70.0),
@@ -269,7 +269,7 @@ async def test_mandatory_fallback_endpoint(client: AsyncClient):
                     synonyms=[],
                     branch="Area of Law",
                     branch_color="#1A5276",
-                    hierarchy_path=["Area of Law", "Business Law"],
+                    hierarchy_path=[{"label": "Area of Law", "iri_hash": "RAoL"}, {"label": "Business Law", "iri_hash": "RBL"}],
                     score=70.0,
                 )
             ],

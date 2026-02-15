@@ -11,6 +11,11 @@ class CandidateRequest(BaseModel):
     max_per_branch: int = 10
 
 
+class HierarchyPathEntry(BaseModel):
+    label: str
+    iri_hash: str
+
+
 class FolioCandidate(BaseModel):
     label: str
     iri: str
@@ -19,7 +24,7 @@ class FolioCandidate(BaseModel):
     synonyms: list[str] = []
     branch: str
     branch_color: str
-    hierarchy_path: list[str] = []
+    hierarchy_path: list[HierarchyPathEntry] = []
     score: float  # 0-100
 
 
