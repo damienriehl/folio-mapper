@@ -161,6 +161,36 @@ def run_stage1(
                     for iri_hash, owl_class, score in results:
                         segment_candidates.append((iri_hash, owl_class, score, branch_name))
 
+        # Re-score candidates against the original segment text.
+        # Synonym searches may find candidates that match the synonym but
+        # not the original query (e.g., "payment" synonym for "Blockchain"
+        # finds "Sales Tax Payment"). Re-scoring ensures the final score
+        # reflects relevance to the actual input, not just the synonym.
+        orig_content = _content_words(segment.text)
+        if orig_content:
+            min_score = threshold * 100
+            rescored = []
+            for iri_hash, owl_class, syn_score, branch_name in segment_candidates:
+                orig_score = _compute_relevance_score(
+                    orig_content, segment.text,
+                    owl_class.label or iri_hash,
+                    owl_class.definition,
+                    owl_class.alternative_labels or [],
+                )
+                if orig_score >= min_score:
+                    # Candidate matches the original text — keep full score
+                    rescored.append((iri_hash, owl_class, max(orig_score, syn_score), branch_name))
+                elif syn_score >= min_score:
+                    # Only matches via synonym — use the original-text score
+                    # (which captures partial relevance) with a minimum floor
+                    # so the candidate survives but at a lower score
+                    blended = max(orig_score, syn_score * 0.3)
+                    if blended >= min_score:
+                        rescored.append((iri_hash, owl_class, blended, branch_name))
+                    else:
+                        rescored.append((iri_hash, owl_class, min_score, branch_name))
+            segment_candidates = rescored
+
         # Fallback: if < 5 candidates for this segment, use unscoped search
         unique_hashes = {c[0] for c in segment_candidates}
         if len(unique_hashes) < 5:

@@ -33,6 +33,26 @@ def _strip_markdown_fences(text: str) -> str:
     return text.strip()
 
 
+def _repair_truncated_json(text: str) -> str | None:
+    """Attempt to repair JSON truncated by token limits.
+
+    If the LLM ran out of tokens mid-array, find the last complete object
+    and close the JSON structure.
+    """
+    last_brace = text.rfind("}")
+    if last_brace < 0:
+        return None
+    truncated = text[: last_brace + 1]
+    open_brackets = truncated.count("[") - truncated.count("]")
+    open_braces = truncated.count("{") - truncated.count("}")
+    truncated += "]" * open_brackets + "}" * open_braces
+    try:
+        json.loads(truncated)
+        return truncated
+    except json.JSONDecodeError:
+        return None
+
+
 def _parse_judge_json(
     raw: str,
     ranked_lookup: dict[str, RankedCandidate],
@@ -47,8 +67,14 @@ def _parse_judge_json(
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError:
-        logger.warning("Stage 3: Failed to parse JSON. Raw: %s", raw[:200])
-        return None
+        # Try to recover from truncated JSON (token limit hit)
+        repaired = _repair_truncated_json(cleaned)
+        if repaired:
+            logger.info("Stage 3: Recovered truncated JSON response.")
+            data = json.loads(repaired)
+        else:
+            logger.warning("Stage 3: Failed to parse JSON. Raw: %s", raw[:200])
+            return None
 
     judged_data = data.get("judged", [])
     if not isinstance(judged_data, list):
@@ -146,7 +172,7 @@ async def run_stage3(
         raw_response = await provider.complete(
             messages=messages,
             temperature=0.1,
-            max_tokens=2048,
+            max_tokens=4096,
         )
     except Exception as e:
         logger.error("Stage 3: LLM call failed: %s", e)

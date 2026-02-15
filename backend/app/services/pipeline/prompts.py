@@ -103,27 +103,19 @@ def build_ranking_prompt(
         segment_lines.append(f'- "{seg.text}" → branches: {branches_str}')
     segment_analysis = "\n".join(segment_lines)
 
-    # Group candidates by branch for presentation
-    by_branch: dict[str, list[ScopedCandidate]] = {}
+    # Present candidates in a flat list (not grouped by branch) to force
+    # independent evaluation and prevent batch-scoring by domain
+    candidate_lines = []
     for c in candidates:
-        by_branch.setdefault(c.branch, []).append(c)
+        parts = [f"- **{c.label}** (iri_hash: {c.iri_hash}, branch: {c.branch})"]
+        if c.definition:
+            defn = c.definition[:200] + "..." if len(c.definition) > 200 else c.definition
+            parts.append(f"  Definition: {defn}")
+        if c.synonyms:
+            parts.append(f"  Synonyms: {', '.join(c.synonyms[:5])}")
+        candidate_lines.append("\n".join(parts))
 
-    candidate_sections = []
-    for branch, cands in sorted(by_branch.items()):
-        lines = [f"\n### {branch}"]
-        for c in cands:
-            parts = [f"  - **{c.label}** (iri_hash: {c.iri_hash})"]
-            if c.definition:
-                # Truncate long definitions
-                defn = c.definition[:200] + "..." if len(c.definition) > 200 else c.definition
-                parts.append(f"    Definition: {defn}")
-            if c.synonyms:
-                parts.append(f"    Synonyms: {', '.join(c.synonyms[:5])}")
-            parts.append(f"    Local score: {c.score}")
-            lines.append("\n".join(parts))
-        candidate_sections.append("\n".join(lines))
-
-    candidates_text = "\n".join(candidate_sections)
+    candidates_text = "\n".join(candidate_lines)
 
     system = (
         "You are a legal ontology mapping specialist. Given a legal text and a list of "
@@ -135,16 +127,18 @@ def build_ranking_prompt(
         "- 30-54: Weak relevance. Same broad field but clearly different concept.\n"
         "- 1-29: Very weak. Only superficial connection.\n\n"
         "Rules:\n"
-        "1. Score each candidate INDEPENDENTLY based on semantic relevance to the input text. "
-        "Ignore the \"Local score\" shown — it is a keyword-matching heuristic and may be inaccurate.\n"
+        "1. Score each candidate INDEPENDENTLY based on semantic relevance to the input text.\n"
         "2. Use the FULL 0-100 range. Your top candidate and bottom candidate should differ by "
         "at least 30 points. Do NOT give similar scores to dissimilar candidates.\n"
         "3. Consider the segment analysis to understand which parts of the text match which branches.\n"
         "4. Prefer specific concepts over general ones when the text is specific.\n"
-        "5. A concept that merely contains the same keyword in a different context should score LOW.\n"
-        "6. Return at most 20 candidates, sorted by score descending.\n\n"
+        "5. A concept that merely shares a domain with the input but describes a DIFFERENT concept "
+        "should score VERY LOW (below 30). Example: for input \"Blockchain\", \"Sales Tax Payment\" "
+        "should score below 15 because it describes tax payments, not blockchain technology.\n"
+        "6. Return at most 20 candidates, sorted by score descending.\n"
+        "7. Keep reasoning to 1 short sentence per candidate.\n\n"
         "Respond with ONLY valid JSON (no markdown fences) in this format:\n"
-        '{"ranked": [{"iri_hash": "hash", "score": 85, "reasoning": "why this score"}]}'
+        '{"ranked": [{"iri_hash": "hash", "score": 85, "reasoning": "brief reason"}]}'
     )
 
     user = (
@@ -188,7 +182,7 @@ def build_judge_prompt(
         sc = scoped_lookup.get(r.iri_hash)
         if sc is None:
             continue
-        parts = [f"- **{sc.label}** (iri_hash: {r.iri_hash}, branch: {sc.branch}, current_score: {r.score})"]
+        parts = [f"- **{sc.label}** (iri_hash: {r.iri_hash}, branch: {sc.branch})"]
         if sc.definition:
             defn = sc.definition[:250] + "..." if len(sc.definition) > 250 else sc.definition
             parts.append(f"  Definition: {defn}")
@@ -212,8 +206,7 @@ def build_judge_prompt(
         "- 0: No connection at all — reject.\n\n"
         "CRITICAL: Score each candidate INDEPENDENTLY based on its semantic match to the input text. "
         "Do NOT cluster scores together. Candidates that are merely in the same legal domain as the "
-        "input should score much lower than candidates that directly describe the input concept. "
-        "Ignore the current_score shown — evaluate from scratch.\n\n"
+        "input should score much lower than candidates that directly describe the input concept.\n\n"
         "Your goals:\n"
         "1. REDUCE FALSE POSITIVES: If a candidate has surface-level word overlap but is not "
         "semantically relevant, give it a LOW score (penalize).\n"
@@ -231,13 +224,14 @@ def build_judge_prompt(
         "- reasoning: brief explanation\n\n"
         "Rules:\n"
         "- Score each candidate on its OWN merit. Do not give similar scores to dissimilar candidates.\n"
-        "- A concept with the input term in its name but in a completely different context should "
-        "score LOW (e.g., \"Enforcement of Visitation Claim\" is NOT a good match for general "
-        "\"enforcement\" — it is about family law visitation, not enforcement as a concept).\n"
-        "- Be strict and discriminating. The best candidate should score much higher than weak ones.\n\n"
+        "- Concepts that share a broad domain with the input but describe DIFFERENT things should "
+        "score VERY LOW (below 30). Example: for input \"Blockchain\", \"Sales Tax Payment\" "
+        "should score below 15 — it describes tax payments, not blockchain/DLT.\n"
+        "- Be strict and discriminating. The best candidate should score much higher than weak ones.\n"
+        "- Keep reasoning to 1 short sentence per candidate.\n\n"
         "Respond with ONLY valid JSON (no markdown fences) in this format:\n"
         '{"judged": [{"iri_hash": "hash", "adjusted_score": 85, "verdict": "confirmed", '
-        '"reasoning": "why this judgment"}]}'
+        '"reasoning": "brief reason"}]}'
     )
 
     user = (

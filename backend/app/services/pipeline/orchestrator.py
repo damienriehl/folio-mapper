@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
+from collections import Counter
 
 from app.models.llm_models import LLMConfig
 from app.models.mapping_models import (
@@ -24,7 +26,9 @@ from app.models.pipeline_models import (
 from app.services.branch_config import get_branch_color
 from app.services.folio_service import (
     _build_hierarchy_path,
+    _content_words,
     _extract_iri_hash,
+    _word_overlap,
     get_all_branches,
     get_folio,
 )
@@ -35,6 +39,110 @@ from app.services.pipeline.stage2_rank import run_stage2
 from app.services.pipeline.stage3_judge import run_stage3
 
 logger = logging.getLogger(__name__)
+
+
+def _differentiate_scores(
+    text: str,
+    judged: list[JudgedCandidate],
+    scoped_lookup: dict[str, ScopedCandidate],
+) -> list[JudgedCandidate]:
+    """Break tied scores using semantic relevance signals.
+
+    When the LLM gives many candidates the same score (e.g., all 54 because
+    they share a keyword), this function differentiates them using:
+    - Query word coverage: fraction of query words found in the label
+    - Label specificity: how focused the label is on query terms
+    - Definition relevance: whether the definition mentions query terms
+    """
+    if len(judged) < 2:
+        return judged
+
+    # Check if differentiation is needed: >40% of candidates share the same
+    # rounded score
+    rounded_counts = Counter(round(j.adjusted_score) for j in judged)
+    most_common_score, most_common_count = rounded_counts.most_common(1)[0]
+    if most_common_count < max(3, len(judged) * 0.4):
+        return judged  # Scores already varied enough
+
+    logger.info(
+        "Score differentiation: %d/%d candidates share score %d, applying tiebreaking",
+        most_common_count, len(judged), most_common_score,
+    )
+
+    query_words = _content_words(text)
+    if not query_words:
+        return judged
+
+    # Compute a semantic relevance signal for each candidate (0.0 - 1.0)
+    signals: dict[str, float] = {}
+    for j in judged:
+        sc = scoped_lookup.get(j.iri_hash)
+        if sc is None:
+            signals[j.iri_hash] = 0.0
+            continue
+
+        label_words = _content_words(sc.label)
+        # 1. Forward overlap: what fraction of query words appear in the label
+        forward = _word_overlap(query_words, label_words) if label_words else 0.0
+        # 2. Reverse overlap: what fraction of label words are query words
+        #    Higher = label is more focused on the query topic
+        reverse = _word_overlap(label_words, query_words) if label_words else 0.0
+        # 3. Definition boost: does the definition contain query terms?
+        def_boost = 0.0
+        if sc.definition:
+            def_words = _content_words(sc.definition)
+            def_overlap = _word_overlap(query_words, def_words) if def_words else 0.0
+            def_boost = def_overlap * 0.3  # Smaller weight than label signals
+        # 4. Synonym boost
+        syn_boost = 0.0
+        for syn in (sc.synonyms or [])[:5]:
+            syn_words = _content_words(syn)
+            syn_overlap = _word_overlap(query_words, syn_words) if syn_words else 0.0
+            syn_boost = max(syn_boost, syn_overlap * 0.2)
+
+        # Combined signal: weighted average (0.0 - ~1.0)
+        signal = forward * 0.4 + reverse * 0.3 + def_boost + syn_boost
+        signals[j.iri_hash] = signal
+
+    # Apply differentiation: spread scores based on signal ranking
+    # Sort by (adjusted_score DESC, signal DESC) to establish ordering
+    sorted_judged = sorted(
+        judged,
+        key=lambda j: (j.adjusted_score, signals.get(j.iri_hash, 0.0)),
+        reverse=True,
+    )
+
+    # Find score range — use at least a 30-point spread
+    max_score = sorted_judged[0].adjusted_score
+    min_signal = min(signals.values()) if signals else 0.0
+    max_signal = max(signals.values()) if signals else 1.0
+    signal_range = max_signal - min_signal if max_signal > min_signal else 1.0
+
+    result = []
+    for idx, j in enumerate(sorted_judged):
+        sig = signals.get(j.iri_hash, 0.0)
+        # Normalize signal to [0, 1]
+        normalized = (sig - min_signal) / signal_range
+
+        # Map to score: top signal gets the original score, bottom signal
+        # gets original - 35 (ensuring visible differentiation)
+        spread = 50.0
+        new_score = max_score - spread * (1.0 - normalized)
+        # Small position-based tiebreaker to ensure every candidate
+        # gets a unique rounded score (0.4 points per rank position)
+        new_score -= idx * 0.4
+        new_score = max(1.0, min(99.0, round(new_score, 1)))
+
+        result.append(JudgedCandidate(
+            iri_hash=j.iri_hash,
+            original_score=j.original_score,
+            adjusted_score=new_score,
+            verdict=j.verdict,
+            reasoning=j.reasoning,
+        ))
+
+    result.sort(key=lambda j: j.adjusted_score, reverse=True)
+    return result
 
 
 def _build_folio_candidate_from_judged(
@@ -158,6 +266,9 @@ async def run_pipeline(
 
         # Stage 3: Judge validation
         judged = await run_stage3(item.text, prescan, ranked, scoped_lookup, llm_config)
+
+        # Stage 4: Score differentiation — break tied scores using semantic signals
+        judged = _differentiate_scores(item.text, judged, scoped_lookup)
 
         # Compute judge stats
         stage3_boosted = sum(1 for j in judged if j.verdict == "boosted")

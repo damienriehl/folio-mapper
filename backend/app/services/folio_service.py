@@ -455,6 +455,77 @@ def lookup_concept_detail(iri_hash: str) -> ConceptDetail | None:
     )
 
 
+def _differentiate_local_scores(
+    query_words: set[str],
+    scored: list[tuple[str, object, float]],
+) -> list[tuple[str, object, float]]:
+    """Break tied scores using combined forward+reverse overlap signals.
+
+    When many candidates share a keyword, word-overlap scoring gives them
+    identical scores. This function uses a richer relevance signal (combining
+    label overlap, definition overlap, and synonym overlap with directional
+    weighting) to spread out tied groups.
+    """
+    from collections import Counter
+
+    if len(scored) < 3 or not query_words:
+        return scored
+
+    # Check if differentiation is needed
+    rounded_counts = Counter(round(s) for _, _, s in scored)
+    most_common_score, most_common_count = rounded_counts.most_common(1)[0]
+    if most_common_count < max(3, len(scored) * 0.3):
+        return scored  # Scores already varied enough
+
+    # Compute a rich relevance signal for each candidate
+    signals: list[float] = []
+    for iri_hash, owl_class, score in scored:
+        label = owl_class.label or iri_hash
+        label_words = _content_words(label)
+        forward = _word_overlap(query_words, label_words) if label_words else 0.0
+        reverse = _word_overlap(label_words, query_words) if label_words else 0.0
+
+        def_boost = 0.0
+        if owl_class.definition:
+            def_words = _content_words(owl_class.definition)
+            def_boost = _word_overlap(query_words, def_words) * 0.3 if def_words else 0.0
+
+        syn_boost = 0.0
+        for syn in (owl_class.alternative_labels or [])[:5]:
+            syn_words = _content_words(syn)
+            if syn_words:
+                syn_boost = max(syn_boost, _word_overlap(query_words, syn_words) * 0.2)
+
+        signals.append(forward * 0.4 + reverse * 0.3 + def_boost + syn_boost)
+
+    # Apply differentiation: spread tied scores using signal ranking
+    min_sig = min(signals)
+    max_sig = max(signals)
+    sig_range = max_sig - min_sig if max_sig > min_sig else 1.0
+
+    top_score = scored[0][2]  # Highest score in the group
+    spread = 50.0
+
+    # Sort by (score DESC, signal DESC) to establish rank ordering
+    indexed = sorted(
+        enumerate(zip(scored, signals)),
+        key=lambda x: (x[1][0][2], x[1][1]),
+        reverse=True,
+    )
+
+    result = []
+    for rank, (_, ((iri_hash, owl_class, score), sig)) in enumerate(indexed):
+        normalized = (sig - min_sig) / sig_range
+        new_score = top_score - spread * (1.0 - normalized)
+        # Small position-based tiebreaker for unique rounded scores
+        new_score -= rank * 0.4
+        new_score = round(max(1.0, min(99.0, new_score)), 1)
+        result.append((iri_hash, owl_class, new_score))
+
+    result.sort(key=lambda x: x[2], reverse=True)
+    return result
+
+
 def search_candidates(
     term: str,
     threshold: float = 0.3,
@@ -607,6 +678,12 @@ def search_candidates(
 
     # Sort by score descending
     scored.sort(key=lambda x: x[2], reverse=True)
+
+    # Phase 2.7: Differentiate tied scores using semantic signals.
+    # When many candidates share a keyword (e.g., "trademark"), word-overlap
+    # scoring gives them identical scores.  Break ties using the combined
+    # forward + reverse overlap signal so each candidate gets a distinct value.
+    scored = _differentiate_local_scores(content_words, scored)
 
     # Phase 3: Build FolioCandidate objects with per-branch limits
     candidates: list[FolioCandidate] = []

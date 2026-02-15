@@ -148,8 +148,8 @@ def test_build_ranking_prompt_groups_by_branch():
     assert len(messages) == 2
     assert "Investigation" in messages[1]["content"]
     assert "Agency" in messages[1]["content"]
-    assert "### Service" in messages[1]["content"]
-    assert "### Actor / Player" in messages[1]["content"]
+    assert "branch: Service" in messages[1]["content"]
+    assert "branch: Actor / Player" in messages[1]["content"]
 
 
 def test_build_judge_prompt_includes_candidates():
@@ -177,7 +177,7 @@ def test_build_judge_prompt_includes_candidates():
     assert "REDUCE FALSE NEGATIVES" in messages[0]["content"]
     assert "Investigation" in messages[1]["content"]
     assert "Inquiry" in messages[1]["content"]
-    assert "current_score: 90.0" in messages[1]["content"]
+    assert "branch: Service" in messages[1]["content"]
 
 
 # --- Stage 0 JSON parsing tests ---
@@ -467,7 +467,7 @@ async def test_stage2_calls_llm(llm_config):
     mock_provider.complete.assert_called_once()
     call_kwargs = mock_provider.complete.call_args
     assert call_kwargs.kwargs.get("temperature") == 0.1
-    assert call_kwargs.kwargs.get("max_tokens") == 2048
+    assert call_kwargs.kwargs.get("max_tokens") == 4096
 
 
 @pytest.mark.anyio
