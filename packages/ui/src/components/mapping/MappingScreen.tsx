@@ -180,13 +180,14 @@ export function MappingScreen({
     : [];
 
   // Ensure mandatory branches always appear (even with 0 candidates from backend)
+  // Re-sort after adding missing branches so they appear in the correct position
   const completeBranchGroups = (() => {
     const presentBranches = new Set(sortedBranchGroups.map((g) => g.branch));
     const missingMandatory = allBranches.filter(
       (b) => branchStates[b.name] === 'mandatory' && !presentBranches.has(b.name),
     );
     if (missingMandatory.length === 0) return sortedBranchGroups;
-    return [
+    const combined = [
       ...sortedBranchGroups,
       ...missingMandatory.map((b) => ({
         branch: b.name,
@@ -194,6 +195,7 @@ export function MappingScreen({
         candidates: [],
       })),
     ];
+    return sortBranchGroups(combined, branchSortMode, customBranchOrder);
   })();
 
   // Compute effective threshold from Top N (scoped to search results when filter is active)

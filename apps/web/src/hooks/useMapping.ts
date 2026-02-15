@@ -5,7 +5,6 @@ import {
   fetchPipelineCandidates,
 } from '@folio-mapper/core';
 import type {
-  BranchState,
   ParseItem,
   PipelineRequestConfig,
 } from '@folio-mapper/core';
@@ -53,22 +52,16 @@ export function useMapping() {
     async (
       itemIndex: number,
       itemText: string,
-      branchStates: Record<string, BranchState>,
-      branchesWithCandidates: Set<string>,
+      branches: string[],
       llmConfig?: PipelineRequestConfig | null,
     ) => {
-      // Find mandatory branches that have no existing candidates for this item
-      const mandatoryWithNoCandidates = Object.entries(branchStates)
-        .filter(([name, state]) => state === 'mandatory' && !branchesWithCandidates.has(name))
-        .map(([name]) => name);
-
-      if (mandatoryWithNoCandidates.length === 0) return;
+      if (branches.length === 0) return;
 
       try {
         const response = await fetchMandatoryFallback(
           itemText,
           itemIndex,
-          mandatoryWithNoCandidates,
+          branches,
           llmConfig,
         );
         mergeFallbackResults(response.item_index, response.fallback_results);

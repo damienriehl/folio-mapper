@@ -123,10 +123,8 @@ export function App() {
   useFolioWarmup();
 
   // Trigger mandatory fallback when a branch is set to mandatory and has no candidates.
-  // Uses a persistent "attempted" set so each item+branch combo is only tried once per
-  // LLM config change (prevents infinite loops when fallback returns 0 results).
-  const fallbackAttempted = useRef<Set<string>>(new Set());
-  const prevLlmKey = useRef<string>('');
+  // mergeFallbackResults bails out if nothing changed, so no infinite loop is possible.
+  const fallbackInFlight = useRef<Set<string>>(new Set());
   useEffect(() => {
     const { mappingResponse, currentItemIndex, branchStates } = mappingState;
     if (!mappingResponse || screen !== 'mapping') return;
@@ -146,13 +144,6 @@ export function App() {
           }
         : null;
 
-    // Reset attempted set when LLM config changes (retry with new LLM)
-    const llmKey = llmConfig ? `${llmConfig.provider}:${llmConfig.model}` : 'none';
-    if (llmKey !== prevLlmKey.current) {
-      fallbackAttempted.current.clear();
-      prevLlmKey.current = llmKey;
-    }
-
     const branchesWithCandidates = new Set(
       currentItem.branch_groups.filter((g) => g.candidates.length > 0).map((g) => g.branch),
     );
@@ -160,23 +151,26 @@ export function App() {
       .filter(([name, state]) => state === 'mandatory' && !branchesWithCandidates.has(name))
       .map(([name]) => name);
 
-    // Only attempt each item+branch combo once (prevents infinite loops)
+    // Skip branches already being fetched
     const toFetch = mandatoryMissing.filter(
-      (b) => !fallbackAttempted.current.has(`${currentItemIndex}:${b}`),
+      (b) => !fallbackInFlight.current.has(`${currentItemIndex}:${b}`),
     );
     if (toFetch.length === 0) return;
 
     for (const b of toFetch) {
-      fallbackAttempted.current.add(`${currentItemIndex}:${b}`);
+      fallbackInFlight.current.add(`${currentItemIndex}:${b}`);
     }
 
     loadMandatoryFallback(
       currentItemIndex,
       currentItem.item_text,
-      branchStates,
-      branchesWithCandidates,
+      toFetch,
       llmConfig,
-    );
+    ).finally(() => {
+      for (const b of toFetch) {
+        fallbackInFlight.current.delete(`${currentItemIndex}:${b}`);
+      }
+    });
   }, [
     mappingState.mappingResponse,
     mappingState.currentItemIndex,

@@ -331,6 +331,7 @@ export const useMappingStore = create<MappingState>()(
         if (!item) return;
 
         const updatedGroups = [...item.branch_groups];
+        let changed = false;
 
         for (const fb of fallbackResults) {
           if (fb.candidates.length === 0) continue;
@@ -342,6 +343,7 @@ export const useMappingStore = create<MappingState>()(
             const newCandidates = fb.candidates.filter((c) => !existingHashes.has(c.iri_hash));
             if (newCandidates.length > 0) {
               existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
+              changed = true;
             }
           } else {
             // Add new branch group
@@ -350,8 +352,12 @@ export const useMappingStore = create<MappingState>()(
               branch_color: fb.branch_color,
               candidates: fb.candidates,
             });
+            changed = true;
           }
         }
+
+        // Only update state if candidates were actually added (prevents infinite effect loops)
+        if (!changed) return;
 
         // Keep branch groups sorted alphabetically (matches backend order)
         updatedGroups.sort((a, b) => a.branch.localeCompare(b.branch));
