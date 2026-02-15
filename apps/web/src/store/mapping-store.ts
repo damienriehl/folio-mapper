@@ -30,6 +30,9 @@ interface MappingState {
   branchSortMode: BranchSortMode;
   customBranchOrder: string[];
 
+  // Input-page branch preferences (carry over to mapping)
+  inputBranchStates: Record<string, BranchState>;
+
   // Detail panel
   selectedCandidateIri: string | null;
 
@@ -51,6 +54,7 @@ interface MappingState {
   toggleCandidate: (itemIndex: number, iriHash: string) => void;
   setThreshold: (threshold: number) => void;
   setBranchState: (branchName: string, state: BranchState) => void;
+  setInputBranchState: (branchName: string, state: BranchState) => void;
   setBranchSortMode: (mode: BranchSortMode) => void;
   setCustomBranchOrder: (order: string[]) => void;
   mergeFallbackResults: (itemIndex: number, fallbackResults: BranchFallbackResult[]) => void;
@@ -92,6 +96,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
   branchStates: {},
   branchSortMode: 'default' as BranchSortMode,
   customBranchOrder: [] as string[],
+  inputBranchStates: {} as Record<string, BranchState>,
   selectedCandidateIri: null,
   pipelineMetadata: null,
   folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
@@ -190,6 +195,11 @@ export const useMappingStore = create<MappingState>((set, get) => ({
     set({ branchStates: { ...branchStates, [branchName]: state } });
   },
 
+  setInputBranchState: (branchName, state) => {
+    const { inputBranchStates } = get();
+    set({ inputBranchStates: { ...inputBranchStates, [branchName]: state } });
+  },
+
   setBranchSortMode: (mode) => {
     const { customBranchOrder, branchStates } = get();
     if (mode === 'custom' && customBranchOrder.length === 0) {
@@ -259,14 +269,16 @@ export const useMappingStore = create<MappingState>((set, get) => ({
   setError: (error) => set({ error, isLoadingCandidates: false }),
 
   startMapping: (response, threshold) => {
+    const { inputBranchStates, branchSortMode, customBranchOrder } = get();
+
     // Initialize selections with above-threshold candidates pre-checked
     const selections: Record<number, string[]> = {};
     const nodeStatuses: Record<number, NodeStatus> = {};
 
-    // Initialize all available branches as 'normal'
+    // Initialize all available branches — apply input-page mandatory prefs
     const branchStates: Record<string, BranchState> = {};
     for (const b of response.branches_available) {
-      branchStates[b.name] = 'normal';
+      branchStates[b.name] = inputBranchStates[b.name] === 'mandatory' ? 'mandatory' : 'normal';
     }
     // Also include branches that have candidates but may not be in branches_available
     for (const item of response.items) {
@@ -278,7 +290,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       );
       for (const group of item.branch_groups) {
         if (!(group.branch in branchStates)) {
-          branchStates[group.branch] = 'normal';
+          branchStates[group.branch] = inputBranchStates[group.branch] === 'mandatory' ? 'mandatory' : 'normal';
         }
       }
     }
@@ -291,8 +303,9 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       nodeStatuses,
       threshold,
       branchStates,
-      branchSortMode: 'default' as BranchSortMode,
-      customBranchOrder: [],
+      // Preserve user's sort preferences from input page
+      branchSortMode,
+      customBranchOrder,
       selectedCandidateIri: null,
       isLoadingCandidates: false,
       error: null,
@@ -310,6 +323,7 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       branchStates: {},
       branchSortMode: 'default' as BranchSortMode,
       customBranchOrder: [],
+      inputBranchStates: {},
       selectedCandidateIri: null,
       pipelineMetadata: null,
       isLoadingCandidates: false,

@@ -3,10 +3,11 @@ import type { ReactNode } from 'react';
 interface InputScreenProps {
   textInput: ReactNode;
   fileDropZone: ReactNode;
+  branchOptions?: ReactNode;
   error?: string | null;
 }
 
-export function InputScreen({ textInput, fileDropZone, error }: InputScreenProps) {
+export function InputScreen({ textInput, fileDropZone, branchOptions, error }: InputScreenProps) {
   return (
     <div className="w-full max-w-2xl space-y-8">
       <div>
@@ -24,6 +25,8 @@ export function InputScreen({ textInput, fileDropZone, error }: InputScreenProps
         <h2 className="mb-4 text-lg font-medium text-gray-900">Enter text directly</h2>
         {textInput}
       </div>
+
+      {branchOptions}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
