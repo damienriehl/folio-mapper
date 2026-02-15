@@ -341,7 +341,7 @@ def test_parse_judge_json_rejected_forces_zero():
     assert result[0].verdict == "rejected"
 
 
-def test_parse_judge_json_confirmed_clamps_within_5():
+def test_parse_judge_json_confirmed_trusts_adjusted_score():
     ranked_lookup = {"R1": RankedCandidate(iri_hash="R1", score=80.0, reasoning="ok")}
     raw = json.dumps({
         "judged": [
@@ -350,8 +350,8 @@ def test_parse_judge_json_confirmed_clamps_within_5():
     })
     result = _parse_judge_json(raw, ranked_lookup)
     assert result is not None
-    # confirmed should clamp to within 5 of original (80) → max 85
-    assert result[0].adjusted_score == 85.0
+    # confirmed trusts the judge's adjusted_score (no ±5 clamping)
+    assert result[0].adjusted_score == 95.0
 
 
 def test_parse_judge_json_drops_unknown_hashes():

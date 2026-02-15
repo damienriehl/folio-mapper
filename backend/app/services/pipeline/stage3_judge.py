@@ -79,12 +79,8 @@ def _parse_judge_json(
         # Enforce verdict consistency
         if verdict == "rejected":
             adjusted_score = 0.0
-        elif verdict == "confirmed":
-            # Confirmed should stay within 5 points
-            adjusted_score = max(
-                original_score - 5,
-                min(original_score + 5, adjusted_score),
-            )
+        # For confirmed/boosted/penalized, trust the judge's adjusted_score.
+        # The verdict is metadata; the adjusted_score is the real output.
 
         results.append(JudgedCandidate(
             iri_hash=iri_hash,
