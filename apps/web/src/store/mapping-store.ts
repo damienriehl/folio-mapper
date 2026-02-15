@@ -68,10 +68,12 @@ interface MappingState {
   resetMapping: () => void;
 }
 
-function getAboveThresholdCandidates(
+// High-confidence cutoff for initial auto-selection (distinct from visibility threshold)
+const AUTO_SELECT_SCORE = 80;
+
+function getHighConfidenceCandidates(
   response: MappingResponse,
   itemIndex: number,
-  threshold: number,
 ): string[] {
   const item = response.items[itemIndex];
   if (!item) return [];
@@ -79,7 +81,7 @@ function getAboveThresholdCandidates(
   const iriHashes: string[] = [];
   for (const group of item.branch_groups) {
     for (const candidate of group.candidates) {
-      if (candidate.score >= threshold) {
+      if (candidate.score >= AUTO_SELECT_SCORE) {
         iriHashes.push(candidate.iri_hash);
       }
     }
@@ -166,8 +168,17 @@ export const useMappingStore = create<MappingState>((set, get) => ({
       // Only auto-select for items that haven't been completed
       if (updatedStatuses[i] === 'completed') continue;
 
-      const defaults = getAboveThresholdCandidates(mappingResponse, i, threshold);
-      updatedSelections[i] = defaults;
+      const item = mappingResponse.items[i];
+      if (!item) continue;
+      const visible: string[] = [];
+      for (const group of item.branch_groups) {
+        for (const candidate of group.candidates) {
+          if (candidate.score >= threshold) {
+            visible.push(candidate.iri_hash);
+          }
+        }
+      }
+      updatedSelections[i] = visible;
       updatedStatuses[i] = 'completed';
     }
 
@@ -336,10 +347,9 @@ export const useMappingStore = create<MappingState>((set, get) => ({
     // Also include branches that have candidates but may not be in branches_available
     for (const item of response.items) {
       nodeStatuses[item.item_index] = 'pending';
-      selections[item.item_index] = getAboveThresholdCandidates(
+      selections[item.item_index] = getHighConfidenceCandidates(
         response,
         item.item_index,
-        threshold,
       );
       for (const group of item.branch_groups) {
         if (!(group.branch in branchStates)) {

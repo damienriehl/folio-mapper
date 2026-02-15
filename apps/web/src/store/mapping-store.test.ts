@@ -21,7 +21,7 @@ const mockResponse: MappingResponse = {
               branch: 'Area of Law',
               branch_color: '#1A5276',
               hierarchy_path: [{ label: 'Area of Law', iri_hash: 'RAoL' }, { label: 'Animal Law', iri_hash: 'Rtest1' }],
-              score: 75,
+              score: 85,
             },
             {
               label: 'Personal Injury',
@@ -81,16 +81,16 @@ describe('mapping-store', () => {
     expect(state.threshold).toBe(45);
   });
 
-  it('startMapping initializes state and pre-selects above threshold', () => {
+  it('startMapping initializes state and auto-selects only high-confidence candidates', () => {
     useMappingStore.getState().startMapping(mockResponse, 45);
     const state = useMappingStore.getState();
 
     expect(state.totalItems).toBe(2);
     expect(state.currentItemIndex).toBe(0);
-    // Item 0: Animal Law (75) should be selected, Personal Injury (40) should not
+    // Item 0: Animal Law (85) should be auto-selected, Personal Injury (40) should not
     expect(state.selections[0]).toContain('Rtest1');
     expect(state.selections[0]).not.toContain('Rtest2');
-    // Item 1: Contract Law (100) should be selected
+    // Item 1: Contract Law (100) should be auto-selected
     expect(state.selections[1]).toContain('Rtest3');
     // All items should be pending
     expect(state.nodeStatuses[0]).toBe('pending');
