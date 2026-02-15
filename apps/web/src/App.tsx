@@ -377,6 +377,8 @@ export function App() {
             onSuggestToFolio={handleSuggestToFolio}
             onRemoveSuggestion={mappingState.removeSuggestion}
             onEditSuggestion={(entry) => setEditingSuggestion(entry)}
+            searchFilterHashes={mappingState.searchFilterHashes}
+            onClearSearchFilter={mappingState.clearSearchFilter}
             onOpenSubmission={() => {
               suggestionSubmit.resetSubmission();
               suggestionSubmit.setShowSubmissionModal(true);

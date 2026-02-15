@@ -11,6 +11,7 @@ interface CandidatePanelProps {
   onSelectForDetail: (iriHash: string) => void;
   expandAllSignal?: number;
   collapseAllSignal?: number;
+  searchFilterHashes?: string[] | null;
 }
 
 export function CandidatePanel({
@@ -23,6 +24,7 @@ export function CandidatePanel({
   onSelectForDetail,
   expandAllSignal,
   collapseAllSignal,
+  searchFilterHashes,
 }: CandidatePanelProps) {
   return (
     <div className="flex h-full flex-col">
@@ -37,6 +39,7 @@ export function CandidatePanel({
           onSelectForDetail={onSelectForDetail}
           expandAllSignal={expandAllSignal}
           collapseAllSignal={collapseAllSignal}
+          searchFilterHashes={searchFilterHashes}
         />
       </div>
     </div>
