@@ -75,6 +75,13 @@ describe('computeScoreCutoff', () => {
     expect(computeScoreCutoff([], 5, {})).toBe(0);
   });
 
+  it('topN=50 (All sentinel) returns 0 even with many candidates', () => {
+    const scores = Array.from({ length: 100 }, (_, i) => 100 - i);
+    const groups = [makeBranchGroup('A', scores)];
+    const states: Record<string, BranchState> = { A: 'normal' };
+    expect(computeScoreCutoff(groups, 50, states)).toBe(0);
+  });
+
   it('works across multiple normal branches', () => {
     const groups = [
       makeBranchGroup('A', [90, 70]),
