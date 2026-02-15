@@ -1,3 +1,8 @@
+export interface HierarchyPathEntry {
+  label: string;
+  iri_hash: string;
+}
+
 export interface FolioCandidate {
   label: string;
   iri: string;
@@ -6,7 +11,7 @@ export interface FolioCandidate {
   synonyms: string[];
   branch: string;
   branch_color: string;
-  hierarchy_path: string[];
+  hierarchy_path: HierarchyPathEntry[];
   score: number; // 0-100
 }
 

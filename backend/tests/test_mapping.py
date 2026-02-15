@@ -59,7 +59,7 @@ def test_folio_candidate_model():
         synonyms=["General Theory of Contracts"],
         branch="Area of Law",
         branch_color="#1A5276",
-        hierarchy_path=["Area of Law", "Contract Law"],
+        hierarchy_path=[{"label": "Area of Law", "iri_hash": "RAoL"}, {"label": "Contract Law", "iri_hash": "RCIPwpgRpMs1eVz4vPid0pV"}],
         score=100.0,
     )
     assert c.label == "Contract Law"
@@ -104,7 +104,7 @@ MOCK_CANDIDATES = [
                         synonyms=[],
                         branch="Area of Law",
                         branch_color="#1A5276",
-                        hierarchy_path=["Area of Law", "Animal Law"],
+                        hierarchy_path=[{"label": "Area of Law", "iri_hash": "RAoL"}, {"label": "Animal Law", "iri_hash": "Rtest1"}],
                         score=75.0,
                     ),
                 ],

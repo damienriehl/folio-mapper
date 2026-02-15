@@ -71,11 +71,11 @@ export function DetailPanel({ currentItem, selectedCandidate }: DetailPanelProps
                 Hierarchy
               </p>
               <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-gray-600">
-                {selectedCandidate.hierarchy_path.map((part, i) => (
+                {selectedCandidate.hierarchy_path.map((entry, i) => (
                   <span key={i} className="flex items-center gap-1">
                     {i > 0 && <span className="text-gray-300">&rsaquo;</span>}
                     <span className={i === selectedCandidate.hierarchy_path.length - 1 ? 'font-medium text-gray-900' : ''}>
-                      {part}
+                      {entry.label}
                     </span>
                   </span>
                 ))}

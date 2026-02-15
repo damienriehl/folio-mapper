@@ -15,6 +15,7 @@ from app.models.mapping_models import (
     BranchInfo,
     FolioCandidate,
     FolioStatus,
+    HierarchyPathEntry,
     ItemMappingResult,
 )
 from app.models.parse_models import ParseItem
@@ -168,9 +169,9 @@ def get_branch_for_class(folio: FOLIO, iri_hash: str) -> str:
     return "Unknown"
 
 
-def _build_hierarchy_path(folio: FOLIO, iri_hash: str) -> list[str]:
+def _build_hierarchy_path(folio: FOLIO, iri_hash: str) -> list[HierarchyPathEntry]:
     """Build hierarchy path from root branch down to this class."""
-    path: list[str] = []
+    path: list[HierarchyPathEntry] = []
     owl_class = folio[iri_hash]
     if not owl_class:
         return path
@@ -182,7 +183,10 @@ def _build_hierarchy_path(folio: FOLIO, iri_hash: str) -> list[str]:
         if current_hash in visited:
             break
         visited.add(current_hash)
-        path.append(current.label or current_hash)
+        path.append(HierarchyPathEntry(
+            label=current.label or current_hash,
+            iri_hash=current_hash,
+        ))
 
         if current_hash in _branch_root_iris:
             break

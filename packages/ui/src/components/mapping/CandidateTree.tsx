@@ -6,6 +6,7 @@ import { ConfidenceBadge } from './ConfidenceBadge';
 
 interface HierarchyNode {
   label: string;
+  iriHash: string | null;
   candidate: FolioCandidate | null;
   children: HierarchyNode[];
 }
@@ -21,9 +22,9 @@ function buildHierarchyTree(candidates: FolioCandidate[]): HierarchyNode[] {
     let siblings = roots;
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i];
-      let node = siblings.find((n) => n.label === seg);
+      let node = siblings.find((n) => n.label === seg.label);
       if (!node) {
-        node = { label: seg, candidate: null, children: [] };
+        node = { label: seg.label, iriHash: seg.iri_hash, candidate: null, children: [] };
         siblings.push(node);
       }
       // Last segment → attach candidate
@@ -72,7 +73,11 @@ export function CandidateTree({
     });
   }, []);
 
-  const visibleGroups = branchGroups.filter((g) => branchStates[g.branch] !== 'excluded');
+  const visibleGroups = branchGroups.filter((g) => {
+    if (branchStates[g.branch] === 'excluded') return false;
+    if (branchStates[g.branch] === 'mandatory') return g.candidates.length > 0;
+    return g.candidates.some((c) => c.score >= threshold);
+  });
 
   if (visibleGroups.length === 0) {
     return (
@@ -177,7 +182,8 @@ function HierarchyNodeComponent({
   const isCandidate = node.candidate !== null;
   const isCollapsed = collapsedNodes.has(pathKey);
 
-  const isSelected = isCandidate && selectedIriHashes.includes(node.candidate!.iri_hash);
+  const nodeIriHash = isCandidate ? node.candidate!.iri_hash : node.iriHash;
+  const isSelected = nodeIriHash ? selectedIriHashes.includes(nodeIriHash) : false;
   const isDetailTarget = isCandidate && selectedCandidateIri === node.candidate!.iri_hash;
 
   // Candidate leaf (no children) — bullet point
@@ -250,18 +256,38 @@ function HierarchyNodeComponent({
     );
   }
 
-  // Structural node (not a candidate, has children) — disclosure triangle, plain text
+  // Structural node (not a candidate, has children) — disclosure triangle + checkbox
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => toggleCollapse(pathKey)}
-        className="flex w-full items-center gap-1.5 rounded py-1 text-left text-sm text-gray-600 hover:bg-gray-50"
+      <div
+        className={`flex items-center gap-1.5 rounded py-1 text-sm ${
+          isSelected ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-gray-50'
+        }`}
         style={{ paddingLeft: `${depth * 4 + 4}px` }}
       >
-        <span className="text-xs text-gray-400">{isCollapsed ? '\u25B6' : '\u25BC'}</span>
-        <span>{node.label}</span>
-      </button>
+        <button
+          type="button"
+          onClick={() => toggleCollapse(pathKey)}
+          className={`shrink-0 text-xs ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}
+        >
+          {isCollapsed ? '\u25B6' : '\u25BC'}
+        </button>
+        {nodeIriHash && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleCandidate(nodeIriHash)}
+            className="h-3.5 w-3.5 shrink-0 rounded border-gray-300"
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => toggleCollapse(pathKey)}
+          className="min-w-0 flex-1 text-left"
+        >
+          {node.label}
+        </button>
+      </div>
       {!isCollapsed && (
         <div className="ml-2">
           {node.children.map((child) => (
