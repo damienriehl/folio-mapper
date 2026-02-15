@@ -125,6 +125,8 @@ export function MappingScreen({
 }: MappingScreenProps) {
   const [showBranchOptions, setShowBranchOptions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandAllSignal, setExpandAllSignal] = useState(0);
+  const [collapseAllSignal, setCollapseAllSignal] = useState(0);
 
   const currentItem: ItemMappingResult | undefined = mappingResponse.items[currentItemIndex];
   const currentSelections = selections[currentItemIndex] || [];
@@ -279,9 +281,20 @@ export function MappingScreen({
                     )}
                   </button>
                 </form>
-                <span className="text-xs text-gray-400">
-                  {currentSelections.length} of {visibleCandidateHashes.length} selected
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setExpandAllSignal((n) => n + 1)}
+                  className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Expand All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCollapseAllSignal((n) => n + 1)}
+                  className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Collapse All
+                </button>
               </div>
             </div>
             {/* Scrollable candidate results */}
@@ -294,6 +307,8 @@ export function MappingScreen({
                 threshold={threshold}
                 onToggleCandidate={(iriHash) => onToggleCandidate(iriHash)}
                 onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
+                expandAllSignal={expandAllSignal}
+                collapseAllSignal={collapseAllSignal}
               />
             </div>
           </div>
@@ -303,9 +318,14 @@ export function MappingScreen({
             {/* Top half: Current Selection(s) */}
             <div className="flex min-h-0 flex-1 flex-col border-b border-gray-200">
               <div className="shrink-0 border-b border-gray-100 bg-white px-4 pt-3 pb-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Current Selection(s)
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Current Selection(s)
+                  </p>
+                  <span className="text-xs text-gray-400">
+                    {currentSelections.length} of {visibleCandidateHashes.length} selected
+                  </span>
+                </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 <SelectionTree

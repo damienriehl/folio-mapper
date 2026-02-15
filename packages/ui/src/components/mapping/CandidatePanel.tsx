@@ -9,6 +9,8 @@ interface CandidatePanelProps {
   threshold: number;
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string) => void;
+  expandAllSignal?: number;
+  collapseAllSignal?: number;
 }
 
 export function CandidatePanel({
@@ -19,6 +21,8 @@ export function CandidatePanel({
   threshold,
   onToggleCandidate,
   onSelectForDetail,
+  expandAllSignal,
+  collapseAllSignal,
 }: CandidatePanelProps) {
   return (
     <div className="flex h-full flex-col">
@@ -31,6 +35,8 @@ export function CandidatePanel({
           threshold={threshold}
           onToggleCandidate={onToggleCandidate}
           onSelectForDetail={onSelectForDetail}
+          expandAllSignal={expandAllSignal}
+          collapseAllSignal={collapseAllSignal}
         />
       </div>
     </div>
