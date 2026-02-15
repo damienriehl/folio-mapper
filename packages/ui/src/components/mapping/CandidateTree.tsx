@@ -50,6 +50,7 @@ interface CandidateTreeProps {
   onSelectForDetail: (iriHash: string) => void;
   expandAllSignal?: number;
   collapseAllSignal?: number;
+  searchFilterHashes?: string[] | null;
 }
 
 export function CandidateTree({
@@ -62,6 +63,7 @@ export function CandidateTree({
   onSelectForDetail,
   expandAllSignal,
   collapseAllSignal,
+  searchFilterHashes,
 }: CandidateTreeProps) {
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
 
@@ -96,8 +98,14 @@ export function CandidateTree({
     });
   }, []);
 
+  const filterSet = searchFilterHashes ? new Set(searchFilterHashes) : null;
+
   const visibleGroups = branchGroups.filter((g) => {
     if (branchStates[g.branch] === 'excluded') return false;
+    // When search filter is active, branch must have at least one candidate in the filter set
+    if (filterSet) {
+      return g.candidates.some((c) => filterSet.has(c.iri_hash));
+    }
     if (branchStates[g.branch] === 'mandatory') return g.candidates.length > 0;
     return g.candidates.some((c) => c.score >= threshold);
   });
@@ -116,9 +124,12 @@ export function CandidateTree({
         const branchKey = group.branch;
         const isBranchCollapsed = collapsedNodes.has(branchKey);
         const isMandatory = branchStates[group.branch] === 'mandatory';
-        const visibleCandidates = isMandatory
+        let visibleCandidates = isMandatory
           ? group.candidates
           : group.candidates.filter((c) => c.score >= threshold);
+        if (filterSet) {
+          visibleCandidates = visibleCandidates.filter((c) => filterSet.has(c.iri_hash));
+        }
         const tree = buildHierarchyTree(visibleCandidates);
 
         return (

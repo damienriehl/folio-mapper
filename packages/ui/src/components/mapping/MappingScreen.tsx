@@ -72,6 +72,8 @@ interface MappingScreenProps {
   onRemoveSuggestion: (id: string) => void;
   onEditSuggestion: (entry: SuggestionEntry) => void;
   onOpenSubmission: () => void;
+  searchFilterHashes?: string[] | null;
+  onClearSearchFilter?: () => void;
 }
 
 function sortBranchGroups(
@@ -156,6 +158,8 @@ export function MappingScreen({
   onRemoveSuggestion,
   onEditSuggestion,
   onOpenSubmission,
+  searchFilterHashes,
+  onClearSearchFilter,
 }: MappingScreenProps) {
   const [showBranchOptions, setShowBranchOptions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,16 +203,23 @@ export function MappingScreen({
 
   const selectedCandidate = candidateFromData ?? fetchedConcept;
 
-  // Collect all visible candidate IRI hashes for current item (respecting threshold + branch filters)
+  // Collect all visible candidate IRI hashes for current item (respecting threshold + branch filters + search filter)
   // Mandatory branches bypass the threshold — show all candidates
+  const searchFilterSet = searchFilterHashes ? new Set(searchFilterHashes) : null;
   const visibleCandidateHashes: string[] = currentItem
     ? sortedBranchGroups
-        .filter((g) => branchStates[g.branch] !== 'excluded')
+        .filter((g) => {
+          if (branchStates[g.branch] === 'excluded') return false;
+          if (searchFilterSet) return g.candidates.some((c) => searchFilterSet.has(c.iri_hash));
+          return true;
+        })
         .flatMap((g) => {
           const isMandatory = branchStates[g.branch] === 'mandatory';
-          return g.candidates
-            .filter((c) => isMandatory || c.score >= threshold)
-            .map((c) => c.iri_hash);
+          let candidates = g.candidates.filter((c) => isMandatory || c.score >= threshold);
+          if (searchFilterSet) {
+            candidates = candidates.filter((c) => searchFilterSet.has(c.iri_hash));
+          }
+          return candidates.map((c) => c.iri_hash);
         })
     : [];
 
@@ -308,7 +319,7 @@ export function MappingScreen({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search candidates..."
+                    placeholder="Search and filter candidates..."
                     disabled={isSearching}
                     className="w-44 rounded border border-gray-300 px-2 py-1 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none disabled:opacity-50"
                   />
@@ -323,6 +334,16 @@ export function MappingScreen({
                       'Search'
                     )}
                   </button>
+                  {searchFilterHashes && (
+                    <button
+                      type="button"
+                      onClick={onClearSearchFilter}
+                      className="flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-200"
+                    >
+                      {searchFilterHashes.length} found
+                      <span className="text-blue-500">&times;</span>
+                    </button>
+                  )}
                 </form>
                 <button
                   type="button"
@@ -370,6 +391,7 @@ export function MappingScreen({
                 onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
                 expandAllSignal={expandAllSignal}
                 collapseAllSignal={collapseAllSignal}
+                searchFilterHashes={searchFilterHashes}
               />
             </div>
           </div>

@@ -51,6 +51,9 @@ interface MappingState {
   // Suggestion queue for ALEA submissions
   suggestionQueue: SuggestionEntry[];
 
+  // Search filter: IRI hashes from last search (null = no filter active)
+  searchFilterHashes: string[] | null;
+
   // FOLIO loading state
   folioStatus: FolioStatus;
   isLoadingCandidates: boolean;
@@ -78,6 +81,7 @@ interface MappingState {
   setFolioStatus: (status: FolioStatus) => void;
   setLoadingCandidates: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  clearSearchFilter: () => void;
   addSuggestion: (entry: SuggestionEntry) => void;
   removeSuggestion: (id: string) => void;
   updateSuggestion: (id: string, updates: Partial<SuggestionEntry>) => void;
@@ -142,6 +146,7 @@ export const useMappingStore = create<MappingState>()(
       selectedCandidateIri: null,
       pipelineMetadata: null,
       suggestionQueue: [] as SuggestionEntry[],
+      searchFilterHashes: null,
       folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
       isLoadingCandidates: false,
       error: null,
@@ -178,6 +183,7 @@ export const useMappingStore = create<MappingState>()(
           nodeStatuses: updatedStatuses,
           currentItemIndex: nextIndex,
           selectedCandidateIri: null,
+          searchFilterHashes: null,
         });
       },
 
@@ -199,6 +205,7 @@ export const useMappingStore = create<MappingState>()(
         set({
           currentItemIndex: prevIndex,
           selectedCandidateIri: null,
+          searchFilterHashes: null,
         });
       },
 
@@ -223,13 +230,14 @@ export const useMappingStore = create<MappingState>()(
           nodeStatuses: updatedStatuses,
           currentItemIndex: nextIndex,
           selectedCandidateIri: null,
+          searchFilterHashes: null,
         });
       },
 
       goToItem: (index) => {
         const { totalItems } = get();
         if (index >= 0 && index < totalItems) {
-          set({ currentItemIndex: index, selectedCandidateIri: null });
+          set({ currentItemIndex: index, selectedCandidateIri: null, searchFilterHashes: null });
         }
       },
 
@@ -359,6 +367,7 @@ export const useMappingStore = create<MappingState>()(
 
         const updatedGroups = [...item.branch_groups];
         const newBranchStates = { ...branchStates };
+        const newHashes: string[] = [];
 
         for (const group of searchItem.branch_groups) {
           if (group.candidates.length === 0) continue;
@@ -369,6 +378,7 @@ export const useMappingStore = create<MappingState>()(
             const newCandidates = group.candidates.filter((c) => !existingHashes.has(c.iri_hash));
             if (newCandidates.length > 0) {
               existingGroup.candidates = [...existingGroup.candidates, ...newCandidates];
+              for (const c of newCandidates) newHashes.push(c.iri_hash);
             }
           } else {
             updatedGroups.push({
@@ -376,6 +386,7 @@ export const useMappingStore = create<MappingState>()(
               branch_color: group.branch_color,
               candidates: group.candidates,
             });
+            for (const c of group.candidates) newHashes.push(c.iri_hash);
           }
 
           if (!(group.branch in newBranchStates)) {
@@ -395,6 +406,7 @@ export const useMappingStore = create<MappingState>()(
         set({
           mappingResponse: { ...mappingResponse, items },
           branchStates: newBranchStates,
+          searchFilterHashes: newHashes.length > 0 ? newHashes : null,
         });
       },
 
@@ -414,6 +426,8 @@ export const useMappingStore = create<MappingState>()(
       setLoadingCandidates: (loading) => set({ isLoadingCandidates: loading }),
 
       setError: (error) => set({ error, isLoadingCandidates: false }),
+
+      clearSearchFilter: () => set({ searchFilterHashes: null }),
 
       addSuggestion: (entry) => {
         const { suggestionQueue } = get();
@@ -500,6 +514,7 @@ export const useMappingStore = create<MappingState>()(
           statusFilter: 'all' as StatusFilter,
           pipelineMetadata: null,
           suggestionQueue: [],
+          searchFilterHashes: null,
           isLoadingCandidates: false,
           error: null,
         }),
