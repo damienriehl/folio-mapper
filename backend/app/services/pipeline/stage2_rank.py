@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 def _strip_markdown_fences(text: str) -> str:
     """Remove markdown code fences from LLM output."""
     text = text.strip()
-    text = re.sub(r"^```(?:json)?\s*\n?", "", text)
-    text = re.sub(r"\n?```\s*$", "", text)
+    text = re.sub(r"^`{3,}\s*(?:json)?\s*\n?", "", text)
+    text = re.sub(r"\n?`{3,}\s*$", "", text)
     return text.strip()
 
 
@@ -116,7 +116,7 @@ async def run_stage2(
         raw_response = await provider.complete(
             messages=messages,
             temperature=0.1,
-            max_tokens=2048,
+            max_tokens=3072,
         )
     except Exception as e:
         logger.error("Stage 2: LLM call failed: %s", e)

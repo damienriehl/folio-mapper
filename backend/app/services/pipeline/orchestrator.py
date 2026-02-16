@@ -94,88 +94,86 @@ def _assemble_item_result(
     )
 
 
-async def run_pipeline(
-    items: list[ParseItem],
+_MAX_JUDGE_CANDIDATES = 10  # Cap candidates sent to Stage 3 judge
+_CONCURRENCY_LIMIT = 3       # Max items processed in parallel
+
+
+async def _process_item(
+    item: ParseItem,
     llm_config: LLMConfig,
-    threshold: float = 0.3,
-    max_per_branch: int = 10,
-) -> PipelineResponse:
-    """Run the full mapping pipeline (Stages 0→1→2→3) for all items.
-
-    Processes items sequentially to respect LLM rate limits.
-
-    Args:
-        items: Parsed input items to map.
-        llm_config: LLM provider configuration.
-        threshold: Minimum score threshold (0-1).
-        max_per_branch: Max candidates per branch in fallback search.
-
-    Returns:
-        PipelineResponse with MappingResponse and pipeline metadata.
-    """
-    folio = get_folio()
-    item_results: list[ItemMappingResult] = []
-    metadata: list[PipelineItemMetadata] = []
-
-    for item in items:
+    folio: object,
+    threshold: float,
+    max_per_branch: int,
+    sem: asyncio.Semaphore,
+) -> tuple[ItemMappingResult, PipelineItemMetadata]:
+    """Process a single item through the full pipeline (Stages 0→1→1.5→2→3)."""
+    async with sem:
+        print(f"\n{'='*60}")
+        print(f"PIPELINE: Processing item {item.index}: {item.text[:60]}")
+        print(f"{'='*60}")
         logger.info("Pipeline: processing item %d: %s", item.index, item.text[:60])
 
         # Stage 0: Pre-scan
         prescan = await run_stage0(item.text, llm_config)
-        logger.info(
-            "Pipeline: Stage 0 produced %d segments for item %d",
-            len(prescan.segments), item.index,
-        )
+        print(f"[item {item.index}] STAGE 0: {len(prescan.segments)} segments")
 
         # Stage 1: Branch-scoped local search
         stage1_candidates = await asyncio.get_event_loop().run_in_executor(
             None, run_stage1, folio, prescan, threshold, max_per_branch,
         )
-        logger.info(
-            "Pipeline: Stage 1 produced %d candidates for item %d",
-            len(stage1_candidates), item.index,
-        )
+        print(f"[item {item.index}] STAGE 1: {len(stage1_candidates)} candidates")
 
-        # Stage 1.5: LLM-assisted candidate expansion for underrepresented branches
+        # Stage 1.5: LLM-assisted candidate expansion
         stage1b_new = await run_stage1b(item.text, prescan, stage1_candidates, llm_config)
         stage1b_branches = list({c.branch for c in stage1b_new}) if stage1b_new else []
         if stage1b_new:
             stage1_candidates = stage1_candidates + stage1b_new
-            logger.info(
-                "Pipeline: Stage 1.5 added %d candidates for item %d (branches: %s)",
-                len(stage1b_new), item.index, ", ".join(stage1b_branches),
-            )
+            print(f"[item {item.index}] STAGE 1.5: Added {len(stage1b_new)} candidates")
+        else:
+            print(f"[item {item.index}] STAGE 1.5: No expansion needed")
 
         # Stage 2: LLM ranking
         ranked = await run_stage2(item.text, prescan, stage1_candidates, llm_config)
-        logger.info(
-            "Pipeline: Stage 2 ranked %d candidates for item %d",
-            len(ranked), item.index,
-        )
+        print(f"[item {item.index}] STAGE 2: {len(ranked)} ranked candidates")
+        for r in ranked[:3]:
+            sc = {c.iri_hash: c for c in stage1_candidates}.get(r.iri_hash)
+            label = sc.label if sc else r.iri_hash[:20]
+            print(f"  - {label}: score={r.score}")
 
-        # Build scoped lookup for converting ranked/judged → FolioCandidate
+        # Build scoped lookup
         scoped_lookup = {c.iri_hash: c for c in stage1_candidates}
 
-        # Stage 3: Judge validation
-        judged = await run_stage3(item.text, prescan, ranked, scoped_lookup, llm_config)
+        # Stage 3: Judge validation — only send top N to reduce output size
+        ranked_for_judge = ranked[:_MAX_JUDGE_CANDIDATES]
+        judged = await run_stage3(item.text, prescan, ranked_for_judge, scoped_lookup, llm_config)
+
+        # Also pass through any ranked candidates beyond top N (unjudged)
+        judged_hashes = {j.iri_hash for j in judged}
+        for r in ranked[_MAX_JUDGE_CANDIDATES:]:
+            if r.iri_hash not in judged_hashes:
+                judged.append(JudgedCandidate(
+                    iri_hash=r.iri_hash,
+                    original_score=r.score,
+                    adjusted_score=r.score,
+                    verdict="confirmed",
+                    reasoning="below judge cutoff — score unchanged",
+                ))
+
+        # Re-sort after merging
+        judged = [j for j in judged if j.verdict != "rejected"]
+        judged.sort(key=lambda j: j.adjusted_score, reverse=True)
+
+        print(f"[item {item.index}] STAGE 3: {len(judged)} judged candidates")
 
         # Compute judge stats
         stage3_boosted = sum(1 for j in judged if j.verdict == "boosted")
         stage3_penalized = sum(1 for j in judged if j.verdict == "penalized")
-        # Count rejected from full judge output (before filtering in run_stage3)
-        stage3_rejected = len(ranked) - len(judged)  # removed candidates
-        logger.info(
-            "Pipeline: Stage 3 judged %d candidates for item %d "
-            "(boosted=%d, penalized=%d, rejected=%d)",
-            len(judged), item.index,
-            stage3_boosted, stage3_penalized, stage3_rejected,
-        )
+        stage3_rejected = len(ranked) - len(judged)
 
-        # Assemble result using judge-adjusted scores
+        # Assemble result
         item_result = _assemble_item_result(item, judged, scoped_lookup)
-        item_results.append(item_result)
 
-        metadata.append(PipelineItemMetadata(
+        item_meta = PipelineItemMetadata(
             item_index=item.index,
             item_text=item.text,
             prescan=prescan,
@@ -187,7 +185,42 @@ async def run_pipeline(
             stage3_boosted=stage3_boosted,
             stage3_penalized=stage3_penalized,
             stage3_rejected=stage3_rejected,
-        ))
+        )
+
+        return item_result, item_meta
+
+
+async def run_pipeline(
+    items: list[ParseItem],
+    llm_config: LLMConfig,
+    threshold: float = 0.3,
+    max_per_branch: int = 10,
+) -> PipelineResponse:
+    """Run the full mapping pipeline (Stages 0→1→2→3) for all items.
+
+    Processes items concurrently (up to _CONCURRENCY_LIMIT at a time).
+
+    Args:
+        items: Parsed input items to map.
+        llm_config: LLM provider configuration.
+        threshold: Minimum score threshold (0-1).
+        max_per_branch: Max candidates per branch in fallback search.
+
+    Returns:
+        PipelineResponse with MappingResponse and pipeline metadata.
+    """
+    folio = get_folio()
+    sem = asyncio.Semaphore(_CONCURRENCY_LIMIT)
+
+    tasks = [
+        _process_item(item, llm_config, folio, threshold, max_per_branch, sem)
+        for item in items
+    ]
+    results = await asyncio.gather(*tasks)
+
+    # Unpack results, maintaining original item order
+    item_results = [r[0] for r in results]
+    metadata = [r[1] for r in results]
 
     # Get available branches
     try:

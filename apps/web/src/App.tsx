@@ -22,7 +22,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 export function App() {
   const {
-    screen,
+    screen: rawScreen,
     textInput,
     selectedFile,
     parseResult,
@@ -35,7 +35,11 @@ export function App() {
     goToInput,
     treatAsFlatList,
     setScreen,
+    reset: resetInput,
   } = useInputStore();
+
+  // Defensive: if screen is 'confirming' but parseResult is null, fall back to input
+  const screen = (rawScreen === 'confirming' && !parseResult) ? 'input' : rawScreen;
 
   const mappingState = useMappingStore();
   const llmState = useLLMStore();
@@ -190,7 +194,14 @@ export function App() {
   if (screen === 'mapping') {
     return (
       <div className="flex h-screen flex-col">
-        <Header onOpenSettings={() => setShowSettings(true)} />
+        <Header
+          onOpenSettings={() => setShowSettings(true)}
+          onRestart={() => {
+            mappingState.resetMapping();
+            resetInput();
+            setIsPipelineRun(false);
+          }}
+        />
         {settingsModal}
         {mappingState.mappingResponse ? (
           <MappingScreen
@@ -254,6 +265,16 @@ export function App() {
               {mappingState.error && (
                 <p className="mt-2 text-sm text-red-600">{mappingState.error}</p>
               )}
+              <button
+                onClick={() => {
+                  mappingState.resetMapping();
+                  resetInput();
+                  setIsPipelineRun(false);
+                }}
+                className="mt-4 rounded bg-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-300"
+              >
+                Start Over
+              </button>
             </div>
           </div>
         )}
