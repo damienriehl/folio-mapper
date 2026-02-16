@@ -5,10 +5,11 @@ interface InputScreenProps {
   fileDropZone: ReactNode;
   branchOptions?: ReactNode;
   sessionFileInput?: ReactNode;
+  modelChooser?: ReactNode;
   error?: string | null;
 }
 
-export function InputScreen({ textInput, fileDropZone, branchOptions, sessionFileInput, error }: InputScreenProps) {
+export function InputScreen({ textInput, fileDropZone, branchOptions, sessionFileInput, modelChooser, error }: InputScreenProps) {
   return (
     <div className="w-full max-w-2xl space-y-8">
       <div>
@@ -40,6 +41,13 @@ export function InputScreen({ textInput, fileDropZone, branchOptions, sessionFil
         <div>
           <h2 className="mb-4 text-lg font-medium text-gray-900">Resume a saved session</h2>
           {sessionFileInput}
+        </div>
+      )}
+
+      {modelChooser && (
+        <div>
+          <h2 className="mb-4 text-lg font-medium text-gray-900">Choose your model (optional)</h2>
+          {modelChooser}
         </div>
       )}
 

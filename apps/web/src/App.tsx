@@ -10,6 +10,7 @@ import {
   MappingScreen,
   Header,
   LLMSettings,
+  ModelChooser,
   BranchOptionsPanel,
   SessionRecoveryModal,
   NewProjectModal,
@@ -477,6 +478,17 @@ export function App() {
             />
           }
           error={error}
+          modelChooser={
+            <ModelChooser
+              activeProvider={llmState.activeProvider}
+              configs={llmState.configs}
+              onSetActiveProvider={llmState.setActiveProvider}
+              onUpdateConfig={llmState.updateConfig}
+              onSetConnectionStatus={llmState.setConnectionStatus}
+              testConnection={testConnection}
+              fetchModels={fetchModels}
+            />
+          }
           sessionFileInput={
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
