@@ -106,7 +106,7 @@ export function CandidateTree({
     if (filterSet) {
       return g.candidates.some((c) => filterSet.has(c.iri_hash));
     }
-    if (branchStates[g.branch] === 'mandatory') return true;
+    if (branchStates[g.branch] === 'mandatory') return g.candidates.length > 0;
     return g.candidates.some((c) => c.score >= threshold);
   });
 
@@ -160,7 +160,7 @@ export function CandidateTree({
               <div className="ml-4 border-l border-gray-100 pl-1">
                 {tree.length === 0 ? (
                   <p className="py-1 text-xs text-gray-400">
-                    {isMandatory ? 'No candidates found — try a manual search' : 'No candidates in Top N filter'}
+                    No candidates in Top N filter
                   </p>
                 ) : (
                   tree.map((node) => (

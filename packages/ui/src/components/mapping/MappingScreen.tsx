@@ -179,27 +179,10 @@ export function MappingScreen({
     ? sortBranchGroups(currentItem.branch_groups, branchSortMode, customBranchOrder)
     : [];
 
-  // Ensure mandatory branches always appear (even with 0 candidates from backend)
-  const completeBranchGroups = (() => {
-    const presentBranches = new Set(sortedBranchGroups.map((g) => g.branch));
-    const missingMandatory = allBranches.filter(
-      (b) => branchStates[b.name] === 'mandatory' && !presentBranches.has(b.name),
-    );
-    if (missingMandatory.length === 0) return sortedBranchGroups;
-    return [
-      ...sortedBranchGroups,
-      ...missingMandatory.map((b) => ({
-        branch: b.name,
-        branch_color: b.color,
-        candidates: [],
-      })),
-    ];
-  })();
-
   // Compute effective threshold from Top N
   const effectiveThreshold = searchFilterHashes
     ? 0
-    : computeScoreCutoff(completeBranchGroups, topN, branchStates);
+    : computeScoreCutoff(sortedBranchGroups, topN, branchStates);
 
   // Find the selected candidate for the detail panel
   let candidateFromData: FolioCandidate | null = null;
@@ -233,7 +216,7 @@ export function MappingScreen({
   // Mandatory branches bypass the threshold — show all candidates
   const searchFilterSet = searchFilterHashes ? new Set(searchFilterHashes) : null;
   const visibleCandidateHashes: string[] = currentItem
-    ? completeBranchGroups
+    ? sortedBranchGroups
         .filter((g) => {
           if (branchStates[g.branch] === 'excluded') return false;
           if (searchFilterSet) return g.candidates.some((c) => searchFilterSet.has(c.iri_hash));
@@ -410,7 +393,7 @@ export function MappingScreen({
             {/* Scrollable candidate results */}
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <CandidatePanel
-                branchGroups={completeBranchGroups}
+                branchGroups={sortedBranchGroups}
                 branchStates={branchStates}
                 selectedIriHashes={currentSelections}
                 selectedCandidateIri={selectedCandidateIri}
