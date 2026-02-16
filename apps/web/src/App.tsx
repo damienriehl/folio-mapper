@@ -288,6 +288,7 @@ export function App() {
             setIsPipelineRun(false);
           }}
           onSaveSession={session.downloadSession}
+          onOpenExport={() => exportState.setShowExportModal(true)}
           onNewProject={session.handleNewProject}
           hasActiveSession={session.hasActiveSession}
         />
