@@ -1,0 +1,2 @@
+// Web adapter stub
+export {};
