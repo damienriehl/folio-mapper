@@ -14,7 +14,7 @@ interface InputState {
   setScreen: (screen: Screen) => void;
   setTextInput: (text: string) => void;
   setSelectedFile: (file: File | null) => void;
-  setParseResult: (result: ParseResult) => void;
+  setParseResult: (result: ParseResult | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   goToInput: () => void;
@@ -39,12 +39,11 @@ export const useInputStore = create<InputState>()(
       setSelectedFile: (file) => set({ selectedFile: file }),
 
       setParseResult: (result) =>
-        set({
-          parseResult: result,
-          screen: 'confirming',
-          isLoading: false,
-          error: null,
-        }),
+        set(
+          result
+            ? { parseResult: result, screen: 'confirming', isLoading: false, error: null }
+            : { parseResult: null, isLoading: false, error: null },
+        ),
 
       setLoading: (loading) => set({ isLoading: loading, error: null }),
       setError: (error) => set({ error, isLoading: false }),

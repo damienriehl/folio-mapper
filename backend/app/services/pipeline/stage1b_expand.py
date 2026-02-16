@@ -121,7 +121,7 @@ async def _llm_suggest_labels(
         )
 
         prompt = _build_expansion_prompt(item_text, branch_name)
-        response = await provider.chat_completion(
+        response = await provider.complete(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             max_tokens=512,

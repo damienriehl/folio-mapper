@@ -32,10 +32,24 @@ class AnthropicProvider(BaseLLMProvider):
         if not self.model:
             raise ValueError("No model selected")
         client = anthropic.AsyncAnthropic(api_key=self.api_key)
-        resp = await client.messages.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=kwargs.pop("max_tokens", 4096),
+
+        # Anthropic API requires system messages as a separate parameter
+        system_text = None
+        non_system = []
+        for msg in messages:
+            if msg.get("role") == "system":
+                system_text = msg["content"]
+            else:
+                non_system.append(msg)
+
+        create_kwargs = {
+            "model": self.model,
+            "messages": non_system,
+            "max_tokens": kwargs.pop("max_tokens", 4096),
             **kwargs,
-        )
+        }
+        if system_text:
+            create_kwargs["system"] = system_text
+
+        resp = await client.messages.create(**create_kwargs)
         return resp.content[0].text

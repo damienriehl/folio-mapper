@@ -216,10 +216,11 @@ def build_judge_prompt(
         "- \"penalized\" means you lowered the score by 10+ points.\n"
         "- \"rejected\" means adjusted_score = 0.\n"
         "- Be strict: do not rubber-stamp. Look critically at each candidate.\n"
-        "- Consider the FULL input text and all segments, not just keyword matches.\n\n"
+        "- Consider the FULL input text and all segments, not just keyword matches.\n"
+        "- Keep reasoning VERY brief (under 10 words each).\n\n"
         "Respond with ONLY valid JSON (no markdown fences) in this format:\n"
         '{"judged": [{"iri_hash": "hash", "adjusted_score": 85, "verdict": "confirmed", '
-        '"reasoning": "why this judgment"}]}'
+        '"reasoning": "brief reason"}]}'
     )
 
     user = (

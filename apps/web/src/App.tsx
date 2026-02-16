@@ -31,7 +31,7 @@ import { useSuggestionSubmit } from './hooks/useSuggestionSubmit';
 
 export function App() {
   const {
-    screen,
+    screen: rawScreen,
     textInput,
     selectedFile,
     parseResult,
@@ -44,7 +44,11 @@ export function App() {
     goToInput,
     treatAsFlatList,
     setScreen,
+    reset: resetInput,
   } = useInputStore();
+
+  // Defensive: if screen is 'confirming' but parseResult is null, fall back to input
+  const screen = (rawScreen === 'confirming' && !parseResult) ? 'input' : rawScreen;
 
   const mappingState = useMappingStore();
   const llmState = useLLMStore();
@@ -205,16 +209,27 @@ export function App() {
 
     // Auto-detect: use LLM pipeline if active provider has a valid connection
     const activeConfig = llmState.configs[llmState.activeProvider];
+    console.log('[DEBUG handleContinue] activeProvider:', llmState.activeProvider);
+    console.log('[DEBUG handleContinue] connectionStatus:', activeConfig?.connectionStatus);
+    console.log('[DEBUG handleContinue] apiKey present:', !!activeConfig?.apiKey);
+    console.log('[DEBUG handleContinue] model:', activeConfig?.model);
+    console.log('[DEBUG handleContinue] parseResult items:', parseResult.items.length);
     if (activeConfig?.connectionStatus === 'valid') {
+      console.log('[DEBUG handleContinue] → PIPELINE PATH');
       setIsPipelineRun(true);
-      await loadPipelineCandidates(parseResult.items, {
-        provider: llmState.activeProvider,
-        api_key: activeConfig.apiKey || null,
-        base_url: activeConfig.baseUrl || null,
-        model: activeConfig.model || null,
-      });
+      try {
+        await loadPipelineCandidates(parseResult.items, {
+          provider: llmState.activeProvider,
+          api_key: activeConfig.apiKey || null,
+          base_url: activeConfig.baseUrl || null,
+          model: activeConfig.model || null,
+        });
+      } catch (err) {
+        console.error('[DEBUG handleContinue] Pipeline error:', err);
+      }
       setIsPipelineRun(false);
     } else {
+      console.log('[DEBUG handleContinue] → LOCAL PATH (no valid connection)');
       await loadCandidates(parseResult.items);
     }
   };
@@ -276,13 +291,18 @@ export function App() {
           onOpenSettings={() => setShowSettings(true)}
           onSaveSession={session.downloadSession}
           onNewProject={session.handleNewProject}
+          onRestart={() => {
+            mappingState.resetMapping();
+            resetInput();
+            setIsPipelineRun(false);
+          }}
           hasActiveSession={session.hasActiveSession}
         />
         {settingsModal}
         {session.showNewProjectModal && (
           <NewProjectModal
-            onSaveAndNew={session.handleSaveAndNew}
-            onDiscardAndNew={session.handleDiscardAndNew}
+            onSaveAndNew={() => { session.handleSaveAndNew(); resetInput(); setIsPipelineRun(false); }}
+            onDiscardAndNew={() => { session.handleDiscardAndNew(); resetInput(); setIsPipelineRun(false); }}
             onCancel={session.handleCancelNewProject}
           />
         )}
@@ -396,6 +416,16 @@ export function App() {
               {mappingState.error && (
                 <p className="mt-2 text-sm text-red-600">{mappingState.error}</p>
               )}
+              <button
+                onClick={() => {
+                  session.handleDiscardAndNew?.() ?? mappingState.resetMapping();
+                  resetInput();
+                  setIsPipelineRun(false);
+                }}
+                className="mt-4 rounded bg-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-300"
+              >
+                Start Over
+              </button>
             </div>
           </div>
         )}

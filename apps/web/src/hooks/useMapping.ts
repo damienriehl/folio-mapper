@@ -28,6 +28,7 @@ export function useMapping() {
         startMapping(response);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load candidates');
+        setLoadingCandidates(false);
       }
     },
     [startMapping, setLoadingCandidates, setError],
@@ -44,6 +45,7 @@ export function useMapping() {
         setPipelineMetadata(response.pipeline_metadata);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Pipeline mapping failed');
+        setLoadingCandidates(false);
       }
     },
     [startMapping, setPipelineMetadata, setLoadingCandidates, setError],

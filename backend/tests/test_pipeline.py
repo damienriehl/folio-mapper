@@ -467,7 +467,7 @@ async def test_stage2_calls_llm(llm_config):
     mock_provider.complete.assert_called_once()
     call_kwargs = mock_provider.complete.call_args
     assert call_kwargs.kwargs.get("temperature") == 0.1
-    assert call_kwargs.kwargs.get("max_tokens") == 2048
+    assert call_kwargs.kwargs.get("max_tokens") == 3072
 
 
 @pytest.mark.anyio

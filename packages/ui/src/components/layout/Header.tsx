@@ -2,14 +2,25 @@ interface HeaderProps {
   onOpenSettings?: () => void;
   onSaveSession?: () => void;
   onNewProject?: () => void;
+  onRestart?: () => void;
   hasActiveSession?: boolean;
 }
 
-export function Header({ onOpenSettings, onSaveSession, onNewProject, hasActiveSession }: HeaderProps) {
+export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, hasActiveSession }: HeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
       <h1 className="text-xl font-semibold text-gray-900">FOLIO Mapper</h1>
       <div className="flex items-center gap-1">
+        {onRestart && (
+          <button
+            onClick={onRestart}
+            className="rounded px-2 py-1.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            title="Restart — clear session and start over"
+            aria-label="Restart"
+          >
+            Restart
+          </button>
+        )}
         {hasActiveSession && onSaveSession && (
           <button
             onClick={onSaveSession}
