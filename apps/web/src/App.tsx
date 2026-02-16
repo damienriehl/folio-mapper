@@ -211,12 +211,16 @@ export function App() {
     const activeConfig = llmState.configs[llmState.activeProvider];
     if (activeConfig?.connectionStatus === 'valid') {
       setIsPipelineRun(true);
-      await loadPipelineCandidates(parseResult.items, {
-        provider: llmState.activeProvider,
-        api_key: activeConfig.apiKey || null,
-        base_url: activeConfig.baseUrl || null,
-        model: activeConfig.model || null,
-      });
+      try {
+        await loadPipelineCandidates(parseResult.items, {
+          provider: llmState.activeProvider,
+          api_key: activeConfig.apiKey || null,
+          base_url: activeConfig.baseUrl || null,
+          model: activeConfig.model || null,
+        });
+      } catch (err) {
+        console.error('Pipeline failed:', err);
+      }
       setIsPipelineRun(false);
     } else {
       await loadCandidates(parseResult.items);
@@ -337,8 +341,8 @@ export function App() {
             totalItems={mappingState.totalItems}
             selections={mappingState.selections}
             nodeStatuses={mappingState.nodeStatuses}
-            topN={mappingState.topN}
-            defaultTopN={mappingState.defaultTopN}
+            topN={mappingState.topN ?? 5}
+            defaultTopN={mappingState.defaultTopN ?? 5}
             branchStates={mappingState.branchStates}
             allBranches={
               mappingState.mappingResponse.branches_available.map((b) => ({
@@ -347,9 +351,7 @@ export function App() {
               }))
             }
             selectedCandidateIri={mappingState.selectedCandidateIri}
-            prescanSegments={
-              mappingState.pipelineMetadata?.[mappingState.currentItemIndex]?.prescan?.segments
-            }
+            prescanSegments={null}
             folioStatus={mappingState.folioStatus}
             isLoadingCandidates={mappingState.isLoadingCandidates}
             showGoToDialog={showGoToDialog}
@@ -372,8 +374,8 @@ export function App() {
             }
             onSelectForDetail={mappingState.selectCandidateForDetail}
             onSetBranchState={mappingState.setBranchState}
-            onTopNChange={mappingState.setTopN}
-            onDefaultTopNChange={mappingState.setDefaultTopN}
+            onTopNChange={(n: number) => mappingState.setTopN(n)}
+            onDefaultTopNChange={(n: number) => mappingState.setDefaultTopN(n)}
             branchSortMode={mappingState.branchSortMode}
             customBranchOrder={mappingState.customBranchOrder}
             onSetBranchSortMode={mappingState.setBranchSortMode}

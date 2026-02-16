@@ -37,6 +37,9 @@ export function MappingToolbar({
   onStatusFilterChange,
   onShowShortcuts,
 }: MappingToolbarProps) {
+  // Defensive defaults in case store hydration provides undefined
+  const safeTopN = topN ?? 5;
+  const safeDefaultTopN = defaultTopN ?? 5;
   const completedCount = Object.values(nodeStatuses).filter((s) => s === 'completed').length;
   const progressPercent = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
 
@@ -82,15 +85,15 @@ export function MappingToolbar({
                 type="range"
                 min={1}
                 max={50}
-                value={topN}
-                onChange={(e) => onTopNChange(Number(e.target.value))}
+                value={safeTopN}
+                onChange={(e) => onTopNChange?.(Number(e.target.value))}
                 className="h-1.5 w-24 cursor-pointer appearance-none rounded-full bg-gray-200 accent-blue-600"
               />
-              <span className="w-6 text-right text-xs font-medium text-gray-700">{topN >= 50 ? 'All' : topN}</span>
-              {topN !== defaultTopN && (
+              <span className="w-6 text-right text-xs font-medium text-gray-700">{safeTopN >= 50 ? 'All' : safeTopN}</span>
+              {safeTopN !== safeDefaultTopN && (
                 <button
                   type="button"
-                  onClick={() => onDefaultTopNChange(topN)}
+                  onClick={() => onDefaultTopNChange?.(safeTopN)}
                   className="rounded border border-blue-300 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100"
                   title="Set current Top N as the default for all items"
                 >

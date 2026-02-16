@@ -82,7 +82,7 @@ export function ProviderCard({
               <label className="w-10 shrink-0 text-xs text-gray-500">Key:</label>
               <input
                 type="password"
-                value={config.apiKey}
+                value={config.apiKey || ''}
                 onChange={(e) =>
                   onUpdateConfig(meta.type, {
                     apiKey: e.target.value,
@@ -104,7 +104,7 @@ export function ProviderCard({
               <label className="w-10 shrink-0 text-xs text-gray-500">URL:</label>
               <input
                 type="text"
-                value={config.baseUrl}
+                value={config.baseUrl || ''}
                 onChange={(e) =>
                   onUpdateConfig(meta.type, {
                     baseUrl: e.target.value,
@@ -121,7 +121,7 @@ export function ProviderCard({
           <div className="mt-2 flex items-center gap-2">
             <label className="w-10 shrink-0 text-xs text-gray-500">Model:</label>
             <select
-              value={config.model}
+              value={config.model || ''}
               onChange={(e) => onUpdateConfig(meta.type, { model: e.target.value })}
               className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-400 focus:outline-none"
             >

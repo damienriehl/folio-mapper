@@ -702,7 +702,6 @@ async def test_orchestrator(llm_config):
     mock_folio.__getitem__ = lambda self, key: {"Rinvest": mock_owl_invest, "Renforce": mock_owl_enforce}.get(key)
 
     with (
-        patch("app.services.pipeline.orchestrator.run_stage0", return_value=MOCK_PRESCAN),
         patch("app.services.pipeline.orchestrator.run_stage1", return_value=MOCK_STAGE1),
         patch("app.services.pipeline.orchestrator.run_stage2", return_value=MOCK_RANKED),
         patch("app.services.pipeline.orchestrator.run_stage3", return_value=MOCK_JUDGED),
@@ -730,7 +729,7 @@ async def test_orchestrator(llm_config):
     assert meta.stage1_candidate_count == 2
     assert meta.stage2_candidate_count == 2
     assert meta.stage3_judged_count == 2
-    assert len(meta.prescan.segments) == 2
+    assert len(meta.prescan.segments) == 1  # prescan disabled — single synthetic segment
 
 
 # --- Endpoint test (fully mocked pipeline) ---
@@ -881,15 +880,11 @@ async def test_acceptance_agency_investigation(llm_config):
     mock_folio.search_by_prefix = MagicMock(return_value=[])
     mock_folio.get_children = MagicMock(return_value=[])
 
-    # Mock LLM provider (returns different responses for stage 0, stage 2, stage 3)
+    # Mock LLM provider (stage 3 judge only; stages 0 and 2 are disabled)
     call_count = {"n": 0}
 
     async def mock_complete(messages, **kwargs):
         call_count["n"] += 1
-        if call_count["n"] == 1:
-            return stage0_response
-        elif call_count["n"] == 2:
-            return stage2_response
         return stage3_response
 
     mock_provider = AsyncMock()
@@ -918,8 +913,6 @@ async def test_acceptance_agency_investigation(llm_config):
     ]
 
     with (
-        patch("app.services.pipeline.stage0_prescan.get_provider", return_value=mock_provider),
-        patch("app.services.pipeline.stage2_rank.get_provider", return_value=mock_provider),
         patch("app.services.pipeline.stage3_judge.get_provider", return_value=mock_provider),
         patch("app.services.pipeline.orchestrator.get_folio", return_value=mock_folio),
         patch("app.services.pipeline.stage1_filter.get_folio", return_value=mock_folio),
@@ -934,12 +927,11 @@ async def test_acceptance_agency_investigation(llm_config):
     ):
         result = await run_pipeline(items, llm_config)
 
-    # Verify pre-scan
+    # Verify pre-scan (disabled — single synthetic segment, no branches)
     assert len(result.pipeline_metadata) == 1
     meta = result.pipeline_metadata[0]
-    assert len(meta.prescan.segments) == 2
-    assert "Service" in meta.prescan.segments[0].branches
-    assert "Service" in meta.prescan.segments[1].branches
+    assert len(meta.prescan.segments) == 1
+    assert meta.prescan.segments[0].branches == []
 
     # Verify candidates were produced through all stages
     assert meta.stage1_candidate_count > 0
@@ -951,8 +943,8 @@ async def test_acceptance_agency_investigation(llm_config):
     item = result.mapping.items[0]
     assert item.total_candidates > 0
 
-    # Verify LLM was called three times (stage 0 + stage 2 + stage 3)
-    assert call_count["n"] == 3
+    # Verify LLM was called once (stage 3 judge only; stages 0 and 2 disabled)
+    assert call_count["n"] == 1
 
 
 def _make_owl(iri_hash: str, label: str, definition: str, alt_labels: list[str]) -> MagicMock:

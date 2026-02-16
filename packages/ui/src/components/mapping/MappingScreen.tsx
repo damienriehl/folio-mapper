@@ -196,10 +196,19 @@ export function MappingScreen({
     ];
   })();
 
-  // Compute effective threshold from Top N
-  const effectiveThreshold = searchFilterHashes
-    ? 0
-    : computeScoreCutoff(completeBranchGroups, topN, branchStates);
+  // Compute effective threshold from Top N (scoped to search results when filter is active)
+  const safeTopN = topN ?? 5;
+  const effectiveThreshold = (() => {
+    if (searchFilterHashes) {
+      const filterSet = new Set(searchFilterHashes);
+      const filtered = completeBranchGroups.map((g) => ({
+        ...g,
+        candidates: g.candidates.filter((c) => filterSet.has(c.iri_hash)),
+      }));
+      return computeScoreCutoff(filtered, safeTopN, branchStates);
+    }
+    return computeScoreCutoff(completeBranchGroups, safeTopN, branchStates);
+  })();
 
   // Find the selected candidate for the detail panel
   let candidateFromData: FolioCandidate | null = null;

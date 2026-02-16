@@ -28,7 +28,7 @@ from app.services.folio_service import (
     get_all_branches,
     get_folio,
 )
-from app.services.pipeline.stage0_prescan import run_stage0
+from app.models.pipeline_models import PreScanResult, PreScanSegment
 from app.services.pipeline.stage1_filter import run_stage1
 from app.services.pipeline.stage1b_expand import run_stage1b
 from app.services.pipeline.stage2_rank import run_stage2
@@ -113,9 +113,12 @@ async def _process_item(
         print(f"{'='*60}")
         logger.info("Pipeline: processing item %d: %s", item.index, item.text[:60])
 
-        # Stage 0: Pre-scan
-        prescan = await run_stage0(item.text, llm_config)
-        print(f"[item {item.index}] STAGE 0: {len(prescan.segments)} segments")
+        # Stage 0: Skipped — use whole text as single segment (no LLM call)
+        prescan = PreScanResult(
+            segments=[PreScanSegment(text=item.text, branches=[], reasoning="prescan disabled")],
+            raw_text=item.text,
+        )
+        print(f"[item {item.index}] STAGE 0: skipped (prescan disabled)")
 
         # Stage 1: Branch-scoped local search
         stage1_candidates = await asyncio.get_event_loop().run_in_executor(
@@ -132,9 +135,13 @@ async def _process_item(
         else:
             print(f"[item {item.index}] STAGE 1.5: No expansion needed")
 
-        # Stage 2: LLM ranking
-        ranked = await run_stage2(item.text, prescan, stage1_candidates, llm_config)
-        print(f"[item {item.index}] STAGE 2: {len(ranked)} ranked candidates")
+        # Stage 2: LLM ranking — DISABLED, using local scores instead
+        # ranked = await run_stage2(item.text, prescan, stage1_candidates, llm_config)
+        ranked = [
+            RankedCandidate(iri_hash=c.iri_hash, score=c.score, reasoning="local score")
+            for c in sorted(stage1_candidates, key=lambda c: c.score, reverse=True)[:20]
+        ]
+        print(f"[item {item.index}] STAGE 2: {len(ranked)} candidates (local scores, LLM disabled)")
         for r in ranked[:3]:
             sc = {c.iri_hash: c for c in stage1_candidates}.get(r.iri_hash)
             label = sc.label if sc else r.iri_hash[:20]

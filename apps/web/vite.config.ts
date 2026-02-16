@@ -12,4 +12,7 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    exclude: ['@folio-mapper/core', '@folio-mapper/ui'],
+  },
 });

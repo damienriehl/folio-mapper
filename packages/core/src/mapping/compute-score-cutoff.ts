@@ -25,8 +25,8 @@ export function computeScoreCutoff(
     }
   }
 
-  // topN >= 50 is the "All" sentinel — show everything
-  if (scores.length === 0 || topN >= 50 || topN >= scores.length) return 0;
+  // topN >= 50 is the "All" sentinel — show everything; !topN guards NaN/undefined
+  if (scores.length === 0 || !topN || topN >= 50 || topN >= scores.length) return 0;
 
   scores.sort((a, b) => b - a);
   return scores[Math.min(topN, scores.length) - 1];

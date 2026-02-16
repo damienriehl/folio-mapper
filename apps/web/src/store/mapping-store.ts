@@ -554,13 +554,16 @@ export const useMappingStore = create<MappingState>()(
       merge: (persisted, current) => {
         const p = persisted as Partial<MappingState> | undefined;
         if (!p) return current;
+        // Strip legacy 'threshold' field from old localStorage data
+        const { threshold: _legacyThreshold, ...cleanPersisted } = p as Record<string, unknown>;
         return {
           ...current,
-          ...p,
+          ...cleanPersisted,
           // Re-derive totalItems from mappingResponse
           totalItems: p.mappingResponse?.total_items ?? 0,
-          // Init topN from persisted defaultTopN (transient field)
-          topN: p.defaultTopN ?? current.defaultTopN,
+          // Ensure topN/defaultTopN always have valid values
+          defaultTopN: p.defaultTopN ?? current.defaultTopN ?? 5,
+          topN: p.defaultTopN ?? current.defaultTopN ?? 5,
           // Reset transient fields
           selectedCandidateIri: null,
           folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
