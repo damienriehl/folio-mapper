@@ -6,10 +6,12 @@ import {
 } from '@folio-mapper/core';
 import type {
   BranchState,
+  LLMProviderType,
   ParseItem,
   PipelineRequestConfig,
 } from '@folio-mapper/core';
 import { useMappingStore } from '../store/mapping-store';
+import { useLLMStore } from '../store/llm-store';
 
 const BATCH_SIZE = 10;
 
@@ -111,6 +113,8 @@ export function useMapping() {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Pipeline mapping failed');
         setLoadingCandidates(false);
+        // Mark provider as invalid so the header badge reflects disconnection
+        useLLMStore.getState().setConnectionStatus(llmConfig.provider as LLMProviderType, 'invalid');
         return;
       }
 

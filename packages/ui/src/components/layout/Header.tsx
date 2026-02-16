@@ -1,3 +1,5 @@
+type LLMStatus = 'connected' | 'disconnected' | 'none';
+
 interface HeaderProps {
   onOpenSettings?: () => void;
   onSaveSession?: () => void;
@@ -5,9 +7,11 @@ interface HeaderProps {
   onRestart?: () => void;
   onOpenExport?: () => void;
   hasActiveSession?: boolean;
+  llmStatus?: LLMStatus;
+  llmProviderLabel?: string;
 }
 
-export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession }: HeaderProps) {
+export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession, llmStatus, llmProviderLabel }: HeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
       <h1 className="text-xl font-semibold text-gray-900">FOLIO Mapper</h1>
@@ -102,6 +106,18 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart,
             </svg>
             New
           </button>
+        )}
+        {llmStatus === 'connected' && (
+          <span className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-400" title={llmProviderLabel ? `Connected to ${llmProviderLabel}` : 'LLM connected'}>
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+            LLM
+          </span>
+        )}
+        {llmStatus === 'disconnected' && (
+          <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-600" title={llmProviderLabel ? `${llmProviderLabel} disconnected` : 'LLM disconnected'}>
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            LLM Disconnected
+          </span>
         )}
         {onOpenSettings && (
           <button

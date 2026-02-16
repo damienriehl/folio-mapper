@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { parseText, testConnection, fetchModels, fetchKnownModels, BRANCH_COLORS } from '@folio-mapper/core';
+import { parseText, testConnection, fetchModels, fetchKnownModels, BRANCH_COLORS, PROVIDER_META } from '@folio-mapper/core';
 import type { SuggestionEntry } from '@folio-mapper/core';
 import {
   AppShell,
@@ -66,6 +66,27 @@ export function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Derive simplified LLM status for header badge
+  const activeConfig = llmState.configs[llmState.activeProvider];
+  const llmStatus = (() => {
+    if (!activeConfig || activeConfig.connectionStatus === 'untested') return 'none' as const;
+    return activeConfig.connectionStatus === 'valid' ? 'connected' as const : 'disconnected' as const;
+  })();
+  const llmProviderLabel = PROVIDER_META[llmState.activeProvider]?.displayName ?? '';
+
+  // Toast banner on valid → invalid transition
+  const [showDisconnectToast, setShowDisconnectToast] = useState(false);
+  const prevConnectionStatus = useRef(activeConfig?.connectionStatus);
+  useEffect(() => {
+    const current = activeConfig?.connectionStatus;
+    if (prevConnectionStatus.current === 'valid' && current === 'invalid') {
+      setShowDisconnectToast(true);
+      const timer = setTimeout(() => setShowDisconnectToast(false), 6000);
+      return () => clearTimeout(timer);
+    }
+    prevConnectionStatus.current = current;
+  }, [activeConfig?.connectionStatus]);
 
   // Session persistence
   const session = useSession();
@@ -302,7 +323,22 @@ export function App() {
           onOpenExport={() => exportState.setShowExportModal(true)}
           onNewProject={session.handleNewProject}
           hasActiveSession={session.hasActiveSession}
+          llmStatus={llmStatus}
+          llmProviderLabel={llmProviderLabel}
         />
+        {showDisconnectToast && (
+          <div className="flex items-center justify-center gap-2 bg-amber-50 px-4 py-2 text-sm text-amber-800 border-b border-amber-200">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            LLM connection lost — falling back to local search
+            <button
+              onClick={() => setShowDisconnectToast(false)}
+              className="ml-2 text-amber-600 hover:text-amber-800"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
         {settingsModal}
         {session.showNewProjectModal && (
           <NewProjectModal
