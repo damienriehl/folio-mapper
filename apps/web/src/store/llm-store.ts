@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ConnectionStatus, LLMProviderConfig, LLMProviderType } from '@folio-mapper/core';
+import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, ModelInfo } from '@folio-mapper/core';
 import { PROVIDER_META } from '@folio-mapper/core';
 
 interface LLMState {
   activeProvider: LLMProviderType;
   configs: Record<LLMProviderType, LLMProviderConfig>;
+  modelsByProvider: Record<string, ModelInfo[]>;
 
   setActiveProvider: (provider: LLMProviderType) => void;
   updateConfig: (provider: LLMProviderType, updates: Partial<LLMProviderConfig>) => void;
   setConnectionStatus: (provider: LLMProviderType, status: ConnectionStatus) => void;
+  setModelsForProvider: (provider: string, models: ModelInfo[]) => void;
+  setAllModels: (models: Record<string, ModelInfo[]>) => void;
 }
 
 function makeDefaultConfigs(): Record<LLMProviderType, LLMProviderConfig> {
@@ -30,6 +33,7 @@ export const useLLMStore = create<LLMState>()(
     (set) => ({
       activeProvider: 'anthropic',
       configs: makeDefaultConfigs(),
+      modelsByProvider: {},
 
       setActiveProvider: (provider) => set({ activeProvider: provider }),
 
@@ -48,9 +52,28 @@ export const useLLMStore = create<LLMState>()(
             [provider]: { ...state.configs[provider], connectionStatus: status },
           },
         })),
+
+      setModelsForProvider: (provider, models) =>
+        set((state) => ({
+          modelsByProvider: { ...state.modelsByProvider, [provider]: models },
+        })),
+
+      setAllModels: (models) =>
+        set({ modelsByProvider: models }),
     }),
     {
       name: 'folio-mapper-llm',
+      merge: (persisted, current) => {
+        const p = persisted as Partial<LLMState> | undefined;
+        return {
+          ...current,
+          ...p,
+          // Deep-merge configs so new providers get defaults
+          configs: { ...current.configs, ...(p?.configs ?? {}) },
+          // Keep persisted models but let current (empty) be overridden
+          modelsByProvider: { ...(p?.modelsByProvider ?? {}) },
+        };
+      },
     },
   ),
 );

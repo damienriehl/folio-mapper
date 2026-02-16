@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, ModelInfo } from '@folio-mapper/core';
 import { CLOUD_PROVIDERS, LOCAL_PROVIDERS, PROVIDER_META } from '@folio-mapper/core';
 import { ProviderCard } from './ProviderCard';
@@ -6,9 +6,11 @@ import { ProviderCard } from './ProviderCard';
 interface LLMSettingsProps {
   activeProvider: LLMProviderType;
   configs: Record<LLMProviderType, LLMProviderConfig>;
+  modelsByProvider: Record<string, ModelInfo[]>;
   onSetActiveProvider: (provider: LLMProviderType) => void;
   onUpdateConfig: (provider: LLMProviderType, updates: Partial<LLMProviderConfig>) => void;
   onSetConnectionStatus: (provider: LLMProviderType, status: ConnectionStatus) => void;
+  onModelsLoaded: (provider: string, models: ModelInfo[]) => void;
   onClose: () => void;
   testConnection: (
     provider: LLMProviderType,
@@ -26,16 +28,17 @@ interface LLMSettingsProps {
 export function LLMSettings({
   activeProvider,
   configs,
+  modelsByProvider,
   onSetActiveProvider,
   onUpdateConfig,
   onSetConnectionStatus,
+  onModelsLoaded,
   onClose,
   testConnection,
   fetchModels,
 }: LLMSettingsProps) {
   const [testingProvider, setTestingProvider] = useState<LLMProviderType | null>(null);
-  const [loadingModelsFor, setLoadingModelsFor] = useState<LLMProviderType | null>(null);
-  const [modelsByProvider, setModelsByProvider] = useState<Record<string, ModelInfo[]>>({});
+  const [loadingModelsFor, setLoadingModelsFor] = useState<Set<LLMProviderType>>(new Set());
 
   const handleTest = useCallback(
     async (provider: LLMProviderType) => {
@@ -61,31 +64,26 @@ export function LLMSettings({
   const handleRefreshModels = useCallback(
     async (provider: LLMProviderType) => {
       const config = configs[provider];
-      setLoadingModelsFor(provider);
+      setLoadingModelsFor((prev) => new Set(prev).add(provider));
       try {
         const models = await fetchModels(
           provider,
           config.apiKey || undefined,
           config.baseUrl || undefined,
         );
-        setModelsByProvider((prev) => ({ ...prev, [provider]: models }));
+        onModelsLoaded(provider, models);
       } catch {
         // Keep existing models on error
       } finally {
-        setLoadingModelsFor(null);
+        setLoadingModelsFor((prev) => {
+          const next = new Set(prev);
+          next.delete(provider);
+          return next;
+        });
       }
     },
-    [configs, fetchModels],
+    [configs, fetchModels, onModelsLoaded],
   );
-
-  // Auto-fetch models for active provider on open
-  useEffect(() => {
-    const config = configs[activeProvider];
-    const meta = PROVIDER_META[activeProvider];
-    if (!meta.requiresApiKey || config.apiKey) {
-      handleRefreshModels(activeProvider);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderProviderSection = (title: string, providers: LLMProviderType[]) => (
     <div>
@@ -98,7 +96,7 @@ export function LLMSettings({
             config={configs[type]}
             isActive={activeProvider === type}
             models={modelsByProvider[type] || []}
-            isLoadingModels={loadingModelsFor === type}
+            isLoadingModels={loadingModelsFor.has(type)}
             isTesting={testingProvider === type}
             onSelect={onSetActiveProvider}
             onUpdateConfig={onUpdateConfig}

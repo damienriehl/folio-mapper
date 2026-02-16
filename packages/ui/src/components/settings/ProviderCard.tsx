@@ -138,7 +138,7 @@ export function ProviderCard({
             </select>
             <button
               onClick={() => onRefreshModels(meta.type)}
-              disabled={isLoadingModels || (meta.requiresApiKey && !config.apiKey)}
+              disabled={isLoadingModels}
               className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
               title="Refresh models"
             >

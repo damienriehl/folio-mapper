@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { parseText, testConnection, fetchModels, BRANCH_COLORS } from '@folio-mapper/core';
+import { parseText, testConnection, fetchModels, fetchKnownModels, BRANCH_COLORS } from '@folio-mapper/core';
 import type { SuggestionEntry } from '@folio-mapper/core';
 import {
   AppShell,
@@ -56,6 +56,13 @@ export function App() {
   const { upload } = useFileUpload();
   const { itemCount } = useTextDetection(textInput);
   const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates } = useMapping();
+
+  // Hydrate known models on startup
+  useEffect(() => {
+    fetchKnownModels()
+      .then((models) => llmState.setAllModels(models))
+      .catch(() => {}); // graceful — store may already have persisted models
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [showSettings, setShowSettings] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -265,9 +272,11 @@ export function App() {
     <LLMSettings
       activeProvider={llmState.activeProvider}
       configs={llmState.configs}
+      modelsByProvider={llmState.modelsByProvider}
       onSetActiveProvider={llmState.setActiveProvider}
       onUpdateConfig={llmState.updateConfig}
       onSetConnectionStatus={llmState.setConnectionStatus}
+      onModelsLoaded={llmState.setModelsForProvider}
       onClose={() => setShowSettings(false)}
       testConnection={testConnection}
       fetchModels={fetchModels}
@@ -482,9 +491,11 @@ export function App() {
             <ModelChooser
               activeProvider={llmState.activeProvider}
               configs={llmState.configs}
+              modelsByProvider={llmState.modelsByProvider}
               onSetActiveProvider={llmState.setActiveProvider}
               onUpdateConfig={llmState.updateConfig}
               onSetConnectionStatus={llmState.setConnectionStatus}
+              onModelsLoaded={llmState.setModelsForProvider}
               testConnection={testConnection}
               fetchModels={fetchModels}
             />

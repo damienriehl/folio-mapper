@@ -7,7 +7,10 @@ export type LLMProviderType =
   | 'meta_llama'
   | 'ollama'
   | 'lmstudio'
-  | 'custom';
+  | 'custom'
+  | 'groq'
+  | 'xai'
+  | 'github_models';
 
 export type ConnectionStatus = 'untested' | 'valid' | 'invalid';
 

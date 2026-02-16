@@ -8,7 +8,7 @@ from app.models.llm_models import (
     ModelInfo,
     ModelListRequest,
 )
-from app.services.llm.registry import get_provider
+from app.services.llm.registry import KNOWN_MODELS, get_provider
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
 
@@ -34,6 +34,12 @@ async def test_connection(req: ConnectionTestRequest) -> ConnectionTestResponse:
             success=False,
             message=str(exc),
         )
+
+
+@router.get("/known-models")
+async def known_models() -> dict[str, list[ModelInfo]]:
+    """Return well-known models for every provider (no API key needed)."""
+    return {k.value: v for k, v in KNOWN_MODELS.items()}
 
 
 @router.post("/models", response_model=list[ModelInfo])

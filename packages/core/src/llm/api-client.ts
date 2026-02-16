@@ -27,6 +27,14 @@ export async function testConnection(
   return res.json();
 }
 
+export async function fetchKnownModels(): Promise<Record<string, ModelInfo[]>> {
+  const res = await fetch(`${BASE_URL}/known-models`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch known models');
+  }
+  return res.json();
+}
+
 export async function fetchModels(
   provider: LLMProviderType,
   apiKey?: string,

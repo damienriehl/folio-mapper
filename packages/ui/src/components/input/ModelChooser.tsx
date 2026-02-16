@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, ModelInfo } from '@folio-mapper/core';
 import { CLOUD_PROVIDERS, LOCAL_PROVIDERS, PROVIDER_META } from '@folio-mapper/core';
 import { ProviderCard } from '../settings/ProviderCard';
@@ -8,9 +8,11 @@ type Tab = 'local' | 'online' | 'none';
 interface ModelChooserProps {
   activeProvider: LLMProviderType;
   configs: Record<LLMProviderType, LLMProviderConfig>;
+  modelsByProvider: Record<string, ModelInfo[]>;
   onSetActiveProvider: (provider: LLMProviderType) => void;
   onUpdateConfig: (provider: LLMProviderType, updates: Partial<LLMProviderConfig>) => void;
   onSetConnectionStatus: (provider: LLMProviderType, status: ConnectionStatus) => void;
+  onModelsLoaded: (provider: string, models: ModelInfo[]) => void;
   testConnection: (
     provider: LLMProviderType,
     apiKey?: string,
@@ -27,9 +29,11 @@ interface ModelChooserProps {
 export function ModelChooser({
   activeProvider,
   configs,
+  modelsByProvider,
   onSetActiveProvider,
   onUpdateConfig,
   onSetConnectionStatus,
+  onModelsLoaded,
   testConnection,
   fetchModels,
 }: ModelChooserProps) {
@@ -43,8 +47,7 @@ export function ModelChooser({
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [testingProvider, setTestingProvider] = useState<LLMProviderType | null>(null);
-  const [loadingModelsFor, setLoadingModelsFor] = useState<LLMProviderType | null>(null);
-  const [modelsByProvider, setModelsByProvider] = useState<Record<string, ModelInfo[]>>({});
+  const [loadingModelsFor, setLoadingModelsFor] = useState<Set<LLMProviderType>>(new Set());
 
   const handleTest = useCallback(
     async (provider: LLMProviderType) => {
@@ -70,35 +73,30 @@ export function ModelChooser({
   const handleRefreshModels = useCallback(
     async (provider: LLMProviderType) => {
       const config = configs[provider];
-      setLoadingModelsFor(provider);
+      setLoadingModelsFor((prev) => new Set(prev).add(provider));
       try {
         const models = await fetchModels(
           provider,
           config.apiKey || undefined,
           config.baseUrl || undefined,
         );
-        setModelsByProvider((prev) => ({ ...prev, [provider]: models }));
+        onModelsLoaded(provider, models);
       } catch {
         // Keep existing models on error
       } finally {
-        setLoadingModelsFor(null);
+        setLoadingModelsFor((prev) => {
+          const next = new Set(prev);
+          next.delete(provider);
+          return next;
+        });
       }
     },
-    [configs, fetchModels],
+    [configs, fetchModels, onModelsLoaded],
   );
 
-  // Auto-fetch models for active provider on mount
-  useEffect(() => {
-    const config = configs[activeProvider];
-    const meta = PROVIDER_META[activeProvider];
-    if (!meta.requiresApiKey || config.apiKey) {
-      handleRefreshModels(activeProvider);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'local', label: 'Local' },
     { key: 'online', label: 'Online' },
+    { key: 'local', label: 'Local' },
     { key: 'none', label: 'No LLM' },
   ];
 
@@ -146,7 +144,7 @@ export function ModelChooser({
                 config={configs[type]}
                 isActive={activeProvider === type}
                 models={modelsByProvider[type] || []}
-                isLoadingModels={loadingModelsFor === type}
+                isLoadingModels={loadingModelsFor.has(type)}
                 isTesting={testingProvider === type}
                 onSelect={onSetActiveProvider}
                 onUpdateConfig={onUpdateConfig}

@@ -15,6 +15,9 @@ class LLMProviderType(str, Enum):
     OLLAMA = "ollama"
     LMSTUDIO = "lmstudio"
     CUSTOM = "custom"
+    GROQ = "groq"
+    XAI = "xai"
+    GITHUB_MODELS = "github_models"
 
 
 class ConnectionTestRequest(BaseModel):
