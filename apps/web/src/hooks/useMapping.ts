@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   fetchCandidates,
   fetchMandatoryFallback,
@@ -11,44 +11,143 @@ import type {
 } from '@folio-mapper/core';
 import { useMappingStore } from '../store/mapping-store';
 
+const BATCH_SIZE = 10;
+
 /**
  * Hook to trigger candidate fetching and initialize mapping state.
+ * Loads the first item immediately, then remaining items in background batches.
  */
 export function useMapping() {
-  const { startMapping, setPipelineMetadata, setLoadingCandidates, setError, mergeFallbackResults, mergeSearchResults } =
-    useMappingStore();
+  const {
+    startMapping,
+    appendMappingItems,
+    setBatchLoading,
+    setPipelineMetadata,
+    setLoadingCandidates,
+    setError,
+    mergeFallbackResults,
+    mergeSearchResults,
+  } = useMappingStore();
+
+  const abortRef = useRef<AbortController | null>(null);
+
+  const cancelBatchLoading = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setBatchLoading(false);
+  }, [setBatchLoading]);
 
   const loadCandidates = useCallback(
     async (items: ParseItem[]) => {
+      // Cancel any in-flight batches from a previous run
+      cancelBatchLoading();
+
       setLoadingCandidates(true);
       setError(null);
 
       try {
-        const response = await fetchCandidates(items, 0, 10);
-        startMapping(response);
+        // Batch 1: first item only — show mapping screen immediately
+        const firstBatch = items.slice(0, 1);
+        const response = await fetchCandidates(firstBatch, 0, 10);
+        startMapping(response, items.length);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load candidates');
         setLoadingCandidates(false);
+        return;
+      }
+
+      // Remaining items in background batches
+      if (items.length <= 1) {
+        setBatchLoading(false);
+        return;
+      }
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const remaining = items.slice(1);
+
+      for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
+        if (controller.signal.aborted) break;
+
+        const batch = remaining.slice(i, i + BATCH_SIZE);
+        try {
+          const response = await fetchCandidates(batch, 0, 10);
+          if (controller.signal.aborted) break;
+          appendMappingItems(response.items);
+        } catch (err) {
+          if (controller.signal.aborted) break;
+          // Non-fatal: log and continue with next batch
+          console.warn('Batch loading error:', err);
+          setBatchLoading(true, err instanceof Error ? err.message : 'Batch loading error');
+        }
+      }
+
+      if (!controller.signal.aborted) {
+        setBatchLoading(false);
+      }
+      if (abortRef.current === controller) {
+        abortRef.current = null;
       }
     },
-    [startMapping, setLoadingCandidates, setError],
+    [startMapping, appendMappingItems, setBatchLoading, setLoadingCandidates, setError, cancelBatchLoading],
   );
 
   const loadPipelineCandidates = useCallback(
     async (items: ParseItem[], llmConfig: PipelineRequestConfig) => {
+      // Cancel any in-flight batches from a previous run
+      cancelBatchLoading();
+
       setLoadingCandidates(true);
       setError(null);
 
       try {
-        const response = await fetchPipelineCandidates(items, llmConfig, 0, 10);
-        startMapping(response.mapping);
+        // Batch 1: first item only — show mapping screen immediately
+        const firstBatch = items.slice(0, 1);
+        const response = await fetchPipelineCandidates(firstBatch, llmConfig, 0, 10);
+        startMapping(response.mapping, items.length);
         setPipelineMetadata(response.pipeline_metadata);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Pipeline mapping failed');
         setLoadingCandidates(false);
+        return;
+      }
+
+      // Remaining items in background batches
+      if (items.length <= 1) {
+        setBatchLoading(false);
+        return;
+      }
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const remaining = items.slice(1);
+
+      for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
+        if (controller.signal.aborted) break;
+
+        const batch = remaining.slice(i, i + BATCH_SIZE);
+        try {
+          const response = await fetchPipelineCandidates(batch, llmConfig, 0, 10);
+          if (controller.signal.aborted) break;
+          appendMappingItems(response.mapping.items, response.pipeline_metadata);
+        } catch (err) {
+          if (controller.signal.aborted) break;
+          // Non-fatal: log and continue with next batch
+          console.warn('Pipeline batch loading error:', err);
+          setBatchLoading(true, err instanceof Error ? err.message : 'Batch loading error');
+        }
+      }
+
+      if (!controller.signal.aborted) {
+        setBatchLoading(false);
+      }
+      if (abortRef.current === controller) {
+        abortRef.current = null;
       }
     },
-    [startMapping, setPipelineMetadata, setLoadingCandidates, setError],
+    [startMapping, appendMappingItems, setBatchLoading, setPipelineMetadata, setLoadingCandidates, setError, cancelBatchLoading],
   );
 
   const loadMandatoryFallback = useCallback(
@@ -96,5 +195,5 @@ export function useMapping() {
     [mergeSearchResults],
   );
 
-  return { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates };
+  return { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates, cancelBatchLoading };
 }

@@ -55,7 +55,7 @@ export function App() {
   const llmState = useLLMStore();
   const { upload } = useFileUpload();
   const { itemCount } = useTextDetection(textInput);
-  const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates } = useMapping();
+  const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates, cancelBatchLoading } = useMapping();
 
   // Hydrate known models on startup
   useEffect(() => {
@@ -293,6 +293,7 @@ export function App() {
         <Header
           onOpenSettings={() => setShowSettings(true)}
           onRestart={() => {
+            cancelBatchLoading();
             mappingState.resetMapping();
             resetInput();
             setIsPipelineRun(false);
@@ -403,6 +404,9 @@ export function App() {
             onEditSuggestion={(entry) => setEditingSuggestion(entry)}
             searchFilterHashes={mappingState.searchFilterHashes}
             onClearSearchFilter={mappingState.clearSearchFilter}
+            loadedItemCount={mappingState.loadedItemCount}
+            isBatchLoading={mappingState.isBatchLoading}
+            batchLoadingError={mappingState.batchLoadingError}
             onOpenSubmission={() => {
               suggestionSubmit.resetSubmission();
               suggestionSubmit.setShowSubmissionModal(true);
@@ -420,6 +424,7 @@ export function App() {
               )}
               <button
                 onClick={() => {
+                  cancelBatchLoading();
                   mappingState.resetMapping();
                   resetInput();
                   setIsPipelineRun(false);

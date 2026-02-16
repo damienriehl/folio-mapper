@@ -17,6 +17,8 @@ interface MappingToolbarProps {
   onDefaultTopNChange: (value: number) => void;
   onStatusFilterChange: (filter: StatusFilter) => void;
   onShowShortcuts: () => void;
+  loadedItemCount?: number;
+  isBatchLoading?: boolean;
 }
 
 export function MappingToolbar({
@@ -36,6 +38,8 @@ export function MappingToolbar({
   onDefaultTopNChange,
   onStatusFilterChange,
   onShowShortcuts,
+  loadedItemCount,
+  isBatchLoading,
 }: MappingToolbarProps) {
   // Defensive defaults in case store hydration provides undefined
   const safeTopN = topN ?? 5;
@@ -50,6 +54,12 @@ export function MappingToolbar({
           <span className="text-sm font-medium text-gray-900">
             NODE: {currentIndex + 1} of {totalItems}
           </span>
+          {isBatchLoading && loadedItemCount != null && (
+            <span className="flex items-center gap-1.5 text-xs text-blue-600">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border border-blue-300 border-t-blue-600" />
+              Loading... {loadedItemCount}/{totalItems}
+            </span>
+          )}
           <div className="flex items-center gap-1">
             <button
               type="button"

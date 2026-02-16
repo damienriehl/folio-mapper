@@ -5,6 +5,7 @@ import type {
   BranchSortMode,
   BranchState,
   FolioStatus,
+  ItemMappingResult,
   MappingResponse,
   NodeStatus,
   PipelineItemMetadata,
@@ -56,6 +57,11 @@ interface MappingState {
   // Search filter: IRI hashes from last search (null = no filter active)
   searchFilterHashes: string[] | null;
 
+  // Progressive batch loading
+  loadedItemCount: number;
+  isBatchLoading: boolean;
+  batchLoadingError: string | null;
+
   // FOLIO loading state
   folioStatus: FolioStatus;
   isLoadingCandidates: boolean;
@@ -89,7 +95,9 @@ interface MappingState {
   removeSuggestion: (id: string) => void;
   updateSuggestion: (id: string, updates: Partial<SuggestionEntry>) => void;
   clearSuggestionQueue: () => void;
-  startMapping: (response: MappingResponse) => void;
+  startMapping: (response: MappingResponse, fullItemCount?: number) => void;
+  appendMappingItems: (newItems: ItemMappingResult[], pipelineMetadata?: PipelineItemMetadata[]) => void;
+  setBatchLoading: (loading: boolean, error?: string | null) => void;
   resetMapping: () => void;
 }
 
@@ -151,6 +159,9 @@ export const useMappingStore = create<MappingState>()(
       pipelineMetadata: null,
       suggestionQueue: [] as SuggestionEntry[],
       searchFilterHashes: null,
+      loadedItemCount: 0,
+      isBatchLoading: false,
+      batchLoadingError: null,
       folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
       isLoadingCandidates: false,
       error: null,
@@ -466,8 +477,26 @@ export const useMappingStore = create<MappingState>()(
 
       clearSuggestionQueue: () => set({ suggestionQueue: [] }),
 
-      startMapping: (response) => {
+      startMapping: (response, fullItemCount?) => {
         const { inputBranchStates, branchSortMode, customBranchOrder, defaultTopN } = get();
+
+        const totalCount = fullItemCount ?? response.total_items;
+
+        // When fullItemCount is provided, build a sparse items array
+        // so that later batches can be slotted in by item_index
+        let finalResponse = response;
+        if (fullItemCount && fullItemCount > response.items.length) {
+          const sparseItems: (ItemMappingResult | undefined)[] = new Array(fullItemCount);
+          for (const item of response.items) {
+            sparseItems[item.item_index] = item;
+          }
+          finalResponse = {
+            ...response,
+            total_items: fullItemCount,
+            // Cast: sparse slots are undefined, code guards with `if (!item) continue`
+            items: sparseItems as ItemMappingResult[],
+          };
+        }
 
         // Initialize selections with high-confidence candidates pre-checked
         const selections: Record<number, string[]> = {};
@@ -493,8 +522,8 @@ export const useMappingStore = create<MappingState>()(
         }
 
         set({
-          mappingResponse: response,
-          totalItems: response.total_items,
+          mappingResponse: finalResponse,
+          totalItems: totalCount,
           currentItemIndex: 0,
           selections,
           nodeStatuses,
@@ -506,8 +535,62 @@ export const useMappingStore = create<MappingState>()(
           selectedCandidateIri: null,
           notes: {},
           statusFilter: 'all' as StatusFilter,
+          loadedItemCount: response.items.length,
+          isBatchLoading: fullItemCount != null && fullItemCount > response.items.length,
+          batchLoadingError: null,
           isLoadingCandidates: false,
           error: null,
+        });
+      },
+
+      appendMappingItems: (newItems, pipelineMetadata?) => {
+        const { mappingResponse, selections, nodeStatuses, branchStates, inputBranchStates, pipelineMetadata: existingMeta } = get();
+        if (!mappingResponse) return;
+
+        const items = [...mappingResponse.items];
+        const updatedSelections = { ...selections };
+        const updatedStatuses = { ...nodeStatuses };
+        const updatedBranchStates = { ...branchStates };
+
+        for (const item of newItems) {
+          items[item.item_index] = item;
+          updatedStatuses[item.item_index] = 'pending';
+          // Auto-select high-confidence candidates
+          const iriHashes: string[] = [];
+          for (const group of item.branch_groups) {
+            for (const candidate of group.candidates) {
+              if (candidate.score >= AUTO_SELECT_SCORE) {
+                iriHashes.push(candidate.iri_hash);
+              }
+            }
+            // Register new branches
+            if (!(group.branch in updatedBranchStates)) {
+              updatedBranchStates[group.branch] = inputBranchStates[group.branch] === 'mandatory' ? 'mandatory' : 'normal';
+            }
+          }
+          updatedSelections[item.item_index] = iriHashes;
+        }
+
+        // Merge pipeline metadata if provided
+        let mergedMeta = existingMeta;
+        if (pipelineMetadata) {
+          mergedMeta = [...(existingMeta || []), ...pipelineMetadata];
+        }
+
+        set({
+          mappingResponse: { ...mappingResponse, items },
+          selections: updatedSelections,
+          nodeStatuses: updatedStatuses,
+          branchStates: updatedBranchStates,
+          loadedItemCount: get().loadedItemCount + newItems.length,
+          pipelineMetadata: mergedMeta,
+        });
+      },
+
+      setBatchLoading: (loading, error?) => {
+        set({
+          isBatchLoading: loading,
+          batchLoadingError: error ?? null,
         });
       },
 
@@ -529,6 +612,9 @@ export const useMappingStore = create<MappingState>()(
           pipelineMetadata: null,
           suggestionQueue: [],
           searchFilterHashes: null,
+          loadedItemCount: 0,
+          isBatchLoading: false,
+          batchLoadingError: null,
           isLoadingCandidates: false,
           error: null,
         }),
@@ -550,6 +636,7 @@ export const useMappingStore = create<MappingState>()(
         statusFilter: state.statusFilter,
         pipelineMetadata: state.pipelineMetadata,
         suggestionQueue: state.suggestionQueue,
+        loadedItemCount: state.loadedItemCount,
       }),
       merge: (persisted, current) => {
         const p = persisted as Partial<MappingState> | undefined;
@@ -569,6 +656,10 @@ export const useMappingStore = create<MappingState>()(
           folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
           isLoadingCandidates: false,
           error: null,
+          // On recovery, batch loading is no longer in progress
+          isBatchLoading: false,
+          batchLoadingError: null,
+          loadedItemCount: p.loadedItemCount ?? (p.mappingResponse?.items?.filter(Boolean).length ?? 0),
         };
       },
     },

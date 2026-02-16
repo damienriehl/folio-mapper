@@ -76,6 +76,9 @@ interface MappingScreenProps {
   onOpenSubmission: () => void;
   searchFilterHashes?: string[] | null;
   onClearSearchFilter?: () => void;
+  loadedItemCount?: number;
+  isBatchLoading?: boolean;
+  batchLoadingError?: string | null;
 }
 
 function sortBranchGroups(
@@ -164,6 +167,9 @@ export function MappingScreen({
   onOpenSubmission,
   searchFilterHashes,
   onClearSearchFilter,
+  loadedItemCount,
+  isBatchLoading,
+  batchLoadingError,
 }: MappingScreenProps) {
   const [showBranchOptions, setShowBranchOptions] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -307,6 +313,8 @@ export function MappingScreen({
         onDefaultTopNChange={onDefaultTopNChange}
         onStatusFilterChange={onStatusFilterChange}
         onShowShortcuts={onShowShortcuts}
+        loadedItemCount={loadedItemCount}
+        isBatchLoading={isBatchLoading}
       />
 
       {currentItem && (
@@ -494,6 +502,25 @@ export function MappingScreen({
               onRemove={onRemoveSuggestion}
               onSubmit={onOpenSubmission}
             />
+          </div>
+        </div>
+      )}
+
+      {!currentItem && (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+            <p className="text-sm text-gray-600">
+              Loading candidates for item {currentItemIndex + 1}...
+            </p>
+            {loadedItemCount != null && (
+              <p className="mt-1 text-xs text-gray-400">
+                {loadedItemCount} of {totalItems} items loaded
+              </p>
+            )}
+            {batchLoadingError && (
+              <p className="mt-1 text-xs text-amber-600">{batchLoadingError}</p>
+            )}
           </div>
         </div>
       )}
