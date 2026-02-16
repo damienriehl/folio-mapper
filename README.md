@@ -190,7 +190,7 @@ pnpm test:api     # Backend tests (155 cases)
 
 ## FOLIO Ontology
 
-[FOLIO](https://folio.openlegalstandard.org/) (Financial and Operational Legal Information Ontology) is an open legal standard with ~18,300 classes across 24 branches:
+[FOLIO](https://folio.openlegalstandard.org/) (Federated Open Legal Information Ontology) is an open legal standard with ~18,300 classes across 24 branches:
 
 Actor/Player, Area of Law, Asset Type, Communication Modality, Currency, Data Format, Document/Artifact, Engagement Terms, Event, Forums/Venues, Governmental Body, Industry, Language, Legal Authorities, Legal Entity, Location, Matter Narrative, Matter Narrative Format, Objectives, Service, Standards Compatibility, Status, System Identifiers, and more.
 
