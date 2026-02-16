@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from fastapi.responses import Response
 
 from app.models.export_models import ExportPreviewRow, ExportRequest, TranslationRequest
+from app.services.export_scope import expand_scope
 from app.services.export_service import (
     generate_csv,
     generate_excel,
@@ -42,8 +43,9 @@ async def export_generate(body: ExportRequest) -> Response:
             media_type="application/json",
         )
 
+    expanded = expand_scope(body)
     generator, mime_type, extension = FORMAT_GENERATORS[fmt]
-    data = generator(body)
+    data = generator(expanded)
 
     filename = f"folio-mappings{extension}"
     return Response(
@@ -57,9 +59,10 @@ async def export_generate(body: ExportRequest) -> Response:
 async def export_preview(body: ExportRequest) -> list[ExportPreviewRow]:
     """Return a preview of the export (default 5 rows)."""
     preview_count = body.preview_rows or 5
+    expanded = expand_scope(body)
     preview_rows: list[ExportPreviewRow] = []
 
-    for row in body.rows[:preview_count]:
+    for row in expanded.rows[:preview_count]:
         if row.selected_concepts:
             for concept in row.selected_concepts:
                 preview_rows.append(
@@ -68,16 +71,16 @@ async def export_preview(body: ExportRequest) -> list[ExportPreviewRow]:
                         label=concept.label,
                         iri=(
                             concept.iri_hash
-                            if body.options.iri_format == "hash"
+                            if expanded.options.iri_format == "hash"
                             else concept.iri
                         ),
                         branch=concept.branch,
                         confidence=(
                             concept.score
-                            if body.options.include_confidence
+                            if expanded.options.include_confidence
                             else None
                         ),
-                        note=row.note if body.options.include_notes else None,
+                        note=row.note if expanded.options.include_notes else None,
                         translations=concept.translations,
                     )
                 )

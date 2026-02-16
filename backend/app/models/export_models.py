@@ -11,6 +11,16 @@ class ExportConcept(BaseModel):
     score: float
     definition: str | None = None
     translations: dict[str, str] = {}
+    alternative_labels: list[str] = []
+    examples: list[str] = []
+    hierarchy_path: list[str] = []
+    parent_iri_hash: str | None = None
+    see_also: list[str] = []
+    notes: str | None = None
+    deprecated: bool = False
+    is_mapped: bool = True
+    mapping_source_text: str | None = None
+    relationship: str | None = None  # "direct" | "sibling" | "ancestor" | "ontology"
 
 
 class ExportRow(BaseModel):
@@ -30,6 +40,7 @@ class ExportOptions(BaseModel):
     iri_format: str = "hash"  # hash, full_url, both
     languages: list[str] = []
     include_hierarchy: bool = True
+    export_scope: str = "mapped_only"  # "mapped_only" | "mapped_with_related" | "full_ontology"
 
 
 class ExportRequest(BaseModel):

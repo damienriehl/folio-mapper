@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ExportFormat, ExportOptions, ExportPreviewRow, LanguageCode } from '@folio-mapper/core';
+import type { ExportFormat, ExportOptions, ExportPreviewRow, ExportScope, LanguageCode } from '@folio-mapper/core';
 import { EXPORT_FORMATS, SUPPORTED_LANGUAGES } from '@folio-mapper/core';
 
 interface ExportModalProps {
@@ -20,6 +20,7 @@ export function ExportModal({
   isExporting,
 }: ExportModalProps) {
   const [format, setFormat] = useState<ExportFormat>('csv');
+  const [exportScope, setExportScope] = useState<ExportScope>('mapped_only');
   const [includeConfidence, setIncludeConfidence] = useState(true);
   const [includeNotes, setIncludeNotes] = useState(true);
   const [iriFormat, setIriFormat] = useState<'hash' | 'full_url' | 'both'>('hash');
@@ -36,6 +37,7 @@ export function ExportModal({
     iri_format: iriFormat,
     languages,
     include_hierarchy: true,
+    export_scope: exportScope,
   });
 
   const handlePreview = async () => {
@@ -101,6 +103,37 @@ export function ExportModal({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Export scope */}
+        <div className="mb-4">
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">Export Scope</label>
+          <div className="flex flex-col gap-2">
+            {([
+              ['mapped_only', 'Mapped Only', 'Only concepts you selected during mapping'],
+              ['mapped_with_related', 'Mapped + Related', 'Selected concepts plus siblings and ancestors'],
+              ['full_ontology', 'Full Ontology', 'All ~18,323 FOLIO classes (mapped items denoted)'],
+            ] as const).map(([val, label, desc]) => (
+              <label key={val} className="flex items-start gap-2 text-sm text-gray-600">
+                <input
+                  type="radio"
+                  name="export-scope"
+                  checked={exportScope === val}
+                  onChange={() => { setExportScope(val as ExportScope); setPreview(null); }}
+                  className="mt-0.5 border-gray-300"
+                />
+                <span>
+                  <span className="font-medium text-gray-700">{label}</span>
+                  {' — '}{desc}
+                </span>
+              </label>
+            ))}
+          </div>
+          {exportScope === 'full_ontology' && (
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-700">
+              Full ontology export includes ~18,323 concepts and may take several seconds.
+            </div>
+          )}
         </div>
 
         {/* Column options */}

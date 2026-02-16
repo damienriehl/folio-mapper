@@ -3,6 +3,8 @@ export type ExportFormat =
   | 'rdf_turtle' | 'json_ld'
   | 'markdown' | 'html' | 'pdf';
 
+export type ExportScope = 'mapped_only' | 'mapped_with_related' | 'full_ontology';
+
 export const EXPORT_FORMATS: { value: ExportFormat; label: string; extension: string; mime: string }[] = [
   { value: 'csv',        label: 'CSV',         extension: '.csv',   mime: 'text/csv' },
   { value: 'excel',      label: 'Excel',       extension: '.xlsx',  mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
@@ -37,6 +39,7 @@ export interface ExportOptions {
   iri_format: 'hash' | 'full_url' | 'both';
   languages: LanguageCode[];
   include_hierarchy: boolean;
+  export_scope: ExportScope;
 }
 
 export interface ExportRow {
@@ -56,6 +59,16 @@ export interface ExportConcept {
   score: number;
   definition: string | null;
   translations: Record<string, string>;
+  alternative_labels?: string[];
+  examples?: string[];
+  hierarchy_path?: string[];
+  parent_iri_hash?: string | null;
+  see_also?: string[];
+  notes?: string | null;
+  deprecated?: boolean;
+  is_mapped?: boolean;
+  mapping_source_text?: string | null;
+  relationship?: string | null;
 }
 
 export interface ExportRequest {

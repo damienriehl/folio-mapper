@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from app.models.export_models import ExportOptions, ExportRequest, ExportRow
+from app.models.export_models import ExportConcept, ExportOptions, ExportRequest, ExportRow
 from app.services.folio_service import get_folio
 
 
@@ -69,6 +69,11 @@ def _build_headers(options: ExportOptions) -> list[str]:
         headers.append("Notes")
     for lang in options.languages:
         headers.append(f"Label ({LANG_NAMES.get(lang, lang)})")
+    # Metadata columns (always present)
+    headers.extend(["Definition", "Alt Labels", "Examples", "Hierarchy"])
+    # Scope-aware columns
+    if options.export_scope != "mapped_only":
+        headers.extend(["Mapped", "Relationship", "Source Text"])
     return headers
 
 
@@ -79,6 +84,7 @@ def _flatten_rows(
     rows: list[ExportRow], options: ExportOptions
 ) -> list[list[str]]:
     flat: list[list[str]] = []
+    scope = options.export_scope
     for row in rows:
         if not row.selected_concepts:
             line: list[str] = [row.source_text, "", "", ""]
@@ -88,6 +94,10 @@ def _flatten_rows(
                 line.append(row.note or "")
             for _ in options.languages:
                 line.append("")
+            # Metadata columns
+            line.extend(["", "", "", ""])
+            if scope != "mapped_only":
+                line.extend(["", "", ""])
             flat.append(line)
         else:
             for concept in row.selected_concepts:
@@ -110,6 +120,16 @@ def _flatten_rows(
                     line.append(row.note or "")
                 for lang in options.languages:
                     line.append(concept.translations.get(lang, ""))
+                # Metadata columns
+                line.append(concept.definition or "")
+                line.append("; ".join(concept.alternative_labels))
+                line.append("; ".join(concept.examples))
+                line.append(" > ".join(concept.hierarchy_path))
+                # Scope-aware columns
+                if scope != "mapped_only":
+                    line.append("Yes" if concept.is_mapped else "No")
+                    line.append(concept.relationship or "")
+                    line.append(concept.mapping_source_text or "")
                 flat.append(line)
     return flat
 
@@ -145,28 +165,43 @@ def generate_excel(request: ExportRequest) -> bytes:
 
 def generate_json(request: ExportRequest) -> bytes:
     now = datetime.now(timezone.utc).isoformat()
+    scope = request.options.export_scope
+
+    def _concept_dict(c: ExportConcept) -> dict:
+        d: dict = {
+            "label": c.label,
+            "iri": c.iri,
+            "iri_hash": c.iri_hash,
+            "branch": c.branch,
+            "score": c.score,
+            "definition": c.definition,
+            "translations": c.translations,
+            "alternative_labels": c.alternative_labels,
+            "examples": c.examples,
+            "hierarchy_path": c.hierarchy_path,
+            "parent_iri_hash": c.parent_iri_hash,
+            "see_also": c.see_also,
+            "notes": c.notes,
+            "deprecated": c.deprecated,
+        }
+        if scope != "mapped_only":
+            d["is_mapped"] = c.is_mapped
+            d["relationship"] = c.relationship
+            d["mapping_source_text"] = c.mapping_source_text
+        return d
+
     data = {
         "exported": now,
         "source_file": request.source_file,
         "total_items": len(request.rows),
+        "export_scope": scope,
         "mappings": [
             {
                 "source": row.source_text,
                 "ancestry": row.ancestry,
                 "status": row.status,
                 "note": row.note,
-                "concepts": [
-                    {
-                        "label": c.label,
-                        "iri": c.iri,
-                        "iri_hash": c.iri_hash,
-                        "branch": c.branch,
-                        "score": c.score,
-                        "definition": c.definition,
-                        "translations": c.translations,
-                    }
-                    for c in row.selected_concepts
-                ],
+                "concepts": [_concept_dict(c) for c in row.selected_concepts],
             }
             for row in request.rows
         ],
@@ -179,40 +214,59 @@ def _escape_turtle(s: str) -> str:
 
 
 def generate_rdf_turtle(request: ExportRequest) -> bytes:
+    scope = request.options.export_scope
     lines = [
         "@prefix folio: <https://folio.openlegalstandard.org/> .",
         "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
         "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
         "@prefix dcterms: <http://purl.org/dc/terms/> .",
+        "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
+        "@prefix folio-mapper: <https://folio.openlegalstandard.org/mapper/> .",
         "",
     ]
     for row in request.rows:
         for concept in row.selected_concepts:
-            lines.append(f"folio:{concept.iri_hash}")
-            lines.append(
-                f'    rdfs:label "{_escape_turtle(concept.label)}" ;'
-            )
+            props: list[str] = []
+            props.append(f'    rdfs:label "{_escape_turtle(concept.label)}"')
             if concept.definition:
-                lines.append(
-                    f'    skos:definition "{_escape_turtle(concept.definition)}" ;'
-                )
-            lines.append(
-                f'    dcterms:subject "{_escape_turtle(row.source_text)}" .'
-            )
+                props.append(f'    skos:definition "{_escape_turtle(concept.definition)}"')
+            for alt in concept.alternative_labels:
+                props.append(f'    skos:altLabel "{_escape_turtle(alt)}"')
+            for ex in concept.examples:
+                props.append(f'    skos:example "{_escape_turtle(ex)}"')
+            if concept.parent_iri_hash:
+                props.append(f'    skos:broader folio:{concept.parent_iri_hash}')
+            for sa in concept.see_also:
+                props.append(f'    rdfs:seeAlso folio:{sa}')
+            props.append(f'    dcterms:subject "{_escape_turtle(row.source_text)}"')
+            if scope != "mapped_only":
+                mapped_val = "true" if concept.is_mapped else "false"
+                props.append(f'    folio-mapper:isMapped "{mapped_val}"^^xsd:boolean')
+                if concept.mapping_source_text:
+                    props.append(f'    folio-mapper:mappedFrom "{_escape_turtle(concept.mapping_source_text)}"')
+                if concept.relationship:
+                    props.append(f'    folio-mapper:relationship "{_escape_turtle(concept.relationship)}"')
+
+            lines.append(f"folio:{concept.iri_hash}")
+            for i, prop in enumerate(props):
+                sep = " ." if i == len(props) - 1 else " ;"
+                lines.append(f"{prop}{sep}")
             lines.append("")
     return "\n".join(lines).encode("utf-8")
 
 
 def generate_json_ld(request: ExportRequest) -> bytes:
-    doc = {
-        "@context": {
-            "folio": "https://folio.openlegalstandard.org/",
-            "skos": "http://www.w3.org/2004/02/skos/core#",
-            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-            "dcterms": "http://purl.org/dc/terms/",
-        },
-        "@graph": [],
+    scope = request.options.export_scope
+    context: dict = {
+        "folio": "https://folio.openlegalstandard.org/",
+        "skos": "http://www.w3.org/2004/02/skos/core#",
+        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+        "dcterms": "http://purl.org/dc/terms/",
+        "xsd": "http://www.w3.org/2001/XMLSchema#",
     }
+    if scope != "mapped_only":
+        context["folio-mapper"] = "https://folio.openlegalstandard.org/mapper/"
+    doc = {"@context": context, "@graph": []}
     for row in request.rows:
         for concept in row.selected_concepts:
             node: dict = {
@@ -222,11 +276,29 @@ def generate_json_ld(request: ExportRequest) -> bytes:
             }
             if concept.definition:
                 node["skos:definition"] = concept.definition
+            # Alt labels: translations + alternative_labels
+            alt_labels = []
             if concept.translations:
-                node["skos:altLabel"] = [
+                alt_labels.extend(
                     {"@value": label, "@language": lang}
                     for lang, label in concept.translations.items()
-                ]
+                )
+            for alt in concept.alternative_labels:
+                alt_labels.append({"@value": alt})
+            if alt_labels:
+                node["skos:altLabel"] = alt_labels
+            for ex in concept.examples:
+                node.setdefault("skos:example", []).append(ex)
+            if concept.parent_iri_hash:
+                node["skos:broader"] = {"@id": f"folio:{concept.parent_iri_hash}"}
+            if concept.see_also:
+                node["rdfs:seeAlso"] = [{"@id": f"folio:{sa}"} for sa in concept.see_also]
+            if scope != "mapped_only":
+                node["folio-mapper:isMapped"] = concept.is_mapped
+                if concept.mapping_source_text:
+                    node["folio-mapper:mappedFrom"] = concept.mapping_source_text
+                if concept.relationship:
+                    node["folio-mapper:relationship"] = concept.relationship
             doc["@graph"].append(node)
     return json.dumps(doc, indent=2, ensure_ascii=False).encode("utf-8")
 
@@ -268,7 +340,13 @@ def _confidence_css_class(score_str: str) -> str:
 def generate_html(request: ExportRequest) -> bytes:
     headers = _build_headers(request.options)
     flat = _flatten_rows(request.rows, request.options)
+    scope = request.options.export_scope
     now = datetime.now(timezone.utc).isoformat()
+
+    # For scope exports, track which flat rows are mapped (by "Mapped" column value)
+    mapped_col_idx = None
+    if scope != "mapped_only" and "Mapped" in headers:
+        mapped_col_idx = headers.index("Mapped")
 
     parts = [
         "<!DOCTYPE html>",
@@ -284,6 +362,7 @@ def generate_html(request: ExportRequest) -> bytes:
         "  .conf-60 { background: #FFD700; }",
         "  .conf-45 { background: #FF8C00; color: white; }",
         "  .conf-low { background: #D3D3D3; }",
+        "  .mapped-row { border-left: 3px solid #22c55e; }",
         "</style></head><body>",
         "<h1>FOLIO Mapping Report</h1>",
         f"<p>Source: {_html_escape(request.source_file or 'N/A')} | "
@@ -295,7 +374,10 @@ def generate_html(request: ExportRequest) -> bytes:
         "<tbody>",
     ]
     for row_data in flat:
-        parts.append("<tr>")
+        row_class = ""
+        if mapped_col_idx is not None and mapped_col_idx < len(row_data) and row_data[mapped_col_idx] == "Yes":
+            row_class = ' class="mapped-row"'
+        parts.append(f"<tr{row_class}>")
         for i, cell in enumerate(row_data):
             css = ""
             if i < len(headers) and headers[i] == "Confidence" and cell:
