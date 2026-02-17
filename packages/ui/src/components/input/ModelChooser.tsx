@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, ModelInfo } from '@folio-mapper/core';
+import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, LlamafileStatus as LlamafileStatusType, ModelInfo } from '@folio-mapper/core';
 import { CLOUD_PROVIDERS, LOCAL_PROVIDERS, PROVIDER_META } from '@folio-mapper/core';
 import { ProviderCard } from '../settings/ProviderCard';
+import { LlamafileStatus } from '../settings/LlamafileStatus';
 
 type Tab = 'local' | 'online' | 'none';
 
@@ -9,6 +10,7 @@ interface ModelChooserProps {
   activeProvider: LLMProviderType;
   configs: Record<LLMProviderType, LLMProviderConfig>;
   modelsByProvider: Record<string, ModelInfo[]>;
+  llamafileStatus?: LlamafileStatusType | null;
   onSetActiveProvider: (provider: LLMProviderType) => void;
   onUpdateConfig: (provider: LLMProviderType, updates: Partial<LLMProviderConfig>) => void;
   onSetConnectionStatus: (provider: LLMProviderType, status: ConnectionStatus) => void;
@@ -30,6 +32,7 @@ export function ModelChooser({
   activeProvider,
   configs,
   modelsByProvider,
+  llamafileStatus,
   onSetActiveProvider,
   onUpdateConfig,
   onSetConnectionStatus,
@@ -43,7 +46,7 @@ export function ModelChooser({
   const hasValidConnection = activeConfig?.connectionStatus === 'valid';
   const initialTab: Tab = hasValidConnection
     ? isLocalProvider ? 'local' : 'online'
-    : 'none';
+    : llamafileStatus ? 'local' : 'none';
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [testingProvider, setTestingProvider] = useState<LLMProviderType | null>(null);
@@ -138,19 +141,21 @@ export function ModelChooser({
         ) : (
           <div className="space-y-2">
             {providers.map((type) => (
-              <ProviderCard
-                key={type}
-                meta={PROVIDER_META[type]}
-                config={configs[type]}
-                isActive={activeProvider === type}
-                models={modelsByProvider[type] || []}
-                isLoadingModels={loadingModelsFor.has(type)}
-                isTesting={testingProvider === type}
-                onSelect={onSetActiveProvider}
-                onUpdateConfig={onUpdateConfig}
-                onTest={handleTest}
-                onRefreshModels={handleRefreshModels}
-              />
+              <div key={type}>
+                <ProviderCard
+                  meta={PROVIDER_META[type]}
+                  config={configs[type]}
+                  isActive={activeProvider === type}
+                  models={modelsByProvider[type] || []}
+                  isLoadingModels={loadingModelsFor.has(type)}
+                  isTesting={testingProvider === type}
+                  onSelect={onSetActiveProvider}
+                  onUpdateConfig={onUpdateConfig}
+                  onTest={handleTest}
+                  onRefreshModels={handleRefreshModels}
+                />
+                {type === 'llamafile' && <LlamafileStatus status={llamafileStatus ?? null} />}
+              </div>
             ))}
           </div>
         )}

@@ -541,6 +541,7 @@ export function App() {
               activeProvider={llmState.activeProvider}
               configs={llmState.configs}
               modelsByProvider={llmState.modelsByProvider}
+              llamafileStatus={llamafileStatus}
               onSetActiveProvider={llmState.setActiveProvider}
               onUpdateConfig={llmState.updateConfig}
               onSetConnectionStatus={llmState.setConnectionStatus}
