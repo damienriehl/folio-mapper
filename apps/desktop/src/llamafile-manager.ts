@@ -6,8 +6,8 @@ import * as path from "path";
 import log from "electron-log";
 
 const DEFAULT_MODEL_URL =
-  "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf";
-const DEFAULT_MODEL_FILENAME = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf";
+  "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf";
+const DEFAULT_MODEL_FILENAME = "Qwen2.5-7B-Instruct-Q4_K_M.gguf";
 const GITHUB_API_RELEASES =
   "https://api.github.com/repos/mozilla-ai/llamafile/releases/latest";
 const READY_POLL_INTERVAL_MS = 1000;
