@@ -19,9 +19,10 @@ def main() -> None:
     os.environ["FOLIO_MAPPER_ORIGIN"] = f"http://127.0.0.1:{args.port}"
 
     import uvicorn
+    from app.main import app
 
     uvicorn.run(
-        "app.main:app",
+        app,
         host="127.0.0.1",
         port=args.port,
         log_level="info",
