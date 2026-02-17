@@ -1,13 +1,15 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import * as path from "path";
 import log from "electron-log";
 import { BackendManager } from "./backend-manager";
+import { LlamafileManager } from "./llamafile-manager";
 import { findFreePort } from "./port-finder";
 
 const isDev = process.argv.includes("--dev");
 
 let mainWindow: BrowserWindow | null = null;
 let backendManager: BackendManager | null = null;
+let llamafileManager: LlamafileManager | null = null;
 
 async function createWindow(port: number): Promise<void> {
   mainWindow = new BrowserWindow({
@@ -34,6 +36,16 @@ async function createWindow(port: number): Promise<void> {
   });
 }
 
+function registerLlamafileIPC(): void {
+  ipcMain.handle("llamafile:get-status", () => {
+    return llamafileManager?.getStatus() ?? { state: "idle" };
+  });
+
+  ipcMain.handle("llamafile:get-port", () => {
+    return llamafileManager?.getPort() ?? null;
+  });
+}
+
 async function startApp(): Promise<void> {
   const port = isDev ? 8000 : await findFreePort();
 
@@ -46,7 +58,17 @@ async function startApp(): Promise<void> {
     log.info("Backend is ready");
   }
 
+  // Register IPC handlers before window creation
+  registerLlamafileIPC();
+
   await createWindow(port);
+
+  // Start llamafile setup in background (non-blocking)
+  const llamafilePort = await findFreePort();
+  llamafileManager = new LlamafileManager(app.getPath("userData"), llamafilePort);
+  llamafileManager.setup().catch((err) => {
+    log.error("[llamafile] Background setup failed:", err);
+  });
 }
 
 app.whenReady().then(() => {
@@ -61,6 +83,9 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", async () => {
+  if (llamafileManager) {
+    await llamafileManager.stop();
+  }
   if (backendManager) {
     await backendManager.stop();
   }

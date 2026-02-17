@@ -18,6 +18,7 @@ class LLMProviderType(str, Enum):
     GROQ = "groq"
     XAI = "xai"
     GITHUB_MODELS = "github_models"
+    LLAMAFILE = "llamafile"
 
 
 class ConnectionTestRequest(BaseModel):

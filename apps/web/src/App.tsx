@@ -30,6 +30,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useSession } from './hooks/useSession';
 import { useExport } from './hooks/useExport';
 import { useSuggestionSubmit } from './hooks/useSuggestionSubmit';
+import { useLlamafile } from './hooks/useLlamafile';
 
 export function App() {
   const {
@@ -94,6 +95,9 @@ export function App() {
 
   // Export
   const exportState = useExport();
+
+  // Llamafile auto-management (desktop only)
+  const llamafileStatus = useLlamafile();
 
   // Suggestion queue + submission
   const suggestionSubmit = useSuggestionSubmit();
@@ -295,6 +299,7 @@ export function App() {
       activeProvider={llmState.activeProvider}
       configs={llmState.configs}
       modelsByProvider={llmState.modelsByProvider}
+      llamafileStatus={llamafileStatus}
       onSetActiveProvider={llmState.setActiveProvider}
       onUpdateConfig={llmState.updateConfig}
       onSetConnectionStatus={llmState.setConnectionStatus}

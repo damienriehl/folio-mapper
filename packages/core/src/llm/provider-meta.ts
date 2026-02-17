@@ -97,6 +97,14 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
     requiresApiKey: true,
     isLocal: false,
   },
+  llamafile: {
+    type: 'llamafile',
+    displayName: 'Llamafile',
+    defaultBaseUrl: 'http://127.0.0.1:8080/v1',
+    defaultModel: '',
+    requiresApiKey: false,
+    isLocal: true,
+  },
 };
 
 export const CLOUD_PROVIDERS: LLMProviderType[] = [
@@ -111,4 +119,4 @@ export const CLOUD_PROVIDERS: LLMProviderType[] = [
   'meta_llama',
 ];
 
-export const LOCAL_PROVIDERS: LLMProviderType[] = ['ollama', 'lmstudio', 'custom'];
+export const LOCAL_PROVIDERS: LLMProviderType[] = ['llamafile', 'ollama', 'lmstudio', 'custom'];

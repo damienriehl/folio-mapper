@@ -22,6 +22,7 @@ DEFAULT_BASE_URLS: dict[LLMProviderType, str] = {
     LLMProviderType.GROQ: "https://api.groq.com/openai/v1",
     LLMProviderType.XAI: "https://api.x.ai/v1",
     LLMProviderType.GITHUB_MODELS: "https://models.github.ai/inference",
+    LLMProviderType.LLAMAFILE: "http://127.0.0.1:8080/v1",
 }
 
 # Default model per provider (used when none selected)
@@ -38,6 +39,7 @@ DEFAULT_MODELS: dict[LLMProviderType, str] = {
     LLMProviderType.GROQ: "llama-3.3-70b-versatile",
     LLMProviderType.XAI: "grok-3-mini",
     LLMProviderType.GITHUB_MODELS: "openai/gpt-4o",
+    LLMProviderType.LLAMAFILE: "",
 }
 
 # Display names for the UI
@@ -54,6 +56,7 @@ PROVIDER_DISPLAY_NAMES: dict[LLMProviderType, str] = {
     LLMProviderType.GROQ: "Groq",
     LLMProviderType.XAI: "xAI",
     LLMProviderType.GITHUB_MODELS: "GitHub Models",
+    LLMProviderType.LLAMAFILE: "Llamafile",
 }
 
 # Whether the provider requires an API key
@@ -70,6 +73,7 @@ REQUIRES_API_KEY: dict[LLMProviderType, bool] = {
     LLMProviderType.GROQ: True,
     LLMProviderType.XAI: True,
     LLMProviderType.GITHUB_MODELS: True,
+    LLMProviderType.LLAMAFILE: False,
 }
 
 # Providers that use OpenAI-compatible API
@@ -82,6 +86,7 @@ _OPENAI_COMPAT_PROVIDERS = {
     LLMProviderType.CUSTOM,
     LLMProviderType.GROQ,
     LLMProviderType.XAI,
+    LLMProviderType.LLAMAFILE,
 }
 
 
@@ -148,6 +153,7 @@ KNOWN_MODELS: dict[LLMProviderType, list["ModelInfo"]] = {
     LLMProviderType.OLLAMA: [],
     LLMProviderType.LMSTUDIO: [],
     LLMProviderType.CUSTOM: [],
+    LLMProviderType.LLAMAFILE: [],
 }
 
 

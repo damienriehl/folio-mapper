@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, ModelInfo } from '@folio-mapper/core';
+import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, LlamafileStatus as LlamafileStatusType, ModelInfo } from '@folio-mapper/core';
 import { CLOUD_PROVIDERS, LOCAL_PROVIDERS, PROVIDER_META } from '@folio-mapper/core';
 import { ProviderCard } from './ProviderCard';
+import { LlamafileStatus } from './LlamafileStatus';
 
 interface LLMSettingsProps {
   activeProvider: LLMProviderType;
@@ -11,6 +12,7 @@ interface LLMSettingsProps {
   onUpdateConfig: (provider: LLMProviderType, updates: Partial<LLMProviderConfig>) => void;
   onSetConnectionStatus: (provider: LLMProviderType, status: ConnectionStatus) => void;
   onModelsLoaded: (provider: string, models: ModelInfo[]) => void;
+  llamafileStatus?: LlamafileStatusType | null;
   onClose: () => void;
   testConnection: (
     provider: LLMProviderType,
@@ -32,6 +34,7 @@ export function LLMSettings({
   onSetActiveProvider,
   onUpdateConfig,
   onSetConnectionStatus,
+  llamafileStatus,
   onModelsLoaded,
   onClose,
   testConnection,
@@ -90,19 +93,21 @@ export function LLMSettings({
       <h3 className="mb-2 text-sm font-semibold text-gray-700">{title}</h3>
       <div className="space-y-2">
         {providers.map((type) => (
-          <ProviderCard
-            key={type}
-            meta={PROVIDER_META[type]}
-            config={configs[type]}
-            isActive={activeProvider === type}
-            models={modelsByProvider[type] || []}
-            isLoadingModels={loadingModelsFor.has(type)}
-            isTesting={testingProvider === type}
-            onSelect={onSetActiveProvider}
-            onUpdateConfig={onUpdateConfig}
-            onTest={handleTest}
-            onRefreshModels={handleRefreshModels}
-          />
+          <div key={type}>
+            <ProviderCard
+              meta={PROVIDER_META[type]}
+              config={configs[type]}
+              isActive={activeProvider === type}
+              models={modelsByProvider[type] || []}
+              isLoadingModels={loadingModelsFor.has(type)}
+              isTesting={testingProvider === type}
+              onSelect={onSetActiveProvider}
+              onUpdateConfig={onUpdateConfig}
+              onTest={handleTest}
+              onRefreshModels={handleRefreshModels}
+            />
+            {type === 'llamafile' && <LlamafileStatus status={llamafileStatus ?? null} />}
+          </div>
         ))}
       </div>
     </div>
@@ -119,6 +124,7 @@ export function LLMSettings({
         return '~$0.001';
       case 'ollama':
       case 'lmstudio':
+      case 'llamafile':
       case 'custom':
         return 'Free (local)';
       default:

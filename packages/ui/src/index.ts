@@ -30,6 +30,7 @@ export { SubmissionModal } from './components/mapping/SubmissionModal';
 // Settings components (Stage 3)
 export { LLMSettings } from './components/settings/LLMSettings';
 export { ProviderCard } from './components/settings/ProviderCard';
+export { LlamafileStatus } from './components/settings/LlamafileStatus';
 
 // Export components (Stage 7)
 export { ExportModal } from './components/export/ExportModal';

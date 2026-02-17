@@ -10,7 +10,8 @@ export type LLMProviderType =
   | 'custom'
   | 'groq'
   | 'xai'
-  | 'github_models';
+  | 'github_models'
+  | 'llamafile';
 
 export type ConnectionStatus = 'untested' | 'valid' | 'invalid';
 
