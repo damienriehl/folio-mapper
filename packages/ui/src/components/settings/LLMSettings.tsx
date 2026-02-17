@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
-import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, LlamafileStatus as LlamafileStatusType, ModelInfo } from '@folio-mapper/core';
+import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, LlamafileStatus as LlamafileStatusType, ModelInfo, ModelStatus } from '@folio-mapper/core';
 import { CLOUD_PROVIDERS, LOCAL_PROVIDERS, PROVIDER_META } from '@folio-mapper/core';
 import { ProviderCard } from './ProviderCard';
 import { LlamafileStatus } from './LlamafileStatus';
+import { LlamafileModelPicker } from './LlamafileModelPicker';
 
 interface LLMSettingsProps {
   activeProvider: LLMProviderType;
@@ -13,6 +14,10 @@ interface LLMSettingsProps {
   onSetConnectionStatus: (provider: LLMProviderType, status: ConnectionStatus) => void;
   onModelsLoaded: (provider: string, models: ModelInfo[]) => void;
   llamafileStatus?: LlamafileStatusType | null;
+  llamafileModels?: ModelStatus[];
+  onDownloadModel?: (modelId: string) => void;
+  onDeleteModel?: (modelId: string) => void;
+  onSetActiveModel?: (modelId: string) => void;
   onClose: () => void;
   testConnection: (
     provider: LLMProviderType,
@@ -35,6 +40,10 @@ export function LLMSettings({
   onUpdateConfig,
   onSetConnectionStatus,
   llamafileStatus,
+  llamafileModels,
+  onDownloadModel,
+  onDeleteModel,
+  onSetActiveModel,
   onModelsLoaded,
   onClose,
   testConnection,
@@ -106,7 +115,19 @@ export function LLMSettings({
               onTest={handleTest}
               onRefreshModels={handleRefreshModels}
             />
-            {type === 'llamafile' && <LlamafileStatus status={llamafileStatus ?? null} />}
+            {type === 'llamafile' && (
+              <>
+                <LlamafileStatus status={llamafileStatus ?? null} />
+                {llamafileModels && llamafileModels.length > 0 && onDownloadModel && onDeleteModel && onSetActiveModel && (
+                  <LlamafileModelPicker
+                    models={llamafileModels}
+                    onDownload={onDownloadModel}
+                    onDelete={onDeleteModel}
+                    onSetActive={onSetActiveModel}
+                  />
+                )}
+              </>
+            )}
           </div>
         ))}
       </div>

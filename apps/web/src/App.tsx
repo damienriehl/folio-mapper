@@ -97,7 +97,8 @@ export function App() {
   const exportState = useExport();
 
   // Llamafile auto-management (desktop only)
-  const llamafileStatus = useLlamafile();
+  const llamafile = useLlamafile();
+  const llamafileStatus = llamafile.status;
 
   // Suggestion queue + submission
   const suggestionSubmit = useSuggestionSubmit();
@@ -300,6 +301,10 @@ export function App() {
       configs={llmState.configs}
       modelsByProvider={llmState.modelsByProvider}
       llamafileStatus={llamafileStatus}
+      llamafileModels={llamafile.models}
+      onDownloadModel={llamafile.downloadModel}
+      onDeleteModel={llamafile.deleteModel}
+      onSetActiveModel={llamafile.setActiveModel}
       onSetActiveProvider={llmState.setActiveProvider}
       onUpdateConfig={llmState.updateConfig}
       onSetConnectionStatus={llmState.setConnectionStatus}
@@ -542,6 +547,10 @@ export function App() {
               configs={llmState.configs}
               modelsByProvider={llmState.modelsByProvider}
               llamafileStatus={llamafileStatus}
+              llamafileModels={llamafile.models}
+              onDownloadModel={llamafile.downloadModel}
+              onDeleteModel={llamafile.deleteModel}
+              onSetActiveModel={llamafile.setActiveModel}
               onSetActiveProvider={llmState.setActiveProvider}
               onUpdateConfig={llmState.updateConfig}
               onSetConnectionStatus={llmState.setConnectionStatus}

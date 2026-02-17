@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import type { LlamafileStatus } from '@folio-mapper/core';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { LlamafileStatus, ModelStatus } from '@folio-mapper/core';
 import { testConnection } from '@folio-mapper/core';
 import { useLLMStore } from '../store/llm-store';
 
@@ -10,6 +10,11 @@ declare global {
       llamafile?: {
         getStatus: () => Promise<LlamafileStatus>;
         getPort: () => Promise<number | null>;
+        listModels: () => Promise<ModelStatus[]>;
+        downloadModel: (modelId: string) => Promise<void>;
+        deleteModel: (modelId: string) => Promise<void>;
+        setActiveModel: (modelId: string) => Promise<void>;
+        getActiveModel: () => Promise<string | null>;
       };
     };
   }
@@ -17,12 +22,21 @@ declare global {
 
 const POLL_INTERVAL_MS = 1000;
 
+export interface UseLlamafileResult {
+  status: LlamafileStatus | null;
+  models: ModelStatus[];
+  downloadModel: (modelId: string) => void;
+  deleteModel: (modelId: string) => void;
+  setActiveModel: (modelId: string) => void;
+}
+
 /**
- * Polls the Electron main process for llamafile status.
+ * Polls the Electron main process for llamafile status and model list.
  * When llamafile becomes ready, auto-configures it in the LLM store.
  */
-export function useLlamafile(): LlamafileStatus | null {
+export function useLlamafile(): UseLlamafileResult {
   const [status, setStatus] = useState<LlamafileStatus | null>(null);
+  const [models, setModels] = useState<ModelStatus[]>([]);
   const hasAutoConfigured = useRef(false);
   const hasAutoSelected = useRef(false);
   const setActiveProvider = useLLMStore((s) => s.setActiveProvider);
@@ -54,8 +68,12 @@ export function useLlamafile(): LlamafileStatus | null {
       if (!mounted) return;
 
       try {
-        const newStatus = await api.getStatus();
+        const [newStatus, newModels] = await Promise.all([
+          api.getStatus(),
+          api.listModels(),
+        ]);
         setStatus(newStatus);
+        setModels(newModels);
 
         // Auto-configure when llamafile becomes ready (once)
         if (newStatus.state === 'ready' && !hasAutoConfigured.current) {
@@ -103,5 +121,23 @@ export function useLlamafile(): LlamafileStatus | null {
     };
   }, [setActiveProvider, updateConfig, setConnectionStatus]);
 
-  return status;
+  const downloadModel = useCallback((modelId: string) => {
+    window.desktop?.llamafile?.downloadModel(modelId).catch((err) => {
+      console.error('Failed to download model:', err);
+    });
+  }, []);
+
+  const deleteModel = useCallback((modelId: string) => {
+    window.desktop?.llamafile?.deleteModel(modelId).catch((err) => {
+      console.error('Failed to delete model:', err);
+    });
+  }, []);
+
+  const setActiveModel = useCallback((modelId: string) => {
+    window.desktop?.llamafile?.setActiveModel(modelId).catch((err) => {
+      console.error('Failed to set active model:', err);
+    });
+  }, []);
+
+  return { status, models, downloadModel, deleteModel, setActiveModel };
 }

@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, LlamafileStatus as LlamafileStatusType, ModelInfo } from '@folio-mapper/core';
+import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, LlamafileStatus as LlamafileStatusType, ModelInfo, ModelStatus } from '@folio-mapper/core';
 import { CLOUD_PROVIDERS, LOCAL_PROVIDERS, PROVIDER_META } from '@folio-mapper/core';
 import { ProviderCard } from '../settings/ProviderCard';
 import { LlamafileStatus } from '../settings/LlamafileStatus';
+import { LlamafileModelPicker } from '../settings/LlamafileModelPicker';
 
 type Tab = 'local' | 'online' | 'none';
 
@@ -11,6 +12,10 @@ interface ModelChooserProps {
   configs: Record<LLMProviderType, LLMProviderConfig>;
   modelsByProvider: Record<string, ModelInfo[]>;
   llamafileStatus?: LlamafileStatusType | null;
+  llamafileModels?: ModelStatus[];
+  onDownloadModel?: (modelId: string) => void;
+  onDeleteModel?: (modelId: string) => void;
+  onSetActiveModel?: (modelId: string) => void;
   onSetActiveProvider: (provider: LLMProviderType) => void;
   onUpdateConfig: (provider: LLMProviderType, updates: Partial<LLMProviderConfig>) => void;
   onSetConnectionStatus: (provider: LLMProviderType, status: ConnectionStatus) => void;
@@ -33,6 +38,10 @@ export function ModelChooser({
   configs,
   modelsByProvider,
   llamafileStatus,
+  llamafileModels,
+  onDownloadModel,
+  onDeleteModel,
+  onSetActiveModel,
   onSetActiveProvider,
   onUpdateConfig,
   onSetConnectionStatus,
@@ -164,7 +173,19 @@ export function ModelChooser({
                   onTest={handleTest}
                   onRefreshModels={handleRefreshModels}
                 />
-                {type === 'llamafile' && <LlamafileStatus status={llamafileStatus ?? null} />}
+                {type === 'llamafile' && (
+                  <>
+                    <LlamafileStatus status={llamafileStatus ?? null} />
+                    {llamafileModels && llamafileModels.length > 0 && onDownloadModel && onDeleteModel && onSetActiveModel && (
+                      <LlamafileModelPicker
+                        models={llamafileModels}
+                        onDownload={onDownloadModel}
+                        onDelete={onDeleteModel}
+                        onSetActive={onSetActiveModel}
+                      />
+                    )}
+                  </>
+                )}
               </div>
             ))}
           </div>

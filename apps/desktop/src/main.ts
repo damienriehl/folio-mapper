@@ -44,6 +44,34 @@ function registerLlamafileIPC(): void {
   ipcMain.handle("llamafile:get-port", () => {
     return llamafileManager?.getPort() ?? null;
   });
+
+  ipcMain.handle("llamafile:list-models", () => {
+    return llamafileManager?.listModels() ?? [];
+  });
+
+  ipcMain.handle("llamafile:download-model", async (_event, modelId: string) => {
+    if (!llamafileManager) throw new Error("Llamafile manager not initialized");
+    await llamafileManager.downloadModel(modelId);
+  });
+
+  ipcMain.handle("llamafile:delete-model", (_event, modelId: string) => {
+    if (!llamafileManager) throw new Error("Llamafile manager not initialized");
+    llamafileManager.deleteModel(modelId);
+  });
+
+  ipcMain.handle("llamafile:set-active-model", async (_event, modelId: string) => {
+    if (!llamafileManager) throw new Error("Llamafile manager not initialized");
+    llamafileManager.setActiveModel(modelId);
+    // Restart llamafile if currently running
+    const status = llamafileManager.getStatus();
+    if (status.state === "ready") {
+      await llamafileManager.restart();
+    }
+  });
+
+  ipcMain.handle("llamafile:get-active-model", () => {
+    return llamafileManager?.getActiveModel() ?? null;
+  });
 }
 
 async function startApp(): Promise<void> {
