@@ -33,6 +33,7 @@ export { ProviderCard } from './components/settings/ProviderCard';
 
 // Export components (Stage 7)
 export { ExportModal } from './components/export/ExportModal';
+export { ExportView } from './components/export/ExportView';
 
 // Session components (Stage 7)
 export { SessionRecoveryModal } from './components/session/SessionRecoveryModal';

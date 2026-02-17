@@ -119,9 +119,7 @@ export function SelectionTree({
         return (
           <div key={group.branch}>
             {/* Branch header */}
-            <button
-              type="button"
-              onClick={() => toggleCollapse(branchKey)}
+            <div
               className="flex w-full items-center gap-2 rounded-md border-l-4 px-3 py-1.5 text-left text-xs font-bold tracking-wide uppercase"
               style={{
                 borderLeftColor: group.branch_color,
@@ -129,16 +127,22 @@ export function SelectionTree({
                 color: group.branch_color,
               }}
             >
-              <span style={{ color: group.branch_color + '90' }}>
+              <button
+                type="button"
+                onClick={() => toggleCollapse(branchKey)}
+                className="shrink-0"
+                style={{ color: group.branch_color + '90' }}
+                aria-label={isBranchCollapsed ? 'Expand branch' : 'Collapse branch'}
+              >
                 {isBranchCollapsed ? '\u25B6' : '\u25BC'}
-              </span>
+              </button>
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: group.branch_color }}
               />
               <span>{group.branch}</span>
               <span style={{ color: group.branch_color + '80' }}>({group.selectedCount})</span>
-            </button>
+            </div>
 
             {!isBranchCollapsed && (
               <div className="ml-4 border-l border-gray-100 pl-1">
@@ -256,18 +260,17 @@ function SelectionNodeComponent({
     );
   }
 
-  // Structural node — selected structural nodes are highlighted, ancestors are plain
-  const isClickable = isSelected && node.iriHash;
+  // Structural node — all nodes with iriHash are clickable for detail
   return (
     <div>
       <div
         className={`flex items-center gap-1.5 rounded py-1 text-sm ${
           isSelected
-            ? 'cursor-pointer font-medium text-gray-900 bg-slate-100'
+            ? 'font-medium text-gray-900 bg-slate-100'
             : 'text-gray-500'
-        } ${hasChildren ? 'cursor-pointer' : ''}`}
+        } ${node.iriHash ? 'cursor-pointer hover:bg-gray-50' : ''}`}
         style={{ paddingLeft: `${depth * 16 + 4}px` }}
-        onClick={() => isClickable ? onSelectForDetail(node.iriHash!) : hasChildren ? toggleCollapse(pathKey) : undefined}
+        onClick={() => node.iriHash ? onSelectForDetail(node.iriHash) : undefined}
       >
         {hasChildren && (
           <button

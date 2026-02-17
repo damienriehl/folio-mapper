@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import type { ExportConcept, ExportOptions, ExportPreviewRow, ExportRow } from '@folio-mapper/core';
-import { EXPORT_FORMATS, fetchExport, fetchExportPreview } from '@folio-mapper/core';
+import type { ExportConcept, ExportOptions, ExportPreviewRow, ExportRow, ExportTreeData } from '@folio-mapper/core';
+import { EXPORT_FORMATS, fetchExport, fetchExportPreview, fetchExportTreeData } from '@folio-mapper/core';
 import { useInputStore } from '../store/input-store';
 import { useMappingStore } from '../store/mapping-store';
 
@@ -84,5 +84,16 @@ export function useExport() {
     });
   }, []);
 
-  return { showExportModal, setShowExportModal, handleExport, handlePreview, isExporting };
+  const handleFetchTreeData = useCallback(async (options: ExportOptions): Promise<ExportTreeData> => {
+    const rows = buildExportRows();
+    const input = useInputStore.getState();
+    return fetchExportTreeData({
+      rows,
+      options,
+      source_file: input.parseResult?.source_filename ?? null,
+      session_created: null,
+    });
+  }, []);
+
+  return { showExportModal, setShowExportModal, handleExport, handlePreview, handleFetchTreeData, isExporting };
 }

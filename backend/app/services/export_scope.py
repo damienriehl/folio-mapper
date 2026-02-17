@@ -6,7 +6,7 @@ import logging
 
 from folio import FOLIO
 
-from app.models.export_models import ExportConcept, ExportRequest, ExportRow
+from app.models.export_models import ExportConcept, ExportRequest, ExportRow, HierarchyPathEntryDict
 from app.services.folio_service import get_branch_for_class, get_folio
 
 logger = logging.getLogger(__name__)
@@ -16,21 +16,30 @@ def _extract_iri_hash(iri: str) -> str:
     return iri.rsplit("/", 1)[-1]
 
 
-def _build_hierarchy_path(folio: FOLIO, iri_hash: str) -> list[str]:
-    """Build hierarchy path as list of labels from root branch down to this class."""
-    path: list[str] = []
+def _build_hierarchy_path(
+    folio: FOLIO, iri_hash: str
+) -> tuple[list[str], list[HierarchyPathEntryDict]]:
+    """Build hierarchy path from root branch down to this class.
+
+    Returns:
+        (labels_list, entries_list) where entries_list includes iri_hash for each node.
+    """
+    labels: list[str] = []
+    entries: list[HierarchyPathEntryDict] = []
     owl_class = folio[iri_hash]
     if not owl_class:
-        return path
+        return labels, entries
 
     current = owl_class
     visited: set[str] = set()
-    while current and len(path) < 10:
+    while current and len(labels) < 10:
         current_hash = _extract_iri_hash(current.iri)
         if current_hash in visited:
             break
         visited.add(current_hash)
-        path.append(current.label or current_hash)
+        label = current.label or current_hash
+        labels.append(label)
+        entries.append(HierarchyPathEntryDict(label=label, iri_hash=current_hash))
 
         if not current.sub_class_of:
             break
@@ -40,8 +49,9 @@ def _build_hierarchy_path(folio: FOLIO, iri_hash: str) -> list[str]:
         parent_hash = _extract_iri_hash(parent_iri)
         current = folio[parent_hash]
 
-    path.reverse()
-    return path
+    labels.reverse()
+    entries.reverse()
+    return labels, entries
 
 
 def enrich_concept(
@@ -59,7 +69,7 @@ def enrich_concept(
         return None
 
     branch = get_branch_for_class(folio, iri_hash)
-    hierarchy_path = _build_hierarchy_path(folio, iri_hash)
+    hierarchy_path, hierarchy_path_entries = _build_hierarchy_path(folio, iri_hash)
 
     # Parent IRI hash
     parent_iri_hash = None
@@ -103,6 +113,7 @@ def enrich_concept(
         alternative_labels=alt_labels,
         examples=examples,
         hierarchy_path=hierarchy_path,
+        hierarchy_path_entries=hierarchy_path_entries,
         parent_iri_hash=parent_iri_hash,
         see_also=see_also,
         notes=notes,
@@ -157,8 +168,16 @@ def _enrich_mapped_only(request: ExportRequest, folio: FOLIO) -> ExportRequest:
     )
 
 
+def _is_branch_root(folio: FOLIO, iri_hash: str) -> bool:
+    """Check if a class is a branch root (direct child of owl#Thing)."""
+    owl_class = folio[iri_hash]
+    if not owl_class or not owl_class.sub_class_of:
+        return True
+    return any("owl#Thing" in s for s in owl_class.sub_class_of)
+
+
 def _enrich_mapped_with_related(request: ExportRequest, folio: FOLIO) -> ExportRequest:
-    """Enrich mapped concepts + add siblings and ancestors."""
+    """Enrich mapped concepts + add direct ancestors and direct descendants."""
     new_rows: list[ExportRow] = []
     for row in request.rows:
         concepts: list[ExportConcept] = []
@@ -188,73 +207,67 @@ def _enrich_mapped_with_related(request: ExportRequest, folio: FOLIO) -> ExportR
                 concepts.append(concept)
                 seen_hashes.add(concept.iri_hash)
 
-            # Find parent for siblings
             owl_class = folio[concept.iri_hash]
-            if not owl_class or not owl_class.sub_class_of:
+            if not owl_class:
                 continue
 
-            parent_iri = owl_class.sub_class_of[0]
-            if "owl#Thing" in parent_iri:
-                continue
-            parent_hash = _extract_iri_hash(parent_iri)
-            parent_class = folio[parent_hash]
-            if not parent_class:
-                continue
-
-            # Siblings: other children of parent (excluding self)
-            if parent_class.parent_class_of:
-                for sibling_iri in parent_class.parent_class_of:
-                    sibling_hash = _extract_iri_hash(sibling_iri)
-                    if sibling_hash in seen_hashes:
+            # --- Direct descendants: children of the mapped concept ---
+            if hasattr(owl_class, "parent_class_of") and owl_class.parent_class_of:
+                for child_iri in owl_class.parent_class_of:
+                    child_hash = _extract_iri_hash(child_iri)
+                    if child_hash in seen_hashes:
                         continue
                     try:
-                        sibling = enrich_concept(
+                        child = enrich_concept(
                             folio,
-                            sibling_hash,
+                            child_hash,
                             score=0.0,
                             is_mapped=False,
                             mapping_source_text=row.source_text,
-                            relationship="sibling",
+                            relationship="child",
                         )
                     except Exception:
-                        logger.exception("enrich_concept failed for sibling %s", sibling_hash)
+                        logger.exception("enrich_concept failed for child %s", child_hash)
                         continue
-                    if sibling:
-                        concepts.append(sibling)
-                        seen_hashes.add(sibling_hash)
+                    if child:
+                        concepts.append(child)
+                        seen_hashes.add(child_hash)
 
-            # Ancestors: walk up the parent chain to branch root
-            current_hash = parent_hash
-            visited_ancestors: set[str] = set()
-            while current_hash and len(visited_ancestors) < 10:
-                if current_hash in seen_hashes or current_hash in visited_ancestors:
-                    break
-                visited_ancestors.add(current_hash)
-                ancestor_class = folio[current_hash]
-                if not ancestor_class:
-                    break
-                try:
-                    ancestor = enrich_concept(
-                        folio,
-                        current_hash,
-                        score=0.0,
-                        is_mapped=False,
-                        mapping_source_text=row.source_text,
-                        relationship="ancestor",
-                    )
-                except Exception:
-                    logger.exception("enrich_concept failed for ancestor %s", current_hash)
-                    break
-                if ancestor:
-                    concepts.append(ancestor)
-                    seen_hashes.add(current_hash)
-                # Move up
-                if not ancestor_class.sub_class_of:
-                    break
-                next_iri = ancestor_class.sub_class_of[0]
-                if "owl#Thing" in next_iri:
-                    break
-                current_hash = _extract_iri_hash(next_iri)
+            # --- Direct ancestors: walk up the parent chain, stop before branch root ---
+            if owl_class.sub_class_of:
+                parent_iri = owl_class.sub_class_of[0]
+                if "owl#Thing" not in parent_iri:
+                    current_hash = _extract_iri_hash(parent_iri)
+                    visited_ancestors: set[str] = set()
+                    while current_hash and len(visited_ancestors) < 10:
+                        if current_hash in seen_hashes or current_hash in visited_ancestors:
+                            break
+                        ancestor_class = folio[current_hash]
+                        if not ancestor_class:
+                            break
+                        # Stop at branch root (parent is owl#Thing) — it's already the branch header
+                        if not ancestor_class.sub_class_of or any(
+                            "owl#Thing" in s for s in ancestor_class.sub_class_of
+                        ):
+                            break
+                        visited_ancestors.add(current_hash)
+                        try:
+                            ancestor = enrich_concept(
+                                folio,
+                                current_hash,
+                                score=0.0,
+                                is_mapped=False,
+                                mapping_source_text=row.source_text,
+                                relationship="ancestor",
+                            )
+                        except Exception:
+                            logger.exception("enrich_concept failed for ancestor %s", current_hash)
+                            break
+                        if ancestor:
+                            concepts.append(ancestor)
+                            seen_hashes.add(current_hash)
+                        # Move up
+                        current_hash = _extract_iri_hash(ancestor_class.sub_class_of[0])
 
         new_rows.append(ExportRow(
             item_index=row.item_index,
@@ -328,6 +341,31 @@ def _build_full_ontology(request: ExportRequest, folio: FOLIO) -> ExportRequest:
         session_created=request.session_created,
         preview_rows=request.preview_rows,
     )
+
+
+def collect_ancestor_metadata(concepts: list[ExportConcept]) -> dict[str, dict]:
+    """Collect and enrich ancestor nodes from hierarchy_path_entries not in the concepts list."""
+    folio = get_folio()
+    concept_hashes: set[str] = set()
+    ancestor_hashes: set[str] = set()
+
+    for concept in concepts:
+        concept_hashes.add(concept.iri_hash)
+        for entry in concept.hierarchy_path_entries:
+            ancestor_hashes.add(entry.iri_hash)
+
+    result: dict[str, dict] = {}
+    for iri_hash in ancestor_hashes - concept_hashes:
+        try:
+            enriched = enrich_concept(
+                folio, iri_hash, score=0.0, is_mapped=False, relationship="ancestor"
+            )
+            if enriched:
+                result[iri_hash] = enriched.model_dump()
+        except Exception:
+            logger.exception("Failed to enrich ancestor %s", iri_hash)
+
+    return result
 
 
 def expand_scope(request: ExportRequest) -> ExportRequest:

@@ -490,25 +490,34 @@ def test_expand_scope_mapped_only_enriches():
     assert concept.alternative_labels == ["Penal Law"]
 
 
-def test_expand_scope_mapped_with_related_adds_siblings():
-    """mapped_with_related scope adds siblings of mapped concepts."""
+def test_expand_scope_mapped_with_related_adds_descendants():
+    """mapped_with_related scope adds direct descendants of mapped concepts."""
     parent = _mock_owl_class(
         iri_hash="RAreaOfLaw", label="Area of Law",
         sub_class_of=["http://www.w3.org/2002/07/owl#Thing"],
         parent_class_of=[
             "https://folio.openlegalstandard.org/RCriminalLaw",
-            "https://folio.openlegalstandard.org/RCivilLaw",
         ],
     )
     criminal = _mock_owl_class(
         iri_hash="RCriminalLaw", label="Criminal Law",
         sub_class_of=["https://folio.openlegalstandard.org/RAreaOfLaw"],
+        parent_class_of=[
+            "https://folio.openlegalstandard.org/RDUILaw",
+            "https://folio.openlegalstandard.org/RTheftLaw",
+        ],
     )
-    civil = _mock_owl_class(
-        iri_hash="RCivilLaw", label="Civil Law",
-        sub_class_of=["https://folio.openlegalstandard.org/RAreaOfLaw"],
+    dui = _mock_owl_class(
+        iri_hash="RDUILaw", label="DUI Law",
+        sub_class_of=["https://folio.openlegalstandard.org/RCriminalLaw"],
     )
-    folio = _make_mock_folio({"RCriminalLaw": criminal, "RCivilLaw": civil, "RAreaOfLaw": parent})
+    theft = _mock_owl_class(
+        iri_hash="RTheftLaw", label="Theft Law",
+        sub_class_of=["https://folio.openlegalstandard.org/RCriminalLaw"],
+    )
+    folio = _make_mock_folio({
+        "RCriminalLaw": criminal, "RDUILaw": dui, "RTheftLaw": theft, "RAreaOfLaw": parent,
+    })
     req = _make_request(options=_make_options(export_scope="mapped_with_related"))
 
     with (
@@ -519,16 +528,17 @@ def test_expand_scope_mapped_with_related_adds_siblings():
 
     concepts = result.rows[0].selected_concepts
     hashes = [c.iri_hash for c in concepts]
-    assert "RCriminalLaw" in hashes
-    assert "RCivilLaw" in hashes
+    assert "RCriminalLaw" in hashes  # mapped concept
+    assert "RDUILaw" in hashes  # direct child
+    assert "RTheftLaw" in hashes  # direct child
 
     direct = next(c for c in concepts if c.iri_hash == "RCriminalLaw")
     assert direct.is_mapped is True
     assert direct.relationship == "direct"
 
-    sibling = next(c for c in concepts if c.iri_hash == "RCivilLaw")
-    assert sibling.is_mapped is False
-    assert sibling.relationship == "sibling"
+    child = next(c for c in concepts if c.iri_hash == "RDUILaw")
+    assert child.is_mapped is False
+    assert child.relationship == "child"
 
 
 def test_expand_scope_mapped_with_related_adds_ancestors():

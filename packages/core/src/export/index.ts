@@ -1,19 +1,18 @@
 export type ExportFormat =
   | 'csv' | 'excel' | 'json'
   | 'rdf_turtle' | 'json_ld'
-  | 'markdown' | 'html' | 'pdf';
+  | 'markdown' | 'html';
 
 export type ExportScope = 'mapped_only' | 'mapped_with_related' | 'full_ontology';
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string; extension: string; mime: string }[] = [
-  { value: 'csv',        label: 'CSV',         extension: '.csv',   mime: 'text/csv' },
-  { value: 'excel',      label: 'Excel',       extension: '.xlsx',  mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
-  { value: 'json',       label: 'JSON',        extension: '.json',  mime: 'application/json' },
-  { value: 'rdf_turtle', label: 'RDF/Turtle',  extension: '.ttl',   mime: 'text/turtle' },
-  { value: 'json_ld',    label: 'JSON-LD',     extension: '.jsonld', mime: 'application/ld+json' },
-  { value: 'markdown',   label: 'Markdown',    extension: '.md',    mime: 'text/markdown' },
   { value: 'html',       label: 'HTML Report', extension: '.html',  mime: 'text/html' },
-  { value: 'pdf',        label: 'PDF',         extension: '.pdf',   mime: 'application/pdf' },
+  { value: 'excel',      label: 'Excel',       extension: '.xlsx',  mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  { value: 'csv',        label: 'CSV',         extension: '.csv',   mime: 'text/csv' },
+  { value: 'markdown',   label: 'Markdown',    extension: '.md',    mime: 'text/markdown' },
+  { value: 'json',       label: 'JSON',        extension: '.json',  mime: 'application/json' },
+  { value: 'json_ld',    label: 'JSON-LD',     extension: '.jsonld', mime: 'application/ld+json' },
+  { value: 'rdf_turtle', label: 'RDF/Turtle',  extension: '.ttl',   mime: 'text/turtle' },
 ];
 
 export const SUPPORTED_LANGUAGES = [
@@ -40,6 +39,10 @@ export interface ExportOptions {
   languages: LanguageCode[];
   include_hierarchy: boolean;
   export_scope: ExportScope;
+  branch_sort_mode?: 'default' | 'alphabetical' | 'custom';
+  custom_branch_order?: string[];
+  include_tree_section?: boolean;
+  include_table_section?: boolean;
 }
 
 export interface ExportRow {
@@ -89,3 +92,4 @@ export interface ExportPreviewRow {
 }
 
 export * from './api-client';
+export * from './tree-types';

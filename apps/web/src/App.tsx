@@ -15,6 +15,7 @@ import {
   SessionRecoveryModal,
   NewProjectModal,
   ExportModal,
+  ExportView,
   SuggestionEditModal,
   SubmissionModal,
 } from '@folio-mapper/ui';
@@ -348,13 +349,15 @@ export function App() {
           />
         )}
         {exportState.showExportModal && (
-          <ExportModal
+          <ExportView
             totalItems={mappingState.totalItems}
             completedCount={Object.values(mappingState.nodeStatuses).filter((s) => s === 'completed').length}
             onExport={exportState.handleExport}
-            onPreview={exportState.handlePreview}
+            onFetchTreeData={exportState.handleFetchTreeData}
             onClose={() => exportState.setShowExportModal(false)}
             isExporting={exportState.isExporting}
+            branchSortMode={mappingState.branchSortMode}
+            customBranchOrder={mappingState.customBranchOrder}
           />
         )}
         {editingSuggestion && (

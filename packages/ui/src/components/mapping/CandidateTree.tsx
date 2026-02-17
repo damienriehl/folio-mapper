@@ -135,9 +135,7 @@ export function CandidateTree({
         return (
           <div key={group.branch}>
             {/* Branch header */}
-            <button
-              type="button"
-              onClick={() => toggleCollapse(branchKey)}
+            <div
               className="flex w-full items-center gap-2 rounded-md border-l-4 px-3 py-1.5 text-left text-xs font-bold tracking-wide uppercase"
               style={{
                 borderLeftColor: group.branch_color,
@@ -145,16 +143,22 @@ export function CandidateTree({
                 color: group.branch_color,
               }}
             >
-              <span style={{ color: group.branch_color + '90' }}>
+              <button
+                type="button"
+                onClick={() => toggleCollapse(branchKey)}
+                className="shrink-0"
+                style={{ color: group.branch_color + '90' }}
+                aria-label={isBranchCollapsed ? 'Expand branch' : 'Collapse branch'}
+              >
                 {isBranchCollapsed ? '\u25B6' : '\u25BC'}
-              </span>
+              </button>
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: group.branch_color }}
               />
               <span>{group.branch}</span>
               <span style={{ color: group.branch_color + '80' }}>({visibleCandidates.length})</span>
-            </button>
+            </div>
 
             {!isBranchCollapsed && (
               <div className="ml-4 border-l border-gray-100 pl-1">
@@ -296,7 +300,7 @@ function HierarchyNodeComponent({
           isSelected ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-gray-50'
         } ${nodeIriHash ? 'cursor-pointer' : ''}`}
         style={{ paddingLeft: `${depth * 4 + 4}px` }}
-        onClick={() => nodeIriHash ? onToggleCandidate(nodeIriHash) : toggleCollapse(pathKey)}
+        onClick={() => nodeIriHash && onSelectForDetail(nodeIriHash)}
       >
         <button
           type="button"

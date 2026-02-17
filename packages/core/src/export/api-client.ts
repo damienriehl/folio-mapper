@@ -1,4 +1,5 @@
 import type { ExportRequest, ExportPreviewRow } from './index';
+import type { ExportTreeData } from './tree-types';
 
 const BASE_URL = '/api/export';
 
@@ -29,6 +30,23 @@ export async function fetchExportPreview(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Preview failed' }));
     throw new Error(err.detail || `Preview failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function fetchExportTreeData(
+  request: ExportRequest,
+): Promise<ExportTreeData> {
+  const res = await fetch(`${BASE_URL}/tree-data`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Tree data failed' }));
+    throw new Error(err.detail || `Tree data failed (${res.status})`);
   }
 
   return res.json();

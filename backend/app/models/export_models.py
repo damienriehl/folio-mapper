@@ -3,6 +3,11 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+class HierarchyPathEntryDict(BaseModel):
+    label: str
+    iri_hash: str
+
+
 class ExportConcept(BaseModel):
     label: str
     iri: str
@@ -14,6 +19,7 @@ class ExportConcept(BaseModel):
     alternative_labels: list[str] = []
     examples: list[str] = []
     hierarchy_path: list[str] = []
+    hierarchy_path_entries: list[HierarchyPathEntryDict] = []
     parent_iri_hash: str | None = None
     see_also: list[str] = []
     notes: str | None = None
@@ -41,6 +47,10 @@ class ExportOptions(BaseModel):
     languages: list[str] = []
     include_hierarchy: bool = True
     export_scope: str = "mapped_only"  # "mapped_only" | "mapped_with_related" | "full_ontology"
+    branch_sort_mode: str = "default"  # "default" | "alphabetical" | "custom"
+    custom_branch_order: list[str] = []
+    include_tree_section: bool = True  # HTML format only
+    include_table_section: bool = True  # HTML format only
 
 
 class ExportRequest(BaseModel):

@@ -1,4 +1,4 @@
-"""Export service: generates CSV, Excel, JSON, RDF/Turtle, JSON-LD, Markdown, HTML, PDF."""
+"""Export service: generates CSV, Excel, JSON, RDF/Turtle, JSON-LD, Markdown, HTML."""
 
 from __future__ import annotations
 
@@ -11,6 +11,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from app.models.export_models import ExportConcept, ExportOptions, ExportRequest, ExportRow
+from app.services.branch_config import get_branch_color
+from app.services.branch_sort import sort_branches
+from app.services.export_scope import collect_ancestor_metadata
+from app.services.export_tree_html import generate_tree_html_section
 from app.services.folio_service import get_folio
 
 
@@ -337,11 +341,41 @@ def _confidence_css_class(score_str: str) -> str:
         return ""
 
 
+def _build_branches_data(request: ExportRequest) -> list[dict]:
+    """Group concepts by branch for tree rendering, deduplicated by iri_hash."""
+    branch_seen: dict[str, dict[str, dict]] = {}  # branch -> {iri_hash -> concept_dict}
+    for row in request.rows:
+        for concept in row.selected_concepts:
+            d = concept.model_dump()
+            h = concept.iri_hash
+            existing = branch_seen.setdefault(concept.branch, {}).get(h)
+            if existing is None or d.get("score", 0) > existing.get("score", 0):
+                branch_seen.setdefault(concept.branch, {})[h] = d
+
+    sorted_names = sort_branches(
+        list(branch_seen.keys()),
+        mode=request.options.branch_sort_mode,
+        custom_order=request.options.custom_branch_order or None,
+    )
+
+    return [
+        {
+            "branch": name,
+            "branch_color": get_branch_color(name),
+            "concepts": list(branch_seen[name].values()),
+        }
+        for name in sorted_names
+    ]
+
+
 def generate_html(request: ExportRequest) -> bytes:
     headers = _build_headers(request.options)
     flat = _flatten_rows(request.rows, request.options)
     scope = request.options.export_scope
     now = datetime.now(timezone.utc).isoformat()
+
+    include_tree = request.options.include_tree_section
+    include_table = request.options.include_table_section
 
     # For scope exports, track which flat rows are mapped (by "Mapped" column value)
     mapped_col_idx = None
@@ -353,7 +387,8 @@ def generate_html(request: ExportRequest) -> bytes:
         "<html><head><meta charset='utf-8'>",
         "<title>FOLIO Mapping Report</title>",
         "<style>",
-        "  body { font-family: -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }",
+        "  body { font-family: -apple-system, sans-serif; margin: 0 auto; padding: 20px; }",
+        "  body.has-table { max-width: 1200px; }",
         "  table { border-collapse: collapse; width: 100%; }",
         "  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }",
         "  th { background: #f8f9fa; font-weight: 600; }",
@@ -363,16 +398,74 @@ def generate_html(request: ExportRequest) -> bytes:
         "  .conf-45 { background: #FF8C00; color: white; }",
         "  .conf-low { background: #D3D3D3; }",
         "  .mapped-row { border-left: 3px solid #22c55e; }",
-        "</style></head><body>",
+        "  .view-toggle { display: flex; gap: 8px; margin: 16px 0; }",
+        "  .view-toggle button { padding: 6px 16px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; cursor: pointer; font-size: 14px; color: #374151; }",
+        "  .view-toggle button.active { background: #2563eb; color: white; border-color: #2563eb; }",
+        "  .view-toggle button:hover:not(.active) { background: #e5e7eb; }",
+        "</style></head>",
+    ]
+
+    # Body class: constrain width only when table-only or initial table view
+    body_class = ""
+    if include_table and not include_tree:
+        body_class = ' class="has-table"'
+    parts.append(f"<body{body_class}>")
+
+    parts += [
         "<h1>FOLIO Mapping Report</h1>",
         f"<p>Source: {_html_escape(request.source_file or 'N/A')} | "
         f"Items: {len(request.rows)} | Exported: {now}</p>",
-        "<table>",
+    ]
+
+    # Toggle bar when both sections are included
+    if include_tree and include_table:
+        parts.append('<div class="view-toggle">')
+        parts.append('<button class="active" onclick="toggleView(\'tree\')">Tree View</button>')
+        parts.append('<button onclick="toggleView(\'table\')">Table View</button>')
+        parts.append('</div>')
+        parts.append("""<script>
+function toggleView(view) {
+  var tree = document.getElementById('tree-section');
+  var table = document.getElementById('table-section');
+  var buttons = document.querySelectorAll('.view-toggle button');
+  if (view === 'tree') {
+    if (tree) tree.style.display = '';
+    if (table) table.style.display = 'none';
+    document.body.classList.remove('has-table');
+    buttons[0].className = 'active';
+    buttons[1].className = '';
+  } else {
+    if (tree) tree.style.display = 'none';
+    if (table) table.style.display = '';
+    document.body.classList.add('has-table');
+    buttons[0].className = '';
+    buttons[1].className = 'active';
+  }
+}
+</script>""")
+
+    # Tree section
+    if include_tree:
+        branches_data = _build_branches_data(request)
+        all_concepts = [
+            concept
+            for row in request.rows
+            for concept in row.selected_concepts
+        ]
+        ancestor_meta = collect_ancestor_metadata(all_concepts)
+        tree_html = generate_tree_html_section(branches_data, ancestor_metadata=ancestor_meta)
+        parts.append(tree_html)
+
+    # Table section
+    table_display = ' style="display:none"' if (include_tree and include_table) else ""
+    parts.append(f'<div id="table-section"{table_display}>')
+    parts.append("<table>")
+    parts.append(
         "<thead><tr>"
         + "".join(f"<th>{_html_escape(h)}</th>" for h in headers)
-        + "</tr></thead>",
-        "<tbody>",
-    ]
+        + "</tr></thead>"
+    )
+    parts.append("<tbody>")
     for row_data in flat:
         row_class = ""
         if mapped_col_idx is not None and mapped_col_idx < len(row_data) and row_data[mapped_col_idx] == "Yes":
@@ -386,7 +479,14 @@ def generate_html(request: ExportRequest) -> bytes:
                     css = f' class="{cls}"'
             parts.append(f"<td{css}>{_html_escape(str(cell))}</td>")
         parts.append("</tr>")
-    parts.append("</tbody></table></body></html>")
+    parts.append("</tbody></table>")
+    parts.append("</div>")  # table-section
+
+    if not include_table and not include_tree:
+        # Edge case: show table by default
+        pass
+
+    parts.append("</body></html>")
     return "\n".join(parts).encode("utf-8")
 
 
@@ -394,6 +494,3 @@ def _html_escape(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def generate_pdf(request: ExportRequest) -> bytes:
-    # For MVP, generate print-friendly HTML; true PDF requires weasyprint
-    return generate_html(request)
