@@ -82,11 +82,22 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
-app.on("before-quit", async () => {
-  if (llamafileManager) {
-    await llamafileManager.stop();
-  }
-  if (backendManager) {
-    await backendManager.stop();
-  }
+let isQuitting = false;
+app.on("before-quit", (e) => {
+  if (isQuitting) return;
+  e.preventDefault();
+  isQuitting = true;
+
+  const cleanup = async () => {
+    if (llamafileManager) {
+      await llamafileManager.stop();
+    }
+    if (backendManager) {
+      await backendManager.stop();
+    }
+  };
+
+  cleanup()
+    .catch((err) => log.error("Cleanup error:", err))
+    .finally(() => app.quit());
 });
