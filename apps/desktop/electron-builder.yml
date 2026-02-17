@@ -1,0 +1,34 @@
+appId: com.folio-mapper.desktop
+productName: FOLIO Mapper
+copyright: Copyright © 2026
+
+directories:
+  output: release
+
+files:
+  - dist/**/*
+  - resources/**/*
+
+extraResources:
+  - from: ../../backend/dist/folio-mapper/
+    to: backend
+    filter:
+      - "**/*"
+  - from: ../../apps/web/dist/
+    to: web
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  deleteAppDataOnUninstall: false

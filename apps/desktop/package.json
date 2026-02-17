@@ -1,0 +1,20 @@
+{
+  "name": "@folio-mapper/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build:ts": "tsc",
+    "start": "electron dist/main.js",
+    "start:dev": "electron dist/main.js --dev",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "electron-log": "^5.1.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "typescript": "^5.7.0"
+  }
+}

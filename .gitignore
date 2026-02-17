@@ -26,3 +26,8 @@ Thumbs.db
 # Test
 coverage/
 .pytest_cache/
+
+# Desktop build
+backend/build/
+backend/dist/
+release/

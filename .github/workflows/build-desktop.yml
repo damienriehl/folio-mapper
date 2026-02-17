@@ -1,0 +1,69 @@
+name: Build Desktop (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node dependencies
+        run: pnpm install
+
+      - name: Build web frontend
+        run: pnpm build
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        working-directory: backend
+        run: |
+          pip install -e .
+          pip install pyinstaller
+
+      - name: Build backend with PyInstaller
+        working-directory: backend
+        run: pyinstaller folio-mapper.spec --noconfirm --clean
+
+      - name: Compile Electron TypeScript
+        working-directory: apps/desktop
+        run: npx tsc
+
+      - name: Build Electron installer
+        working-directory: apps/desktop
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: folio-mapper-windows
+          path: apps/desktop/release/*.exe
+
+      - name: Upload to release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/desktop/release/*.exe
