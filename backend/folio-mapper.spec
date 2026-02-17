@@ -74,6 +74,7 @@ a = Analysis(
         "marisa_trie",
         # FOLIO library
         "folio",
+        "alea_llm_client",
         # HTTP clients
         "httpx",
         "httpcore",

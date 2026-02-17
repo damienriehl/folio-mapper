@@ -9,6 +9,7 @@ dependencies = [
     "openpyxl>=3.1.0",
     "python-multipart>=0.0.12",
     "folio-python>=0.2.0",
+    "alea-llm-client>=0.2.0",
     "rapidfuzz>=3.0.0",
     "marisa-trie>=1.0.0",
     "openai>=1.0.0",
