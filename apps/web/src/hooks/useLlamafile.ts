@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { LlamafileStatus } from '@folio-mapper/core';
 import { testConnection } from '@folio-mapper/core';
 import { useLLMStore } from '../store/llm-store';
@@ -22,8 +22,9 @@ const POLL_INTERVAL_MS = 2000;
  * When llamafile becomes ready, auto-configures it in the LLM store.
  */
 export function useLlamafile(): LlamafileStatus | null {
-  const statusRef = useRef<LlamafileStatus | null>(null);
+  const [status, setStatus] = useState<LlamafileStatus | null>(null);
   const hasAutoConfigured = useRef(false);
+  const hasAutoSelected = useRef(false);
   const setActiveProvider = useLLMStore((s) => s.setActiveProvider);
   const updateConfig = useLLMStore((s) => s.updateConfig);
   const setConnectionStatus = useLLMStore((s) => s.setConnectionStatus);
@@ -32,6 +33,20 @@ export function useLlamafile(): LlamafileStatus | null {
     const api = window.desktop?.llamafile;
     if (!api) return;
 
+    // Auto-select llamafile as active provider in desktop mode (once)
+    if (!hasAutoSelected.current) {
+      hasAutoSelected.current = true;
+      const { activeProvider, configs } = useLLMStore.getState();
+      const activeConfig = configs[activeProvider];
+      if (activeConfig.connectionStatus !== 'valid') {
+        setActiveProvider('llamafile');
+      }
+      // Reset stale connection status from previous session
+      if (configs.llamafile.connectionStatus === 'invalid') {
+        setConnectionStatus('llamafile', 'untested');
+      }
+    }
+
     let mounted = true;
     let timer: ReturnType<typeof setInterval>;
 
@@ -39,11 +54,11 @@ export function useLlamafile(): LlamafileStatus | null {
       if (!mounted) return;
 
       try {
-        const status = await api.getStatus();
-        statusRef.current = status;
+        const newStatus = await api.getStatus();
+        setStatus(newStatus);
 
         // Auto-configure when llamafile becomes ready (once)
-        if (status.state === 'ready' && !hasAutoConfigured.current) {
+        if (newStatus.state === 'ready' && !hasAutoConfigured.current) {
           hasAutoConfigured.current = true;
 
           const port = await api.getPort();
@@ -56,14 +71,7 @@ export function useLlamafile(): LlamafileStatus | null {
               const result = await testConnection('llamafile', undefined, baseUrl);
               if (result.success) {
                 setConnectionStatus('llamafile', 'valid');
-
-                // Auto-activate if no other provider is configured and valid
-                const configs = useLLMStore.getState().configs;
-                const activeProvider = useLLMStore.getState().activeProvider;
-                const activeConfig = configs[activeProvider];
-                if (activeConfig.connectionStatus !== 'valid') {
-                  setActiveProvider('llamafile');
-                }
+                setActiveProvider('llamafile');
 
                 // If model name was returned, set it
                 if (result.model) {
@@ -77,7 +85,7 @@ export function useLlamafile(): LlamafileStatus | null {
         }
 
         // Reset auto-configure flag if llamafile stops being ready
-        if (status.state !== 'ready') {
+        if (newStatus.state !== 'ready') {
           hasAutoConfigured.current = false;
         }
       } catch {
@@ -95,5 +103,5 @@ export function useLlamafile(): LlamafileStatus | null {
     };
   }, [setActiveProvider, updateConfig, setConnectionStatus]);
 
-  return statusRef.current;
+  return status;
 }

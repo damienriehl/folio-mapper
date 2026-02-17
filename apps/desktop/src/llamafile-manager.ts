@@ -36,6 +36,7 @@ interface VersionInfo {
 
 export class LlamafileManager {
   private process: ChildProcess | null = null;
+  private activeRequest: http.ClientRequest | null = null;
   private port: number;
   private basePath: string;
   private status: LlamafileStatus = { state: "idle" };
@@ -59,6 +60,7 @@ export class LlamafileManager {
    */
   async setup(): Promise<void> {
     try {
+      this.cleanupTmpFiles();
       await this.ensureRuntime();
       await this.ensureModel();
       await this.start();
@@ -66,6 +68,21 @@ export class LlamafileManager {
       const msg = err instanceof Error ? err.message : String(err);
       log.error(`[llamafile] Setup failed: ${msg}`);
       this.status = { state: "error", error: msg };
+    }
+  }
+
+  private cleanupTmpFiles(): void {
+    for (const dir of ["llamafile", "models"]) {
+      const fullDir = path.join(this.basePath, dir);
+      if (!fs.existsSync(fullDir)) continue;
+      for (const file of fs.readdirSync(fullDir)) {
+        if (file.endsWith(".tmp")) {
+          try {
+            fs.unlinkSync(path.join(fullDir, file));
+            log.info(`[llamafile] Cleaned up partial download: ${dir}/${file}`);
+          } catch { /* ignore */ }
+        }
+      }
     }
   }
 
@@ -253,6 +270,13 @@ export class LlamafileManager {
   }
 
   async stop(): Promise<void> {
+    // Abort any in-progress download
+    if (this.activeRequest) {
+      this.activeRequest.destroy();
+      this.activeRequest = null;
+      log.info("[llamafile] Aborted in-progress download");
+    }
+
     if (!this.process) return;
 
     log.info("[llamafile] Stopping server...");
@@ -370,7 +394,7 @@ export class LlamafileManager {
     destPath: string,
     knownSize?: number
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const tmpPath = destPath + ".tmp";
 
       const doDownload = (downloadUrl: string, redirectCount: number) => {
@@ -445,10 +469,16 @@ export class LlamafileManager {
         const req = parsedUrl.protocol === "https:"
           ? https.get(options, onResponse)
           : http.get(options, onResponse);
+        this.activeRequest = req;
         req.on("error", onError);
       };
 
       doDownload(url, 0);
+    }).then(() => {
+      this.activeRequest = null;
+    }, (err) => {
+      this.activeRequest = null;
+      throw err;
     });
   }
 }
