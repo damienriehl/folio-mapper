@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ConnectionStatus, LLMProviderConfig, LLMProviderType, LlamafileStatus as LlamafileStatusType, ModelInfo } from '@folio-mapper/core';
 import { CLOUD_PROVIDERS, LOCAL_PROVIDERS, PROVIDER_META } from '@folio-mapper/core';
 import { ProviderCard } from '../settings/ProviderCard';
@@ -49,6 +49,16 @@ export function ModelChooser({
     : llamafileStatus ? 'local' : 'none';
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+  const hasAutoSwitchedTab = useRef(false);
+
+  // Switch to Local tab when llamafileStatus first arrives (desktop mode)
+  useEffect(() => {
+    if (llamafileStatus && !hasAutoSwitchedTab.current && activeTab === 'none') {
+      hasAutoSwitchedTab.current = true;
+      setActiveTab('local');
+    }
+  }, [llamafileStatus, activeTab]);
+
   const [testingProvider, setTestingProvider] = useState<LLMProviderType | null>(null);
   const [loadingModelsFor, setLoadingModelsFor] = useState<Set<LLMProviderType>>(new Set());
 

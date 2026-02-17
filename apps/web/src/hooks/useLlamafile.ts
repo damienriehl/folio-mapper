@@ -15,7 +15,7 @@ declare global {
   }
 }
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 1000;
 
 /**
  * Polls the Electron main process for llamafile status.

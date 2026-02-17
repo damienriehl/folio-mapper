@@ -193,7 +193,18 @@ export class LlamafileManager {
 
     await this.downloadFile(DEFAULT_MODEL_URL, modelPath);
 
-    log.info(`[llamafile] Model download complete`);
+    // Validate downloaded model isn't a truncated/error file
+    const downloadedSize = fs.statSync(modelPath).size;
+    const MIN_MODEL_SIZE = 100_000_000; // 100MB — any real GGUF is much larger
+    if (downloadedSize < MIN_MODEL_SIZE) {
+      fs.unlinkSync(modelPath);
+      throw new Error(
+        `Model download appears corrupt (${(downloadedSize / 1024 / 1024).toFixed(1)} MB). ` +
+        `Expected at least ${MIN_MODEL_SIZE / 1024 / 1024} MB. Will retry on next launch.`
+      );
+    }
+
+    log.info(`[llamafile] Model download complete (${(downloadedSize / 1024 / 1024 / 1024).toFixed(1)} GB)`);
     this.status = {
       ...this.status,
       state: "idle",
