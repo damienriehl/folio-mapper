@@ -63,6 +63,18 @@ export const useLLMStore = create<LLMState>()(
     }),
     {
       name: 'folio-mapper-llm',
+      // Security: exclude API keys from localStorage persistence.
+      // Keys are kept in memory only and must be re-entered on page refresh.
+      partialize: (state) => ({
+        activeProvider: state.activeProvider,
+        configs: Object.fromEntries(
+          Object.entries(state.configs).map(([provider, config]) => [
+            provider,
+            { ...config, apiKey: '' },
+          ]),
+        ),
+        modelsByProvider: state.modelsByProvider,
+      }),
       merge: (persisted, current) => {
         const p = persisted as Partial<LLMState> | undefined;
         return {
