@@ -25,13 +25,17 @@ export function MappingFooter({
   return (
     <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-2" aria-live="polite">
       <div className="flex items-center gap-4 text-xs text-gray-500">
+        {/* Selected count removed — low-value, not actionable. Uncomment to restore:
         <span>
           <span className="font-medium text-gray-700">{selectedCount}</span> selected
         </span>
+        */}
+        {/* Completed count moved to toolbar progress bar. Uncomment to restore:
         <span>
           <span className="font-medium text-gray-700">{completedCount}</span>/{totalItems}{' '}
           completed
         </span>
+        */}
         {skippedCount > 0 && (
           <span>
             <span className="font-medium text-gray-700">{skippedCount}</span> skipped

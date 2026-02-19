@@ -177,13 +177,16 @@ export function MappingToolbar({
 
       {/* Progress bar */}
       <div className="mt-2 flex items-center gap-2">
+        <span className="shrink-0 text-xs text-gray-500">
+          <span className="font-medium text-gray-700">{completedCount}</span>/{totalItems} completed
+        </span>
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
           <div
             className="h-full rounded-full bg-blue-600 transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <span className="text-xs text-gray-500">{progressPercent}%</span>
+        <span className="shrink-0 text-xs text-gray-500">{progressPercent}%</span>
       </div>
     </div>
   );
