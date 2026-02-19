@@ -174,7 +174,7 @@ export function MappingToolbar({
 
       {/* Progress bar */}
       <div className="mt-2 flex items-center gap-2">
-        <span className="shrink-0 text-xs font-semibold text-blue-600">
+        <span className="shrink-0 text-base font-semibold text-blue-600">
           {currentIndex + 1} of {totalItems}
         </span>
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
