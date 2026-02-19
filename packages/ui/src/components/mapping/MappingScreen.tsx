@@ -291,13 +291,6 @@ export function MappingScreen({
     }
   };
 
-  // Count total selected across all items
-  const totalSelected = Object.values(selections).reduce((sum, arr) => sum + arr.length, 0);
-
-  // Count branches
-  const totalBranches = allBranches.length;
-  const enabledBranchCount = Object.values(branchStates).filter((s) => s !== 'excluded').length;
-
   return (
     <div className="flex h-full flex-col">
       <FolioLoadingOverlay
@@ -539,13 +532,8 @@ export function MappingScreen({
       )}
 
       <MappingFooter
-        selectedCount={totalSelected}
-        totalItems={totalItems}
         nodeStatuses={nodeStatuses}
-        branchCount={totalBranches}
-        enabledBranchCount={enabledBranchCount}
         suggestionCount={suggestionQueue.length}
-        onExport={onExport}
       />
 
       {showGoToDialog && (
