@@ -137,6 +137,8 @@ export function MappingToolbar({
               Mappings
             </button>
           )}
+          {/* Accept All button — hidden but functionality preserved via onAcceptAll prop + Shift+A shortcut.
+             Uncomment to restore:
           <button
             type="button"
             onClick={onAcceptAll}
@@ -145,6 +147,7 @@ export function MappingToolbar({
           >
             Accept All (&#8679;A)
           </button>
+          */}
           <button
             type="button"
             onClick={onShowShortcuts}
