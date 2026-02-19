@@ -62,6 +62,146 @@ function groupByBranch(concepts: MappedConcept[]): Record<string, MappedConcept[
   return grouped;
 }
 
+// --- Hierarchy tree for middle pane ---
+
+interface OutputTreeNode {
+  label: string;
+  iriHash: string | null;
+  concept: MappedConcept | null; // non-null for leaf/mapped concepts
+  children: OutputTreeNode[];
+}
+
+function buildOutputTree(concepts: MappedConcept[]): OutputTreeNode[] {
+  const roots: OutputTreeNode[] = [];
+  for (const c of concepts) {
+    // Skip the first element (branch root — already shown as branch header)
+    const segments = c.hierarchy_path.slice(1);
+    if (segments.length === 0) continue;
+
+    let siblings = roots;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      let node = siblings.find((n) => n.label === seg.label);
+      if (!node) {
+        node = { label: seg.label, iriHash: seg.iri_hash, concept: null, children: [] };
+        siblings.push(node);
+      }
+      if (i === segments.length - 1) {
+        node.concept = c;
+      }
+      siblings = node.children;
+    }
+  }
+  return roots;
+}
+
+function OutputNodeComponent({
+  node,
+  depth,
+  selectedConceptIri,
+  onSelectConcept,
+}: {
+  node: OutputTreeNode;
+  depth: number;
+  selectedConceptIri: string | null;
+  onSelectConcept: (iri: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = node.children.length > 0;
+  const isMapped = node.concept !== null;
+  const isSelected = isMapped && node.concept!.iri_hash === selectedConceptIri;
+
+  // Leaf concept node (no children)
+  if (isMapped && !hasChildren) {
+    return (
+      <div
+        className={`flex cursor-pointer items-center gap-1.5 rounded py-1 pr-2 text-sm ${
+          isSelected ? 'bg-blue-100 ring-1 ring-blue-400' : 'text-gray-800 hover:bg-gray-50'
+        }`}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        onClick={() => onSelectConcept(node.concept!.iri_hash)}
+      >
+        <span data-iri={node.concept!.iri_hash} className="text-xs text-gray-300">{'\u25CF'}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
+        <span className="shrink-0 text-xs text-gray-400">{Math.round(node.concept!.score)}%</span>
+      </div>
+    );
+  }
+
+  // Mapped concept that also has children
+  if (isMapped && hasChildren) {
+    return (
+      <div>
+        <div
+          className={`flex cursor-pointer items-center gap-1.5 rounded py-1 pr-2 text-sm ${
+            isSelected ? 'bg-blue-100 ring-1 ring-blue-400' : 'text-gray-800 hover:bg-gray-50'
+          }`}
+          style={{ paddingLeft: `${depth * 16 + 4}px` }}
+          onClick={() => onSelectConcept(node.concept!.iri_hash)}
+        >
+          <button
+            data-iri={node.concept!.iri_hash}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            className="shrink-0 text-xs text-gray-400"
+          >
+            {expanded ? '\u25BC' : '\u25B6'}
+          </button>
+          <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
+          <span className="shrink-0 text-xs text-gray-400">{Math.round(node.concept!.score)}%</span>
+        </div>
+        {expanded && (
+          <div className="ml-2">
+            {node.children.map((child) => (
+              <OutputNodeComponent
+                key={child.label}
+                node={child}
+                depth={depth + 1}
+                selectedConceptIri={selectedConceptIri}
+                onSelectConcept={onSelectConcept}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Structural (non-mapped) node
+  return (
+    <div>
+      <div
+        className="flex items-center gap-1.5 rounded py-1 text-sm text-gray-500"
+        style={{ paddingLeft: `${depth * 16 + 4}px` }}
+      >
+        {hasChildren && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="shrink-0 text-xs text-gray-400"
+          >
+            {expanded ? '\u25BC' : '\u25B6'}
+          </button>
+        )}
+        <span className="min-w-0 flex-1 text-left">{node.label}</span>
+      </div>
+      {hasChildren && expanded && (
+        <div className="ml-2">
+          {node.children.map((child) => (
+            <OutputNodeComponent
+              key={child.label}
+              node={child}
+              depth={depth + 1}
+              selectedConceptIri={selectedConceptIri}
+              onSelectConcept={onSelectConcept}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InputTreeNode({
   node,
   selectedIndex,
@@ -312,47 +452,37 @@ export function MappingsView({
             Object.entries(branchGroups).map(([branch, concepts]) => {
               const color = concepts[0]?.branch_color || '#6b7280';
               if (branchStates[branch] === 'excluded') return null;
+              const tree = buildOutputTree(concepts);
               return (
-                <div key={branch} className="mb-4">
+                <div key={branch} className="mb-3">
                   <div
-                    className="mb-1 flex items-center gap-2 rounded px-2 py-1"
-                    style={{ backgroundColor: `${color}15` }}
+                    className="mb-1 flex items-center gap-2 rounded-md border-l-4 px-3 py-1.5 text-xs font-bold uppercase tracking-wide"
+                    style={{
+                      borderLeftColor: color,
+                      backgroundColor: `${color}15`,
+                      color,
+                    }}
                   >
                     <span
-                      className="h-2.5 w-2.5 rounded-full"
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: color }}
                     />
-                    <span className="text-xs font-semibold" style={{ color }}>
-                      {branch}
-                    </span>
-                    <span className="text-[10px] text-gray-400">
+                    <span>{branch}</span>
+                    <span style={{ color: `${color}80` }}>
                       {concepts.length} concept{concepts.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  {concepts.map((c) => (
-                    <div
-                      key={c.iri_hash}
-                      data-iri={c.iri_hash}
-                      className={`ml-4 cursor-pointer rounded border px-3 py-2 mb-1 text-sm ${
-                        selectedConceptIri === c.iri_hash
-                          ? 'border-blue-400 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                      onClick={() => setSelectedConceptIri(c.iri_hash)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-800">{c.label}</span>
-                        <span className="ml-2 text-xs text-gray-400">
-                          {Math.round(c.score)}%
-                        </span>
-                      </div>
-                      {c.hierarchy_path.length > 0 && (
-                        <p className="mt-0.5 text-[11px] text-gray-400">
-                          {c.hierarchy_path.map((p) => p.label).join(' > ')}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                  <div className="ml-4 border-l border-gray-100 pl-1">
+                    {tree.map((node) => (
+                      <OutputNodeComponent
+                        key={node.label}
+                        node={node}
+                        depth={0}
+                        selectedConceptIri={selectedConceptIri}
+                        onSelectConcept={(iri) => setSelectedConceptIri(iri)}
+                      />
+                    ))}
+                  </div>
                 </div>
               );
             })

@@ -165,6 +165,7 @@ def _enrich_mapped_only(request: ExportRequest, folio: FOLIO) -> ExportRequest:
         source_file=request.source_file,
         session_created=request.session_created,
         preview_rows=request.preview_rows,
+        input_hierarchy=request.input_hierarchy,
     )
 
 
@@ -284,6 +285,7 @@ def _enrich_mapped_with_related(request: ExportRequest, folio: FOLIO) -> ExportR
         source_file=request.source_file,
         session_created=request.session_created,
         preview_rows=request.preview_rows,
+        input_hierarchy=request.input_hierarchy,
     )
 
 
@@ -340,6 +342,7 @@ def _build_full_ontology(request: ExportRequest, folio: FOLIO) -> ExportRequest:
         source_file=request.source_file,
         session_created=request.session_created,
         preview_rows=request.preview_rows,
+        input_hierarchy=request.input_hierarchy,
     )
 
 

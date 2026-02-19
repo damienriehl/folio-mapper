@@ -71,14 +71,15 @@ def generate_interactive_html(request: ExportRequest) -> str:
                     "hierarchy_path": concept.hierarchy_path,
                 }
 
-    input_json = json.dumps(input_data, ensure_ascii=False)
-    mapping_json = json.dumps(mapping_data, ensure_ascii=False)
-    metadata_json = json.dumps(concept_metadata, ensure_ascii=False)
+    input_json = json.dumps(input_data, ensure_ascii=False).replace("</", "<\\/")
+    mapping_json = json.dumps(mapping_data, ensure_ascii=False).replace("</", "<\\/")
+    metadata_json = json.dumps(concept_metadata, ensure_ascii=False).replace("</", "<\\/")
 
     return f"""<div id="interactive-section">
 <style>
   #interactive-section {{
     display: flex;
+    position: relative;
     height: calc(100vh - 160px);
     min-height: 400px;
     border: 1px solid #e5e7eb;
@@ -102,7 +103,6 @@ def generate_interactive_html(request: ExportRequest) -> str:
     flex: 1;
     overflow-y: auto;
     padding: 16px;
-    position: relative;
     border-left: 1px solid #e5e7eb;
   }}
   .int-right {{
@@ -253,25 +253,25 @@ def generate_interactive_html(request: ExportRequest) -> str:
   .int-svg-overlay {{
     position: absolute;
     top: 0;
-    left: -400px;
-    width: calc(100% + 400px);
+    left: 0;
+    width: 100%;
     height: 100%;
     pointer-events: none;
     z-index: 5;
   }}
 </style>
 
-<script id="interactive-input-data" type="application/json">{_html_escape(input_json)}</script>
-<script id="interactive-mapping-data" type="application/json">{_html_escape(mapping_json)}</script>
-<script id="interactive-concept-metadata" type="application/json">{_html_escape(metadata_json)}</script>
+<script id="interactive-input-data" type="application/json">{input_json}</script>
+<script id="interactive-mapping-data" type="application/json">{mapping_json}</script>
+<script id="interactive-concept-metadata" type="application/json">{metadata_json}</script>
 
+<svg class="int-svg-overlay" id="int-svg-overlay"></svg>
 <div class="int-left" id="int-left-pane">
   <div class="int-section-title">Input Items</div>
   <div id="int-input-tree"></div>
 </div>
 <div class="int-gutter" id="int-gutter"></div>
 <div class="int-middle" id="int-middle-pane">
-  <svg class="int-svg-overlay" id="int-svg-overlay"></svg>
   <div class="int-section-title">Mapped FOLIO Concepts</div>
   <div id="int-output-tree">
     <div class="int-placeholder">Select an input item to see its mapped concepts</div>
@@ -377,6 +377,133 @@ def generate_interactive_html(request: ExportRequest) -> str:
     }}
   }}
 
+  function buildTree(concepts) {{
+    var roots = [];
+    for (var i = 0; i < concepts.length; i++) {{
+      var c = concepts[i];
+      var segments = (c.hierarchy_path || []).slice(1);
+      if (segments.length === 0) continue;
+      var siblings = roots;
+      for (var s = 0; s < segments.length; s++) {{
+        var seg = segments[s];
+        var found = null;
+        for (var f = 0; f < siblings.length; f++) {{
+          if (siblings[f].label === seg) {{ found = siblings[f]; break; }}
+        }}
+        if (!found) {{
+          found = {{ label: seg, concept: null, children: [] }};
+          siblings.push(found);
+        }}
+        if (s === segments.length - 1) found.concept = c;
+        siblings = found.children;
+      }}
+    }}
+    return roots;
+  }}
+
+  function renderTreeNode(node, depth, parent) {{
+    var isMapped = node.concept !== null;
+    var hasChildren = node.children.length > 0;
+    var el = document.createElement('div');
+
+    if (isMapped) {{
+      el.className = 'int-concept';
+      el.setAttribute('data-iri', node.concept.iri_hash);
+      if (node.concept.iri_hash === selectedConceptIri) el.classList.add('selected');
+      el.style.paddingLeft = (depth * 16 + (hasChildren ? 4 : 8)) + 'px';
+      el.style.marginLeft = '0';
+      el.style.border = 'none';
+      el.style.borderRadius = '4px';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.gap = '6px';
+
+      if (hasChildren) {{
+        var toggle = document.createElement('button');
+        toggle.className = 'int-toggle-btn';
+        toggle.textContent = '\\u25BC';
+        toggle.style.flexShrink = '0';
+        toggle.setAttribute('data-iri-target', node.concept.iri_hash);
+        el.appendChild(toggle);
+      }} else {{
+        var bullet = document.createElement('span');
+        bullet.textContent = '\\u25CF';
+        bullet.style.fontSize = '11px';
+        bullet.style.color = '#d1d5db';
+        bullet.style.flexShrink = '0';
+        bullet.setAttribute('data-iri-target', node.concept.iri_hash);
+        el.appendChild(bullet);
+      }}
+
+      var lbl = document.createElement('span');
+      lbl.textContent = node.concept.label;
+      lbl.style.flex = '1';
+      lbl.style.fontWeight = '500';
+      lbl.style.overflow = 'hidden';
+      lbl.style.textOverflow = 'ellipsis';
+      lbl.style.whiteSpace = 'nowrap';
+      el.appendChild(lbl);
+
+      var score = document.createElement('span');
+      score.className = 'int-concept-score';
+      score.textContent = Math.round(node.concept.score) + '%';
+      score.style.flexShrink = '0';
+      el.appendChild(score);
+
+      (function(iri) {{
+        el.onclick = function(e) {{
+          if (e.target.tagName === 'BUTTON') return;
+          selectedConceptIri = iri;
+          highlightConcept();
+          renderDetail();
+        }};
+      }})(node.concept.iri_hash);
+    }} else {{
+      el.style.paddingLeft = (depth * 16 + 4) + 'px';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.gap = '6px';
+      el.style.padding = '4px';
+      el.style.paddingLeft = (depth * 16 + 4) + 'px';
+      el.style.fontSize = '13px';
+      el.style.color = '#6b7280';
+
+      if (hasChildren) {{
+        var toggle = document.createElement('button');
+        toggle.className = 'int-toggle-btn';
+        toggle.textContent = '\\u25BC';
+        toggle.style.flexShrink = '0';
+        el.appendChild(toggle);
+      }}
+
+      var lbl = document.createElement('span');
+      lbl.textContent = node.label;
+      lbl.style.flex = '1';
+      el.appendChild(lbl);
+    }}
+
+    parent.appendChild(el);
+
+    if (hasChildren) {{
+      var childWrap = document.createElement('div');
+      childWrap.style.marginLeft = '8px';
+      childWrap.className = 'int-tree-children';
+      for (var i = 0; i < node.children.length; i++) {{
+        renderTreeNode(node.children[i], depth + 1, childWrap);
+      }}
+      parent.appendChild(childWrap);
+
+      if (el.querySelector('button')) {{
+        el.querySelector('button').onclick = function(e) {{
+          e.stopPropagation();
+          var hidden = childWrap.style.display === 'none';
+          childWrap.style.display = hidden ? '' : 'none';
+          this.textContent = hidden ? '\\u25BC' : '\\u25B6';
+        }};
+      }}
+    }}
+  }}
+
   function renderOutputTree() {{
     var container = document.getElementById('int-output-tree');
     if (selectedItemIndex === null) {{
@@ -407,36 +534,21 @@ def generate_interactive_html(request: ExportRequest) -> str:
       var header = document.createElement('div');
       header.className = 'int-branch-header';
       header.style.backgroundColor = color + '15';
+      header.style.borderLeft = '4px solid ' + color;
       header.innerHTML = '<span class="int-branch-dot" style="background:' + color + '"></span>'
         + '<span class="int-branch-name" style="color:' + color + '">' + escapeHtml(branch) + '</span>'
         + '<span class="int-branch-count">' + branchConcepts.length + ' concept' + (branchConcepts.length !== 1 ? 's' : '') + '</span>';
       container.appendChild(header);
 
-      for (var j = 0; j < branchConcepts.length; j++) {{
-        var concept = branchConcepts[j];
-        var el = document.createElement('div');
-        el.className = 'int-concept';
-        el.setAttribute('data-iri', concept.iri_hash);
-        if (concept.iri_hash === selectedConceptIri) el.classList.add('selected');
-
-        var pathStr = '';
-        if (concept.hierarchy_path && concept.hierarchy_path.length > 0) {{
-          pathStr = concept.hierarchy_path.join(' &gt; ');
-        }}
-
-        el.innerHTML = '<div class="int-concept-label"><span>' + escapeHtml(concept.label) + '</span><span class="int-concept-score">' + Math.round(concept.score) + '%</span></div>'
-          + (pathStr ? '<div class="int-concept-path">' + pathStr + '</div>' : '');
-
-        (function(iri) {{
-          el.onclick = function() {{
-            selectedConceptIri = iri;
-            highlightConcept();
-            renderDetail();
-          }};
-        }})(concept.iri_hash);
-
-        container.appendChild(el);
+      var treeWrap = document.createElement('div');
+      treeWrap.style.marginLeft = '16px';
+      treeWrap.style.borderLeft = '1px solid #f3f4f6';
+      treeWrap.style.paddingLeft = '4px';
+      var tree = buildTree(branchConcepts);
+      for (var t = 0; t < tree.length; t++) {{
+        renderTreeNode(tree[t], 0, treeWrap);
       }}
+      container.appendChild(treeWrap);
     }}
   }}
 
@@ -493,15 +605,15 @@ def generate_interactive_html(request: ExportRequest) -> str:
       if (svg) svg.innerHTML = '';
       return;
     }}
-    var middlePane = document.getElementById('int-middle-pane');
+    var section = document.getElementById('interactive-section');
     var leftPane = document.getElementById('int-left-pane');
-    if (!middlePane || !leftPane) return;
+    var middlePane = document.getElementById('int-middle-pane');
+    if (!section || !leftPane || !middlePane) return;
 
-    var middleRect = middlePane.getBoundingClientRect();
-    var leftRect = leftPane.getBoundingClientRect();
+    var sectionRect = section.getBoundingClientRect();
 
     var inputEl = leftPane.querySelector('[data-item-index="' + selectedItemIndex + '"]');
-    var outputEls = middlePane.querySelectorAll('[data-iri]');
+    var outputEls = middlePane.querySelectorAll('[data-iri-target]');
 
     if (!inputEl || outputEls.length === 0) {{
       svg.innerHTML = '';
@@ -509,17 +621,17 @@ def generate_interactive_html(request: ExportRequest) -> str:
     }}
 
     var inputElRect = inputEl.getBoundingClientRect();
-    var startX = inputElRect.right - leftRect.left;
-    var startY = inputElRect.top + inputElRect.height / 2 - middleRect.top;
+    var startX = inputElRect.right - sectionRect.left;
+    var startY = inputElRect.top + inputElRect.height / 2 - sectionRect.top;
 
     var paths = '';
     for (var i = 0; i < outputEls.length; i++) {{
       var el = outputEls[i];
       var rect = el.getBoundingClientRect();
-      var endX = rect.left - leftRect.left;
-      var endY = rect.top + rect.height / 2 - middleRect.top;
+      var endX = rect.left - sectionRect.left;
+      var endY = rect.top + rect.height / 2 - sectionRect.top;
       var color = '#6b7280';
-      var iriHash = el.getAttribute('data-iri');
+      var iriHash = el.getAttribute('data-iri-target');
       if (iriHash && conceptMeta[iriHash]) {{
         color = conceptMeta[iriHash].branch_color || color;
       }}

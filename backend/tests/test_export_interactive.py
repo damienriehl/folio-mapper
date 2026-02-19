@@ -122,9 +122,9 @@ def test_input_items_with_data_attributes():
     """Input data contains item_index for leaf nodes."""
     req = _make_request()
     html = generate_interactive_html(req)
-    # The JSON data is HTML-escaped inside script tags
-    assert "&quot;item_index&quot;: 0" in html
-    assert "&quot;item_index&quot;: 1" in html
+    # JSON data is raw inside script tags (not HTML-escaped)
+    assert '"item_index": 0' in html
+    assert '"item_index": 1' in html
 
 
 def test_folio_concepts_with_data_iri():
@@ -152,8 +152,8 @@ def test_self_contained_no_external_refs():
     assert "href=" not in html.lower()
 
 
-def test_html_escaping():
-    """Special characters in labels are HTML-escaped in JSON blocks."""
+def test_json_special_characters():
+    """Special characters in labels are properly JSON-encoded in script blocks."""
     concept = _make_concept(label='Law of "Torts" & <Liability>')
     row = _make_row(selected_concepts=[concept])
     hierarchy = [
@@ -166,10 +166,10 @@ def test_html_escaping():
     ]
     req = _make_request(rows=[row], input_hierarchy=hierarchy)
     html = generate_interactive_html(req)
-    # JSON inside script tags is HTML-escaped
-    assert "&lt;" in html or "Torts" in html  # Content is present
-    # Should not contain raw unescaped angle brackets in script content
-    assert '<Liability>' not in html
+    # JSON inside script tags is raw (not HTML-escaped); special chars are JSON-escaped
+    assert "Torts" in html
+    # Angle brackets are preserved as-is in JSON inside script tags (safe for application/json)
+    assert "<Liability>" in html
 
 
 def test_flat_input_rendering():
@@ -198,8 +198,8 @@ def test_mapping_count_badges():
     row = _make_row(selected_concepts=[concept1, concept2, concept3])
     req = _make_request(rows=[row])
     html = generate_interactive_html(req)
-    # JSON data is HTML-escaped; check mapping data contains 3 concepts for item 0
-    assert "&quot;0&quot;: [" in html  # item_index 0 has a list of concepts
+    # JSON data is raw; check mapping data contains 3 concepts for item 0
+    assert '"0": [' in html  # item_index 0 has a list of concepts
 
 
 def test_concept_metadata_includes_all_fields():
