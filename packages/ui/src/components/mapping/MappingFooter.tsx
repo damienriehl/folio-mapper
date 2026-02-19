@@ -56,9 +56,12 @@ export function MappingFooter({
           </button>
         )}
         */}
+        {/* Branch count indicator removed — was showing incorrect enabled/total values.
+           Uncomment to restore:
         <span className="text-xs text-gray-500">
           Branches: {enabledBranchCount}/{branchCount}
         </span>
+        */}
       </div>
     </div>
   );
