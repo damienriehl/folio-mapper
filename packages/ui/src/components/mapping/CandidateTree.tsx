@@ -102,12 +102,12 @@ export function CandidateTree({
 
   const visibleGroups = branchGroups.filter((g) => {
     if (branchStates[g.branch] === 'excluded') return false;
+    // Mandatory branches always show (even when search filter is active)
+    if (branchStates[g.branch] === 'mandatory') return true;
     // When search filter is active, branch must have at least one candidate in the filter set
     if (filterSet) {
       return g.candidates.some((c) => filterSet.has(c.iri_hash));
     }
-    // Mandatory branches always show their header (even with 0 candidates above threshold)
-    if (branchStates[g.branch] === 'mandatory') return true;
     return g.candidates.some((c) => c.score >= threshold);
   });
 
@@ -127,12 +127,12 @@ export function CandidateTree({
         const isMandatory = branchStates[group.branch] === 'mandatory';
         let visibleCandidates = group.candidates.filter((c) => c.score >= threshold);
         // Mandatory branches always show at least 3 candidates (sorted by score)
-        if (isMandatory && visibleCandidates.length < 3 && group.candidates.length > 0 && !filterSet) {
+        if (isMandatory && visibleCandidates.length < 3 && group.candidates.length > 0) {
           visibleCandidates = [...group.candidates]
             .sort((a, b) => b.score - a.score)
             .slice(0, Math.max(3, visibleCandidates.length));
         }
-        if (filterSet) {
+        if (filterSet && !isMandatory) {
           visibleCandidates = visibleCandidates.filter((c) => filterSet.has(c.iri_hash));
         }
         const tree = buildHierarchyTree(visibleCandidates);

@@ -250,6 +250,8 @@ export function MappingScreen({
     ? completeBranchGroups
         .filter((g) => {
           if (branchStates[g.branch] === 'excluded') return false;
+          // Mandatory branches always visible (even when search filter is active)
+          if (branchStates[g.branch] === 'mandatory') return true;
           if (searchFilterSet) return g.candidates.some((c) => searchFilterSet.has(c.iri_hash));
           return true;
         })
@@ -257,12 +259,12 @@ export function MappingScreen({
           const isMandatory = branchStates[g.branch] === 'mandatory';
           let candidates = g.candidates.filter((c) => c.score >= effectiveThreshold);
           // Mandatory branches always show at least 3 candidates
-          if (isMandatory && candidates.length < 3 && g.candidates.length > 0 && !searchFilterSet) {
+          if (isMandatory && candidates.length < 3 && g.candidates.length > 0) {
             candidates = [...g.candidates]
               .sort((a, b) => b.score - a.score)
               .slice(0, Math.max(3, candidates.length));
           }
-          if (searchFilterSet) {
+          if (searchFilterSet && !isMandatory) {
             candidates = candidates.filter((c) => searchFilterSet.has(c.iri_hash));
           }
           return candidates.map((c) => c.iri_hash);
