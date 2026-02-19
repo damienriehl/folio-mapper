@@ -1,12 +1,13 @@
 """Local authentication token for securing the API.
 
-In desktop mode, the backend generates a random token on startup and
-emits it to stdout for the Electron shell to capture. All /api/* requests
-(except /api/health) must include this token in the X-Local-Token header.
+In desktop mode, the Electron shell generates a token, passes it via the
+FOLIO_MAPPER_LOCAL_TOKEN env var, and sends it in X-Local-Token headers.
+All /api/* requests (except /api/health) must include this token.
 
-In development, the token can be set via FOLIO_MAPPER_LOCAL_TOKEN env var.
-If neither is set and the env var FOLIO_MAPPER_NO_AUTH=true is present,
-authentication is disabled entirely.
+In dev mode (no FOLIO_MAPPER_LOCAL_TOKEN set), auth is disabled automatically
+so the frontend can reach the backend without a token.
+
+Auth can also be explicitly disabled via FOLIO_MAPPER_NO_AUTH=true.
 """
 
 from __future__ import annotations
@@ -18,15 +19,20 @@ _token: str | None = None
 
 
 def get_or_create_token() -> str | None:
-    """Return the local auth token, creating one if needed.
+    """Return the local auth token if one is configured.
 
-    Returns None if auth is disabled via FOLIO_MAPPER_NO_AUTH=true.
+    Returns None (auth disabled) when:
+    - FOLIO_MAPPER_NO_AUTH=true, OR
+    - No FOLIO_MAPPER_LOCAL_TOKEN env var is set (dev mode)
     """
     global _token
     if os.environ.get("FOLIO_MAPPER_NO_AUTH", "").lower() == "true":
         return None
+    env_token = os.environ.get("FOLIO_MAPPER_LOCAL_TOKEN")
+    if not env_token:
+        return None  # Dev mode — no token configured, auth disabled
     if _token is None:
-        _token = os.environ.get("FOLIO_MAPPER_LOCAL_TOKEN") or secrets.token_urlsafe(32)
+        _token = env_token
     return _token
 
 

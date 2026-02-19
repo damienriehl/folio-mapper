@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from "child_process";
+import * as crypto from "crypto";
 import * as http from "http";
 import * as path from "path";
 import log from "electron-log";
@@ -28,26 +29,17 @@ export class BackendManager {
     );
     const webDir = path.join(resourcesPath, "web");
 
+    // Generate auth token and pass to backend via env var
+    this._localToken = crypto.randomBytes(32).toString("base64url");
     log.info(`Starting backend: ${backendExe} --port ${this.port} --web-dir ${webDir}`);
 
     this.process = spawn(backendExe, ["--port", String(this.port), "--web-dir", webDir], {
       stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, FOLIO_MAPPER_LOCAL_TOKEN: this._localToken },
     });
 
     this.process.stdout?.on("data", (data: Buffer) => {
-      const text = data.toString().trimEnd();
-      log.info(`[backend] ${text}`);
-
-      // Parse local auth token from backend stdout
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed.local_token) {
-          this._localToken = parsed.local_token;
-          log.info("[backend] Captured local auth token");
-        }
-      } catch {
-        // Not JSON — normal log output
-      }
+      log.info(`[backend] ${data.toString().trimEnd()}`);
     });
 
     this.process.stderr?.on("data", (data: Buffer) => {
