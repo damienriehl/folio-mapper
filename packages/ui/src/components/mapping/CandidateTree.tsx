@@ -106,6 +106,7 @@ export function CandidateTree({
     if (filterSet) {
       return g.candidates.some((c) => filterSet.has(c.iri_hash));
     }
+    // Mandatory branches always show their header (even with 0 candidates above threshold)
     if (branchStates[g.branch] === 'mandatory') return true;
     return g.candidates.some((c) => c.score >= threshold);
   });
@@ -124,9 +125,13 @@ export function CandidateTree({
         const branchKey = group.branch;
         const isBranchCollapsed = collapsedNodes.has(branchKey);
         const isMandatory = branchStates[group.branch] === 'mandatory';
-        let visibleCandidates = isMandatory
-          ? group.candidates
-          : group.candidates.filter((c) => c.score >= threshold);
+        let visibleCandidates = group.candidates.filter((c) => c.score >= threshold);
+        // Mandatory branches always show at least 3 candidates (sorted by score)
+        if (isMandatory && visibleCandidates.length < 3 && group.candidates.length > 0 && !filterSet) {
+          visibleCandidates = [...group.candidates]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, Math.max(3, visibleCandidates.length));
+        }
         if (filterSet) {
           visibleCandidates = visibleCandidates.filter((c) => filterSet.has(c.iri_hash));
         }
@@ -164,7 +169,9 @@ export function CandidateTree({
               <div className="ml-4 border-l border-gray-100 pl-1">
                 {tree.length === 0 ? (
                   <p className="py-1 text-xs text-gray-400">
-                    {isMandatory ? 'No candidates found — try a manual search' : 'No candidates in Top N filter'}
+                    {isMandatory
+                      ? 'No candidates found \u2014 try a manual search or expand the Top N slider above'
+                      : 'No candidates in Top N filter \u2014 try expanding the slider above or a manual search'}
                   </p>
                 ) : (
                   tree.map((node) => (

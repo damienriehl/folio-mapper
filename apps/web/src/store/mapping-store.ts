@@ -279,10 +279,15 @@ export const useMappingStore = create<MappingState>()(
             const state = branchStates[group.branch];
             if (state === 'excluded') continue;
             const isMandatory = state === 'mandatory';
-            for (const candidate of group.candidates) {
-              if (isMandatory || candidate.score >= cutoff) {
-                visible.push(candidate.iri_hash);
-              }
+            let aboveCutoff = group.candidates.filter((c) => c.score >= cutoff);
+            // Mandatory branches always include at least 3 candidates
+            if (isMandatory && aboveCutoff.length < 3 && group.candidates.length > 0) {
+              aboveCutoff = [...group.candidates]
+                .sort((a, b) => b.score - a.score)
+                .slice(0, Math.max(3, aboveCutoff.length));
+            }
+            for (const candidate of aboveCutoff) {
+              visible.push(candidate.iri_hash);
             }
           }
           updatedSelections[i] = visible;

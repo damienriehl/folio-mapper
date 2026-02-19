@@ -2,9 +2,9 @@
 
 For each mandatory branch:
 1. Permissive local FOLIO search scoped to the branch (low threshold)
-2. If <3 local candidates AND llm_config provided: LLM suggests concept labels,
-   then searches FOLIO for those labels scoped to the branch
-3. Merge, dedupe, return top 3 per branch
+2. If fewer than _MAX_PER_BRANCH local candidates AND llm_config provided:
+   LLM suggests concept labels, then searches FOLIO for those labels scoped to the branch
+3. Merge, dedupe, return top _MAX_PER_BRANCH per branch
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from app.services.pipeline.stage1_filter import (
 
 logger = logging.getLogger(__name__)
 
-_MAX_PER_BRANCH = 3
+_MAX_PER_BRANCH = 20
 
 
 def _build_llm_prompt(item_text: str, branch_name: str) -> str:
@@ -119,8 +119,8 @@ async def run_mandatory_fallback(
 
     For each branch:
     1. Permissive local search (threshold=0.1)
-    2. If <3 results and LLM available, get LLM suggestions and search for those
-    3. Merge, dedupe, return top 3
+    2. If fewer than _MAX_PER_BRANCH results and LLM available, get LLM suggestions and search for those
+    3. Merge, dedupe, return top _MAX_PER_BRANCH
     """
     folio = get_folio()
     results: list[BranchFallbackResult] = []

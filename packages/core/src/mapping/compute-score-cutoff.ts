@@ -4,8 +4,8 @@ import type { BranchState } from './types';
 /**
  * Converts a "Top N" count into a numeric score cutoff.
  *
- * Collects scores from non-excluded, non-mandatory branches, sorts descending,
- * and returns the score at position min(topN, length) - 1.
+ * Collects scores from all non-excluded branches (including mandatory),
+ * sorts descending, and returns the score at position min(topN, length) - 1.
  * Returns 0 if topN >= total candidates (show everything).
  * Ties at the Nth position are included (score >= cutoff).
  */
@@ -18,8 +18,7 @@ export function computeScoreCutoff(
 
   for (const group of branchGroups) {
     const state = branchStates[group.branch];
-    // Skip excluded and mandatory branches (mandatory bypasses cutoff separately)
-    if (state === 'excluded' || state === 'mandatory') continue;
+    if (state === 'excluded') continue;
     for (const candidate of group.candidates) {
       scores.push(candidate.score);
     }

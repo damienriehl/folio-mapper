@@ -245,7 +245,6 @@ export function MappingScreen({
   const selectedCandidate = candidateFromData ?? fetchedConcept;
 
   // Collect all visible candidate IRI hashes for current item (respecting threshold + branch filters + search filter)
-  // Mandatory branches bypass the threshold — show all candidates
   const searchFilterSet = searchFilterHashes ? new Set(searchFilterHashes) : null;
   const visibleCandidateHashes: string[] = currentItem
     ? completeBranchGroups
@@ -256,7 +255,13 @@ export function MappingScreen({
         })
         .flatMap((g) => {
           const isMandatory = branchStates[g.branch] === 'mandatory';
-          let candidates = g.candidates.filter((c) => isMandatory || c.score >= effectiveThreshold);
+          let candidates = g.candidates.filter((c) => c.score >= effectiveThreshold);
+          // Mandatory branches always show at least 3 candidates
+          if (isMandatory && candidates.length < 3 && g.candidates.length > 0 && !searchFilterSet) {
+            candidates = [...g.candidates]
+              .sort((a, b) => b.score - a.score)
+              .slice(0, Math.max(3, candidates.length));
+          }
           if (searchFilterSet) {
             candidates = candidates.filter((c) => searchFilterSet.has(c.iri_hash));
           }

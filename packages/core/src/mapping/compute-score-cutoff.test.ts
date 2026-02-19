@@ -42,14 +42,14 @@ describe('computeScoreCutoff', () => {
     expect(computeScoreCutoff(groups, 3, states)).toBe(70);
   });
 
-  it('excludes mandatory branches from score count', () => {
+  it('includes mandatory branches in score count', () => {
     const groups = [
       makeBranchGroup('Mandatory', [100, 95]),
       makeBranchGroup('Normal', [80, 60, 40]),
     ];
     const states: Record<string, BranchState> = { Mandatory: 'mandatory', Normal: 'normal' };
-    // Only Normal branch scores: [80, 60, 40], topN=2 → cutoff at index 1 = 60
-    expect(computeScoreCutoff(groups, 2, states)).toBe(60);
+    // All scores: [100, 95, 80, 60, 40], topN=2 → cutoff at index 1 = 95
+    expect(computeScoreCutoff(groups, 2, states)).toBe(95);
   });
 
   it('excludes excluded branches from score count', () => {
@@ -62,12 +62,11 @@ describe('computeScoreCutoff', () => {
     expect(computeScoreCutoff(groups, 1, states)).toBe(80);
   });
 
-  it('returns 0 when no normal branches exist', () => {
+  it('returns 0 when only excluded branches exist', () => {
     const groups = [
-      makeBranchGroup('Mandatory', [100, 95]),
       makeBranchGroup('Excluded', [80]),
     ];
-    const states: Record<string, BranchState> = { Mandatory: 'mandatory', Excluded: 'excluded' };
+    const states: Record<string, BranchState> = { Excluded: 'excluded' };
     expect(computeScoreCutoff(groups, 3, states)).toBe(0);
   });
 
