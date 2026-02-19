@@ -17,6 +17,7 @@ interface MappingToolbarProps {
   onDefaultTopNChange: (value: number) => void;
   onStatusFilterChange: (filter: StatusFilter) => void;
   onShowShortcuts: () => void;
+  onMappings?: () => void;
   loadedItemCount?: number;
   isBatchLoading?: boolean;
 }
@@ -38,6 +39,7 @@ export function MappingToolbar({
   onDefaultTopNChange,
   onStatusFilterChange,
   onShowShortcuts,
+  onMappings,
   loadedItemCount,
   isBatchLoading,
 }: MappingToolbarProps) {
@@ -126,6 +128,15 @@ export function MappingToolbar({
             <option value="skipped">Skipped</option>
             <option value="needs_attention">Needs attention</option>
           </select>
+          {onMappings && (
+            <button
+              type="button"
+              onClick={onMappings}
+              className="rounded border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+            >
+              Mappings
+            </button>
+          )}
           <button
             type="button"
             onClick={onAcceptAll}

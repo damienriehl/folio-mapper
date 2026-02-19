@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { parseText, testConnection, fetchModels, fetchKnownModels, BRANCH_COLORS, PROVIDER_META } from '@folio-mapper/core';
-import type { SuggestionEntry } from '@folio-mapper/core';
+import type { SuggestionEntry, InputHierarchyNode, HierarchyNode } from '@folio-mapper/core';
 import {
   AppShell,
   InputScreen,
@@ -8,6 +8,7 @@ import {
   FileDropZone,
   ConfirmationScreen,
   MappingScreen,
+  MappingsView,
   Header,
   LLMSettings,
   ModelChooser,
@@ -103,6 +104,36 @@ export function App() {
   // Suggestion queue + submission
   const suggestionSubmit = useSuggestionSubmit();
   const [editingSuggestion, setEditingSuggestion] = useState<SuggestionEntry | null>(null);
+
+  // Mappings view
+  const [showMappingsView, setShowMappingsView] = useState(false);
+
+  // Build input hierarchy for MappingsView
+  const inputHierarchy: InputHierarchyNode[] | null = (() => {
+    if (!parseResult) return null;
+    const { hierarchy, items } = parseResult;
+    if (hierarchy) {
+      const itemMap = new Map<string, number>();
+      for (const item of items) {
+        itemMap.set(item.text, item.index);
+      }
+      function convert(node: HierarchyNode): InputHierarchyNode {
+        return {
+          label: node.label,
+          depth: node.depth,
+          item_index: itemMap.get(node.label) ?? null,
+          children: node.children.map(convert),
+        };
+      }
+      return hierarchy.map(convert);
+    }
+    return items.map((item) => ({
+      label: item.text,
+      depth: 0,
+      item_index: item.index,
+      children: [],
+    }));
+  })();
 
   const handleSuggestToFolio = useCallback(() => {
     const { mappingResponse, currentItemIndex, notes } = mappingState;
@@ -358,6 +389,15 @@ export function App() {
             onCancel={session.handleCancelNewProject}
           />
         )}
+        {showMappingsView && mappingState.mappingResponse && (
+          <MappingsView
+            inputHierarchy={inputHierarchy}
+            mappingResponse={mappingState.mappingResponse}
+            selections={mappingState.selections}
+            branchStates={mappingState.branchStates}
+            onClose={() => setShowMappingsView(false)}
+          />
+        )}
         {exportState.showExportModal && (
           <ExportView
             totalItems={mappingState.totalItems}
@@ -447,6 +487,7 @@ export function App() {
             onStatusFilterChange={mappingState.setStatusFilter}
             onShowShortcuts={() => setShowShortcutsOverlay(true)}
             onExport={() => exportState.setShowExportModal(true)}
+            onMappings={() => setShowMappingsView(true)}
             suggestionQueue={mappingState.suggestionQueue}
             onSuggestToFolio={handleSuggestToFolio}
             onRemoveSuggestion={mappingState.removeSuggestion}

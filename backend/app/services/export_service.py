@@ -14,6 +14,7 @@ from openpyxl.styles import Font
 from app.models.export_models import ExportConcept, ExportOptions, ExportRequest, ExportRow
 from app.services.branch_config import get_branch_color
 from app.services.branch_sort import sort_branches
+from app.services.export_interactive_html import generate_interactive_html
 from app.services.export_scope import collect_ancestor_metadata
 from app.services.export_tree_html import generate_tree_html_section
 from app.services.folio_service import get_folio
@@ -67,7 +68,7 @@ LANG_NAMES: dict[str, str] = {
 
 
 def _build_headers(options: ExportOptions) -> list[str]:
-    headers = ["Source", "Label", "IRI", "Branch"]
+    headers = ["Source", "Ancestry", "Label", "IRI", "Branch"]
     if options.include_confidence:
         headers.append("Confidence")
     if options.include_notes:
@@ -91,8 +92,9 @@ def _flatten_rows(
     flat: list[list[str]] = []
     scope = options.export_scope
     for row in rows:
+        ancestry_str = " > ".join(row.ancestry) if row.ancestry else ""
         if not row.selected_concepts:
-            line: list[str] = [row.source_text, "", "", ""]
+            line: list[str] = [row.source_text, ancestry_str, "", "", ""]
             if options.include_confidence:
                 line.append("")
             if options.include_notes:
@@ -115,6 +117,7 @@ def _flatten_rows(
 
                 line = [
                     row.source_text,
+                    ancestry_str,
                     concept.label,
                     iri_display,
                     concept.branch,
@@ -377,6 +380,7 @@ def generate_html(request: ExportRequest) -> bytes:
 
     include_tree = request.options.include_tree_section
     include_table = request.options.include_table_section
+    include_interactive = request.input_hierarchy is not None
 
     # For scope exports, track which flat rows are mapped (by "Mapped" column value)
     mapped_col_idx = None
@@ -418,32 +422,49 @@ def generate_html(request: ExportRequest) -> bytes:
         f"Items: {len(request.rows)} | Exported: {now}</p>",
     ]
 
-    # Toggle bar when both sections are included
-    if include_tree and include_table:
+    # Count available sections for toggle bar
+    section_count = sum([include_interactive, include_tree, include_table])
+
+    if section_count >= 2:
         parts.append('<div class="view-toggle">')
-        parts.append('<button class="active" onclick="toggleView(\'tree\')">Tree View</button>')
-        parts.append('<button onclick="toggleView(\'table\')">Table View</button>')
+        if include_interactive:
+            # Interactive is default when available
+            parts.append('<button class="active" onclick="toggleView(\'interactive\')">Interactive</button>')
+        if include_tree:
+            active = ' class="active"' if not include_interactive else ""
+            parts.append(f'<button{active} onclick="toggleView(\'tree\')">Tree View</button>')
+        if include_table:
+            parts.append('<button onclick="toggleView(\'table\')">Table View</button>')
         parts.append('</div>')
         parts.append("""<script>
 function toggleView(view) {
+  var interactive = document.getElementById('interactive-section');
   var tree = document.getElementById('tree-section');
   var table = document.getElementById('table-section');
   var buttons = document.querySelectorAll('.view-toggle button');
-  if (view === 'tree') {
-    if (tree) tree.style.display = '';
-    if (table) table.style.display = 'none';
-    document.body.classList.remove('has-table');
-    buttons[0].className = 'active';
-    buttons[1].className = '';
-  } else {
-    if (tree) tree.style.display = 'none';
-    if (table) table.style.display = '';
+  if (interactive) interactive.style.display = 'none';
+  if (tree) tree.style.display = 'none';
+  if (table) table.style.display = 'none';
+  document.body.classList.remove('has-table');
+  for (var i = 0; i < buttons.length; i++) buttons[i].className = '';
+  if (view === 'interactive' && interactive) {
+    interactive.style.display = '';
+    for (var i = 0; i < buttons.length; i++) { if (buttons[i].textContent === 'Interactive') buttons[i].className = 'active'; }
+  } else if (view === 'tree' && tree) {
+    tree.style.display = '';
+    for (var i = 0; i < buttons.length; i++) { if (buttons[i].textContent === 'Tree View') buttons[i].className = 'active'; }
+  } else if (view === 'table' && table) {
+    table.style.display = '';
     document.body.classList.add('has-table');
-    buttons[0].className = '';
-    buttons[1].className = 'active';
+    for (var i = 0; i < buttons.length; i++) { if (buttons[i].textContent === 'Table View') buttons[i].className = 'active'; }
   }
 }
 </script>""")
+
+    # Interactive section
+    if include_interactive:
+        interactive_html = generate_interactive_html(request)
+        parts.append(interactive_html)
 
     # Tree section
     if include_tree:
@@ -455,10 +476,18 @@ function toggleView(view) {
         ]
         ancestor_meta = collect_ancestor_metadata(all_concepts)
         tree_html = generate_tree_html_section(branches_data, ancestor_metadata=ancestor_meta)
-        parts.append(tree_html)
+        # Hide tree if interactive or another section is the default
+        tree_hidden = include_interactive or (section_count >= 2 and not include_interactive)
+        if tree_hidden and not include_interactive:
+            tree_hidden = False  # Tree is default when no interactive
+        if include_interactive:
+            parts.append(f'<div id="tree-section" style="display:none">{tree_html}</div>')
+        else:
+            parts.append(tree_html)
 
-    # Table section
-    table_display = ' style="display:none"' if (include_tree and include_table) else ""
+    # Table section — hidden when interactive or tree is default
+    default_is_not_table = include_interactive or include_tree
+    table_display = ' style="display:none"' if (default_is_not_table and include_table) else ""
     parts.append(f'<div id="table-section"{table_display}>')
     parts.append("<table>")
     parts.append(

@@ -76,6 +76,7 @@ interface MappingScreenProps {
   onOpenSubmission: () => void;
   searchFilterHashes?: string[] | null;
   onClearSearchFilter?: () => void;
+  onMappings?: () => void;
   loadedItemCount?: number;
   isBatchLoading?: boolean;
   batchLoadingError?: string | null;
@@ -166,6 +167,7 @@ export function MappingScreen({
   onEditSuggestion,
   onOpenSubmission,
   searchFilterHashes,
+  onMappings,
   onClearSearchFilter,
   loadedItemCount,
   isBatchLoading,
@@ -322,6 +324,7 @@ export function MappingScreen({
         onDefaultTopNChange={onDefaultTopNChange}
         onStatusFilterChange={onStatusFilterChange}
         onShowShortcuts={onShowShortcuts}
+        onMappings={onMappings}
         loadedItemCount={loadedItemCount}
         isBatchLoading={isBatchLoading}
       />

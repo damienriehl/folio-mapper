@@ -1,0 +1,432 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import type {
+  MappingResponse,
+  BranchState,
+  InputHierarchyNode,
+  FolioCandidate,
+} from '@folio-mapper/core';
+
+interface MappingsViewProps {
+  inputHierarchy: InputHierarchyNode[] | null;
+  mappingResponse: MappingResponse;
+  selections: Record<number, string[]>;
+  branchStates: Record<string, BranchState>;
+  onClose: () => void;
+}
+
+interface MappedConcept {
+  iri_hash: string;
+  label: string;
+  branch: string;
+  branch_color: string;
+  score: number;
+  definition: string | null;
+  synonyms: string[];
+  hierarchy_path: { label: string; iri_hash: string }[];
+}
+
+function collectMappedConcepts(
+  itemIndex: number,
+  mappingResponse: MappingResponse,
+  selections: Record<number, string[]>,
+): MappedConcept[] {
+  const selectedHashes = selections[itemIndex] || [];
+  if (selectedHashes.length === 0) return [];
+  const item = mappingResponse.items.find((i) => i.item_index === itemIndex);
+  if (!item) return [];
+  const concepts: MappedConcept[] = [];
+  for (const group of item.branch_groups) {
+    for (const c of group.candidates) {
+      if (selectedHashes.includes(c.iri_hash)) {
+        concepts.push({
+          iri_hash: c.iri_hash,
+          label: c.label,
+          branch: c.branch,
+          branch_color: c.branch_color,
+          score: c.score,
+          definition: c.definition,
+          synonyms: c.synonyms,
+          hierarchy_path: c.hierarchy_path,
+        });
+      }
+    }
+  }
+  return concepts;
+}
+
+function groupByBranch(concepts: MappedConcept[]): Record<string, MappedConcept[]> {
+  const grouped: Record<string, MappedConcept[]> = {};
+  for (const c of concepts) {
+    (grouped[c.branch] ??= []).push(c);
+  }
+  return grouped;
+}
+
+function InputTreeNode({
+  node,
+  selectedIndex,
+  onSelect,
+  mappingResponse,
+  selections,
+}: {
+  node: InputHierarchyNode;
+  selectedIndex: number | null;
+  onSelect: (index: number) => void;
+  mappingResponse: MappingResponse;
+  selections: Record<number, string[]>;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const isLeaf = node.item_index !== null;
+  const isSelected = isLeaf && node.item_index === selectedIndex;
+  const conceptCount = isLeaf
+    ? (selections[node.item_index!] || []).length
+    : 0;
+
+  return (
+    <div style={{ paddingLeft: node.depth > 0 ? 16 : 0 }}>
+      <div
+        className={`flex items-center gap-1.5 rounded px-2 py-1 text-sm ${
+          isSelected
+            ? 'bg-blue-100 font-semibold text-blue-800'
+            : isLeaf
+              ? 'cursor-pointer text-gray-800 hover:bg-gray-100'
+              : 'font-medium text-gray-500'
+        }`}
+        data-item-index={node.item_index}
+        onClick={() => {
+          if (isLeaf) onSelect(node.item_index!);
+          else if (node.children.length > 0) setExpanded(!expanded);
+        }}
+      >
+        {node.children.length > 0 && (
+          <button
+            type="button"
+            className="text-xs text-gray-400"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+          >
+            {expanded ? '\u25BC' : '\u25B6'}
+          </button>
+        )}
+        <span className="truncate">{node.label}</span>
+        {isLeaf && conceptCount > 0 && (
+          <span className="ml-auto shrink-0 rounded-full bg-blue-200 px-1.5 text-[10px] font-medium text-blue-700">
+            {conceptCount} concept{conceptCount !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+      {expanded &&
+        node.children.map((child, i) => (
+          <InputTreeNode
+            key={i}
+            node={child}
+            selectedIndex={selectedIndex}
+            onSelect={onSelect}
+            mappingResponse={mappingResponse}
+            selections={selections}
+          />
+        ))}
+    </div>
+  );
+}
+
+export function MappingsView({
+  inputHierarchy,
+  mappingResponse,
+  selections,
+  branchStates,
+  onClose,
+}: MappingsViewProps) {
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
+  const [selectedConceptIri, setSelectedConceptIri] = useState<string | null>(null);
+  const leftRef = useRef<HTMLDivElement>(null);
+  const middleRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // All mapped concepts for selected input item
+  const selectedConcepts = selectedItemIndex !== null
+    ? collectMappedConcepts(selectedItemIndex, mappingResponse, selections)
+    : [];
+  const branchGroups = groupByBranch(selectedConcepts);
+
+  // Detail concept
+  const detailConcept = selectedConceptIri
+    ? selectedConcepts.find((c) => c.iri_hash === selectedConceptIri) ?? null
+    : null;
+
+  // Draw SVG lines
+  const drawLines = useCallback(() => {
+    const svg = svgRef.current;
+    if (!svg || selectedItemIndex === null) {
+      if (svg) svg.innerHTML = '';
+      return;
+    }
+    const wrapperRect = svg.parentElement?.getBoundingClientRect();
+    if (!wrapperRect) return;
+
+    const inputEl = leftRef.current?.querySelector(
+      `[data-item-index="${selectedItemIndex}"]`,
+    );
+    const outputEls = middleRef.current?.querySelectorAll('[data-iri]') ?? [];
+
+    if (!inputEl || outputEls.length === 0) {
+      svg.innerHTML = '';
+      return;
+    }
+
+    const inputRect = inputEl.getBoundingClientRect();
+    const startX = inputRect.right - wrapperRect.left;
+    const startY = inputRect.top + inputRect.height / 2 - wrapperRect.top;
+
+    let paths = '';
+    outputEls.forEach((el) => {
+      const iriHash = el.getAttribute('data-iri');
+      const concept = selectedConcepts.find((c) => c.iri_hash === iriHash);
+      if (!concept) return;
+      const rect = el.getBoundingClientRect();
+      const endX = rect.left - wrapperRect.left;
+      const endY = rect.top + rect.height / 2 - wrapperRect.top;
+      const cp1x = startX + (endX - startX) * 0.4;
+      const cp2x = startX + (endX - startX) * 0.6;
+      paths += `<path d="M${startX},${startY} C${cp1x},${startY} ${cp2x},${endY} ${endX},${endY}" stroke="${concept.branch_color}" stroke-width="1.5" fill="none" opacity="0.5"/>`;
+    });
+    svg.innerHTML = paths;
+  }, [selectedItemIndex, selectedConcepts]);
+
+  useEffect(() => {
+    drawLines();
+  }, [drawLines]);
+
+  // Redraw on scroll
+  useEffect(() => {
+    const left = leftRef.current;
+    const middle = middleRef.current;
+    let raf: number;
+    const handler = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(drawLines);
+    };
+    left?.addEventListener('scroll', handler);
+    middle?.addEventListener('scroll', handler);
+    return () => {
+      left?.removeEventListener('scroll', handler);
+      middle?.removeEventListener('scroll', handler);
+      cancelAnimationFrame(raf);
+    };
+  }, [drawLines]);
+
+  // Escape to close
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const nodes = inputHierarchy || [];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Input-to-Output Mappings"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/10">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-3">
+          <h2 className="text-sm font-semibold text-gray-800">
+            Input-to-Output Mappings
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50"
+          >
+            <span aria-hidden="true">&times;</span>
+            Close
+            <kbd className="ml-1 rounded border border-gray-200 bg-gray-100 px-1 py-0.5 text-[10px] font-sans text-gray-400">Esc</kbd>
+          </button>
+        </div>
+
+      {/* 3-panel layout */}
+      <div className="relative flex min-h-0 flex-1">
+        {/* SVG overlay spanning left pane + gutter + middle pane */}
+        <svg
+          ref={svgRef}
+          className="pointer-events-none absolute inset-0 z-10"
+          style={{ width: '100%', height: '100%' }}
+        />
+
+        {/* Left pane: Input hierarchy */}
+        <div
+          ref={leftRef}
+          className="w-[280px] shrink-0 overflow-y-auto border-r border-gray-200 bg-gray-50 p-3"
+        >
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Input Items
+          </p>
+          {nodes.length === 0 ? (
+            <p className="text-xs text-gray-400">No input hierarchy available</p>
+          ) : (
+            nodes.map((node, i) => (
+              <InputTreeNode
+                key={i}
+                node={node}
+                selectedIndex={selectedItemIndex}
+                onSelect={(idx) => {
+                  setSelectedItemIndex(idx);
+                  setSelectedConceptIri(null);
+                }}
+                mappingResponse={mappingResponse}
+                selections={selections}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Gutter for bezier lines */}
+        <div className="w-[120px] shrink-0" />
+
+        {/* Middle pane: FOLIO output tree */}
+        <div
+          ref={middleRef}
+          className="min-w-0 flex-1 overflow-y-auto border-l border-gray-200 p-4"
+        >
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Mapped FOLIO Concepts
+          </p>
+          {selectedItemIndex === null ? (
+            <p className="mt-8 text-center text-sm text-gray-400">
+              Select an input item to see its mapped concepts
+            </p>
+          ) : selectedConcepts.length === 0 ? (
+            <p className="mt-8 text-center text-sm text-gray-400">
+              No concepts mapped for this item
+            </p>
+          ) : (
+            Object.entries(branchGroups).map(([branch, concepts]) => {
+              const color = concepts[0]?.branch_color || '#6b7280';
+              if (branchStates[branch] === 'excluded') return null;
+              return (
+                <div key={branch} className="mb-4">
+                  <div
+                    className="mb-1 flex items-center gap-2 rounded px-2 py-1"
+                    style={{ backgroundColor: `${color}15` }}
+                  >
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="text-xs font-semibold" style={{ color }}>
+                      {branch}
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      {concepts.length} concept{concepts.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {concepts.map((c) => (
+                    <div
+                      key={c.iri_hash}
+                      data-iri={c.iri_hash}
+                      className={`ml-4 cursor-pointer rounded border px-3 py-2 mb-1 text-sm ${
+                        selectedConceptIri === c.iri_hash
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                      onClick={() => setSelectedConceptIri(c.iri_hash)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-800">{c.label}</span>
+                        <span className="ml-2 text-xs text-gray-400">
+                          {Math.round(c.score)}%
+                        </span>
+                      </div>
+                      {c.hierarchy_path.length > 0 && (
+                        <p className="mt-0.5 text-[11px] text-gray-400">
+                          {c.hierarchy_path.map((p) => p.label).join(' > ')}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Right pane: Concept details */}
+        <div className="w-[320px] shrink-0 overflow-y-auto border-l border-gray-200 bg-gray-50 p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Concept Details
+          </p>
+          {detailConcept ? (
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  {detailConcept.label}
+                </h3>
+                <p className="mt-0.5 text-xs text-gray-500">{detailConcept.iri_hash}</p>
+              </div>
+              {detailConcept.definition && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                    Definition
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-700">{detailConcept.definition}</p>
+                </div>
+              )}
+              {detailConcept.synonyms.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                    Synonyms
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-700">
+                    {detailConcept.synonyms.join(', ')}
+                  </p>
+                </div>
+              )}
+              {detailConcept.hierarchy_path.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                    Hierarchy
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-700">
+                    {detailConcept.hierarchy_path.map((p) => p.label).join(' > ')}
+                  </p>
+                </div>
+              )}
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Branch
+                </p>
+                <div className="mt-0.5 flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: detailConcept.branch_color }}
+                  />
+                  <span className="text-xs text-gray-700">{detailConcept.branch}</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Confidence
+                </p>
+                <p className="mt-0.5 text-xs text-gray-700">{Math.round(detailConcept.score)}%</p>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-8 text-center text-xs text-gray-400">
+              Click a concept to see details
+            </p>
+          )}
+        </div>
+      </div>
+      </div>
+    </div>
+  );
+}

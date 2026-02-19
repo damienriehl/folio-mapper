@@ -8,6 +8,13 @@ class HierarchyPathEntryDict(BaseModel):
     iri_hash: str
 
 
+class InputHierarchyNode(BaseModel):
+    label: str
+    depth: int
+    item_index: int | None = None
+    children: list[InputHierarchyNode] = []
+
+
 class ExportConcept(BaseModel):
     label: str
     iri: str
@@ -59,6 +66,7 @@ class ExportRequest(BaseModel):
     source_file: str | None = None
     session_created: str | None = None
     preview_rows: int | None = None
+    input_hierarchy: list[InputHierarchyNode] | None = None
 
 
 class ExportPreviewRow(BaseModel):

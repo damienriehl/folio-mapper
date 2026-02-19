@@ -1,8 +1,40 @@
 import { useState, useCallback } from 'react';
-import type { ExportConcept, ExportOptions, ExportPreviewRow, ExportRow, ExportTreeData } from '@folio-mapper/core';
+import type { ExportConcept, ExportOptions, ExportPreviewRow, ExportRow, ExportTreeData, InputHierarchyNode } from '@folio-mapper/core';
+import type { HierarchyNode, ParseItem } from '@folio-mapper/core';
 import { EXPORT_FORMATS, fetchExport, fetchExportPreview, fetchExportTreeData } from '@folio-mapper/core';
 import { useInputStore } from '../store/input-store';
 import { useMappingStore } from '../store/mapping-store';
+
+function buildInputHierarchy(): InputHierarchyNode[] | null {
+  const input = useInputStore.getState();
+  if (!input.parseResult) return null;
+  const { hierarchy, items } = input.parseResult;
+
+  if (hierarchy) {
+    // Convert HierarchyNode[] to InputHierarchyNode[], matching item_index via label
+    const itemMap = new Map<string, number>();
+    for (const item of items) {
+      itemMap.set(item.text, item.index);
+    }
+    function convert(node: HierarchyNode): InputHierarchyNode {
+      return {
+        label: node.label,
+        depth: node.depth,
+        item_index: itemMap.get(node.label) ?? null,
+        children: node.children.map(convert),
+      };
+    }
+    return hierarchy.map(convert);
+  }
+
+  // Flat input: build flat list of nodes
+  return items.map((item: ParseItem) => ({
+    label: item.text,
+    depth: 0,
+    item_index: item.index,
+    children: [],
+  }));
+}
 
 function buildExportRows(): ExportRow[] {
   const mapping = useMappingStore.getState();
@@ -52,11 +84,13 @@ export function useExport() {
     try {
       const rows = buildExportRows();
       const input = useInputStore.getState();
+      const inputHierarchy = buildInputHierarchy();
       const blob = await fetchExport({
         rows,
         options,
         source_file: input.parseResult?.source_filename ?? null,
         session_created: null,
+        input_hierarchy: inputHierarchy,
       });
 
       const format = EXPORT_FORMATS.find((f) => f.value === options.format);
@@ -76,22 +110,26 @@ export function useExport() {
   const handlePreview = useCallback(async (options: ExportOptions): Promise<ExportPreviewRow[]> => {
     const rows = buildExportRows();
     const input = useInputStore.getState();
+    const inputHierarchy = buildInputHierarchy();
     return fetchExportPreview({
       rows,
       options,
       source_file: input.parseResult?.source_filename ?? null,
       session_created: null,
+      input_hierarchy: inputHierarchy,
     });
   }, []);
 
   const handleFetchTreeData = useCallback(async (options: ExportOptions): Promise<ExportTreeData> => {
     const rows = buildExportRows();
     const input = useInputStore.getState();
+    const inputHierarchy = buildInputHierarchy();
     return fetchExportTreeData({
       rows,
       options,
       source_file: input.parseResult?.source_filename ?? null,
       session_created: null,
+      input_hierarchy: inputHierarchy,
     });
   }, []);
 

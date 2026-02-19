@@ -105,10 +105,11 @@ def test_csv_produces_valid_csv_with_bom():
     text = data.decode("utf-8-sig")
     reader = csv.reader(io.StringIO(text))
     rows = list(reader)
-    assert rows[0] == ["Source", "Label", "IRI", "Branch", "Confidence", "Notes", "Definition", "Alt Labels", "Examples", "Hierarchy"]
+    assert rows[0] == ["Source", "Ancestry", "Label", "IRI", "Branch", "Confidence", "Notes", "Definition", "Alt Labels", "Examples", "Hierarchy"]
     assert rows[1][0] == "DUI Defense"
-    assert rows[1][1] == "Criminal Law"
-    assert rows[1][2] == "RCriminalLaw"
+    assert rows[1][1] == "Criminal Law"  # ancestry
+    assert rows[1][2] == "Criminal Law"  # concept label
+    assert rows[1][3] == "RCriminalLaw"
 
 
 def test_csv_includes_language_columns():
@@ -133,7 +134,8 @@ def test_csv_empty_selections():
     rows = list(reader)
     assert len(rows) == 2  # header + 1 row
     assert rows[1][0] == "DUI Defense"
-    assert rows[1][1] == ""  # empty label
+    assert rows[1][1] == "Criminal Law"  # ancestry
+    assert rows[1][2] == ""  # empty label
 
 
 # --- Excel tests ---
@@ -146,9 +148,11 @@ def test_excel_produces_valid_workbook():
     ws = wb.active
     assert ws.title == "FOLIO Mappings"
     assert ws.cell(1, 1).value == "Source"
+    assert ws.cell(1, 2).value == "Ancestry"
     assert ws.cell(1, 1).font.bold is True
     assert ws.cell(2, 1).value == "DUI Defense"
-    assert ws.cell(2, 2).value == "Criminal Law"
+    assert ws.cell(2, 2).value == "Criminal Law"  # ancestry
+    assert ws.cell(2, 3).value == "Criminal Law"  # concept label
 
 
 # --- JSON tests ---
@@ -223,8 +227,8 @@ def test_markdown_generates_table():
     data = generate_markdown(req)
     text = data.decode("utf-8")
     assert "# FOLIO Mapping Results" in text
-    assert "| Source | Label | IRI | Branch | Confidence | Notes |" in text
-    assert "| DUI Defense | Criminal Law |" in text
+    assert "| Source | Ancestry | Label | IRI | Branch | Confidence | Notes |" in text
+    assert "| DUI Defense | Criminal Law | Criminal Law |" in text
 
 
 # --- HTML tests ---
@@ -694,6 +698,7 @@ def test_csv_metadata_columns_mapped_only():
     reader = csv.reader(io.StringIO(text))
     rows = list(reader)
     headers = rows[0]
+    assert "Ancestry" in headers
     assert "Definition" in headers
     assert "Alt Labels" in headers
     assert "Examples" in headers
@@ -860,3 +865,32 @@ def test_excel_metadata_columns():
     assert "Alt Labels" in headers
     assert "Examples" in headers
     assert "Hierarchy" in headers
+
+
+# --- Ancestry column tests ---
+
+
+def test_csv_includes_ancestry_column():
+    """CSV includes Ancestry column with joined ancestry path."""
+    row = _make_row(ancestry=["Criminal Law", "DUI"])
+    req = _make_request(rows=[row])
+    data = generate_csv(req)
+    text = data.decode("utf-8-sig")
+    reader = csv.reader(io.StringIO(text))
+    rows = list(reader)
+    assert "Ancestry" in rows[0]
+    ancestry_idx = rows[0].index("Ancestry")
+    assert rows[1][ancestry_idx] == "Criminal Law > DUI"
+
+
+def test_excel_includes_ancestry_column():
+    """Excel includes Ancestry column."""
+    row = _make_row(ancestry=["Criminal Law", "DUI"])
+    req = _make_request(rows=[row])
+    data = generate_excel(req)
+    wb = load_workbook(io.BytesIO(data))
+    ws = wb.active
+    headers = [ws.cell(1, i + 1).value for i in range(ws.max_column)]
+    assert "Ancestry" in headers
+    ancestry_idx = headers.index("Ancestry") + 1
+    assert ws.cell(2, ancestry_idx).value == "Criminal Law > DUI"

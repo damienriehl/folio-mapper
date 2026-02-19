@@ -74,11 +74,19 @@ export interface ExportConcept {
   relationship?: string | null;
 }
 
+export interface InputHierarchyNode {
+  label: string;
+  depth: number;
+  item_index: number | null;
+  children: InputHierarchyNode[];
+}
+
 export interface ExportRequest {
   rows: ExportRow[];
   options: ExportOptions;
   source_file: string | null;
   session_created: string | null;
+  input_hierarchy?: InputHierarchyNode[] | null;
 }
 
 export interface ExportPreviewRow {
