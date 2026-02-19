@@ -18,6 +18,7 @@ interface MappingToolbarProps {
   onStatusFilterChange: (filter: StatusFilter) => void;
   onShowShortcuts: () => void;
   onMappings?: () => void;
+  onExport?: () => void;
   loadedItemCount?: number;
   isBatchLoading?: boolean;
 }
@@ -40,6 +41,7 @@ export function MappingToolbar({
   onStatusFilterChange,
   onShowShortcuts,
   onMappings,
+  onExport,
   loadedItemCount,
   isBatchLoading,
 }: MappingToolbarProps) {
@@ -135,6 +137,20 @@ export function MappingToolbar({
               className="rounded border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
             >
               Mappings
+            </button>
+          )}
+          {onExport && (
+            <button
+              type="button"
+              onClick={onExport}
+              className="flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+              title="Export (Ctrl+E)"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v10m0 0l3-3m-3 3l-3-3" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+              </svg>
+              Export
             </button>
           )}
           {/* Accept All button — hidden but functionality preserved via onAcceptAll prop + Shift+A shortcut.

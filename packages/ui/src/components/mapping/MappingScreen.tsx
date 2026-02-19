@@ -325,6 +325,7 @@ export function MappingScreen({
         onStatusFilterChange={onStatusFilterChange}
         onShowShortcuts={onShowShortcuts}
         onMappings={onMappings}
+        onExport={onExport}
         loadedItemCount={loadedItemCount}
         isBatchLoading={isBatchLoading}
       />
