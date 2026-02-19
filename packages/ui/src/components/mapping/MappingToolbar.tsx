@@ -55,9 +55,6 @@ export function MappingToolbar({
     <div className="border-b border-gray-200 bg-white px-4 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-900">
-            {currentIndex + 1} of {totalItems}
-          </span>
           {isBatchLoading && loadedItemCount != null && (
             <span className="flex items-center gap-1.5 text-xs text-blue-600">
               <span className="inline-block h-3 w-3 animate-spin rounded-full border border-blue-300 border-t-blue-600" />
@@ -177,6 +174,9 @@ export function MappingToolbar({
 
       {/* Progress bar */}
       <div className="mt-2 flex items-center gap-2">
+        <span className="shrink-0 text-xs font-semibold text-blue-600">
+          {currentIndex + 1} of {totalItems}
+        </span>
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
           <div
             className="h-full rounded-full bg-blue-600 transition-all"
