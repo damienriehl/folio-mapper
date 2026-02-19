@@ -65,6 +65,8 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart,
             Save
           </button>
         )}
+        {/* Export button moved to MappingToolbar (amber style, next to Mappings).
+           Ctrl+E shortcut still works. Uncomment to restore header Export:
         {hasActiveSession && onOpenExport && (
           <button
             onClick={onOpenExport}
@@ -73,22 +75,13 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart,
             aria-label="Export"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v10m0 0l3-3m-3 3l-3-3"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v10m0 0l3-3m-3 3l-3-3" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
             </svg>
             Export
           </button>
         )}
+        */}
         {hasActiveSession && onNewProject && (
           <button
             onClick={onNewProject}
