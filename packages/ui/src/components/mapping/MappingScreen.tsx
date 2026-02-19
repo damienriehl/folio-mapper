@@ -192,7 +192,8 @@ export function MappingScreen({
       (b) => branchStates[b.name] === 'mandatory' && !presentBranches.has(b.name),
     );
     if (missingMandatory.length === 0) return sortedBranchGroups;
-    return [
+    // Append missing mandatory placeholders, then re-sort so they appear in proper order
+    const combined = [
       ...sortedBranchGroups,
       ...missingMandatory.map((b) => ({
         branch: b.name,
@@ -200,6 +201,7 @@ export function MappingScreen({
         candidates: [],
       })),
     ];
+    return sortBranchGroups(combined, branchSortMode, customBranchOrder);
   })();
 
   // Compute effective threshold from Top N (scoped to search results when filter is active)
