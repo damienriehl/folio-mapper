@@ -1,5 +1,6 @@
 import type { ParseItem } from '../input/types';
 import type { PipelineResponse } from './types';
+import { buildAuthHeaders } from '../auth';
 
 const BASE_URL = '/api/pipeline';
 
@@ -18,12 +19,11 @@ export async function fetchPipelineCandidates(
 ): Promise<PipelineResponse> {
   const res = await fetch(`${BASE_URL}/map`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildAuthHeaders(llmConfig.api_key),
     body: JSON.stringify({
       items,
       llm_config: {
         provider: llmConfig.provider,
-        api_key: llmConfig.api_key,
         base_url: llmConfig.base_url,
         model: llmConfig.model,
       },

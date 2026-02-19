@@ -22,7 +22,6 @@ async def client():
 
 def _make_request_body(**overrides):
     base = {
-        "pat": "ghp_testtoken123",
         "owner": "alea-institute",
         "repo": "FOLIO",
         "title": "[Concept Requests] Test batch",
@@ -30,6 +29,10 @@ def _make_request_body(**overrides):
     }
     base.update(overrides)
     return base
+
+
+def _make_headers(pat: str = "ghp_testtoken123"):
+    return {"X-GitHub-Pat": pat}
 
 
 @pytest.mark.anyio
@@ -48,7 +51,11 @@ async def test_submit_issue_success(client: AsyncClient):
     mock_client_instance.__aexit__ = AsyncMock(return_value=False)
 
     with patch("app.routers.github.httpx.AsyncClient", return_value=mock_client_instance):
-        resp = await client.post("/api/github/submit-issue", json=_make_request_body())
+        resp = await client.post(
+            "/api/github/submit-issue",
+            json=_make_request_body(),
+            headers=_make_headers(),
+        )
 
     assert resp.status_code == 200
     data = resp.json()
@@ -74,37 +81,48 @@ async def test_submit_issue_invalid_token(client: AsyncClient):
     mock_client_instance.__aexit__ = AsyncMock(return_value=False)
 
     with patch("app.routers.github.httpx.AsyncClient", return_value=mock_client_instance):
-        resp = await client.post("/api/github/submit-issue", json=_make_request_body())
+        resp = await client.post(
+            "/api/github/submit-issue",
+            json=_make_request_body(),
+            headers=_make_headers(),
+        )
 
     assert resp.status_code == 401
     assert "Bad credentials" in resp.json()["detail"]
 
 
 @pytest.mark.anyio
-async def test_submit_issue_repo_not_found(client: AsyncClient):
-    """Non-existent repo returns 404."""
-    mock_response = MagicMock()
-    mock_response.status_code = 404
-    mock_response.json.return_value = {"message": "Not Found"}
+async def test_submit_issue_repo_not_allowed(client: AsyncClient):
+    """Non-allowlisted repo returns 403."""
+    resp = await client.post(
+        "/api/github/submit-issue",
+        json=_make_request_body(owner="nonexistent", repo="nope"),
+        headers=_make_headers(),
+    )
 
-    mock_client_instance = AsyncMock()
-    mock_client_instance.post.return_value = mock_response
-    mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-    mock_client_instance.__aexit__ = AsyncMock(return_value=False)
+    assert resp.status_code == 403
+    assert "not in the allowed list" in resp.json()["detail"]
 
-    with patch("app.routers.github.httpx.AsyncClient", return_value=mock_client_instance):
-        resp = await client.post(
-            "/api/github/submit-issue",
-            json=_make_request_body(owner="nonexistent", repo="nope"),
-        )
 
-    assert resp.status_code == 404
+@pytest.mark.anyio
+async def test_submit_issue_missing_pat_returns_401(client: AsyncClient):
+    """Missing PAT header returns 401."""
+    resp = await client.post(
+        "/api/github/submit-issue",
+        json=_make_request_body(),
+    )
+    assert resp.status_code == 401
+    assert "PAT required" in resp.json()["detail"]
 
 
 @pytest.mark.anyio
 async def test_submit_issue_missing_fields(client: AsyncClient):
     """Missing required fields returns 422."""
-    resp = await client.post("/api/github/submit-issue", json={"pat": "ghp_test"})
+    resp = await client.post(
+        "/api/github/submit-issue",
+        json={},
+        headers=_make_headers(),
+    )
     assert resp.status_code == 422
 
 
@@ -126,7 +144,11 @@ async def test_submit_issue_sends_correct_payload(client: AsyncClient):
     body = _make_request_body(title="My Title", body="My Body")
 
     with patch("app.routers.github.httpx.AsyncClient", return_value=mock_client_instance):
-        await client.post("/api/github/submit-issue", json=body)
+        await client.post(
+            "/api/github/submit-issue",
+            json=body,
+            headers=_make_headers(),
+        )
 
     call_args = mock_client_instance.post.call_args
     payload = call_args[1]["json"]
@@ -147,7 +169,11 @@ async def test_submit_issue_github_api_error_non_json(client: AsyncClient):
     mock_client_instance.__aexit__ = AsyncMock(return_value=False)
 
     with patch("app.routers.github.httpx.AsyncClient", return_value=mock_client_instance):
-        resp = await client.post("/api/github/submit-issue", json=_make_request_body())
+        resp = await client.post(
+            "/api/github/submit-issue",
+            json=_make_request_body(),
+            headers=_make_headers(),
+        )
 
     assert resp.status_code == 500
     assert "GitHub API error" in resp.json()["detail"]

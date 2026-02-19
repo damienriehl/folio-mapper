@@ -107,7 +107,8 @@ def _find_underrepresented_branches(
 
 
 async def _llm_suggest_labels(
-    item_text: str, branch_name: str, llm_config: LLMConfig
+    item_text: str, branch_name: str, llm_config: LLMConfig,
+    api_key: str | None = None,
 ) -> list[str]:
     """Ask LLM to suggest concept labels for a branch."""
     try:
@@ -115,7 +116,7 @@ async def _llm_suggest_labels(
 
         provider = get_provider(
             llm_config.provider,
-            api_key=llm_config.api_key,
+            api_key=api_key,
             base_url=llm_config.base_url,
             model=llm_config.model,
         )
@@ -137,6 +138,7 @@ async def run_stage1b(
     prescan: PreScanResult,
     stage1_candidates: list[ScopedCandidate],
     llm_config: LLMConfig,
+    api_key: str | None = None,
 ) -> list[ScopedCandidate]:
     """Run Stage 1.5: LLM-assisted candidate expansion.
 
@@ -174,7 +176,7 @@ async def run_stage1b(
             continue
 
         # Ask LLM for concept labels
-        suggested_labels = await _llm_suggest_labels(item_text, branch_name, llm_config)
+        suggested_labels = await _llm_suggest_labels(item_text, branch_name, llm_config, api_key=api_key)
         if not suggested_labels:
             logger.info("Stage 1.5: No LLM suggestions for branch '%s'", branch_name)
             continue

@@ -92,10 +92,10 @@ def test_get_provider_meta_llama():
 def test_get_provider_custom_url():
     provider = get_provider(
         LLMProviderType.CUSTOM,
-        base_url="http://my-server:9999/v1",
+        base_url="http://localhost:9999/v1",
     )
     assert isinstance(provider, OpenAICompatProvider)
-    assert provider.base_url == "http://my-server:9999/v1"
+    assert provider.base_url == "http://localhost:9999/v1"
 
 
 def test_get_provider_respects_model():
@@ -140,7 +140,8 @@ async def test_test_connection_success(mock_get_provider, client: AsyncClient):
 
     resp = await client.post(
         "/api/llm/test-connection",
-        json={"provider": "openai", "api_key": "sk-test", "model": "gpt-4o"},
+        json={"provider": "openai", "model": "gpt-4o"},
+        headers={"Authorization": "Bearer sk-test"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -157,12 +158,14 @@ async def test_test_connection_failure(mock_get_provider, client: AsyncClient):
 
     resp = await client.post(
         "/api/llm/test-connection",
-        json={"provider": "openai", "api_key": "bad-key"},
+        json={"provider": "openai"},
+        headers={"Authorization": "Bearer bad-key"},
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is False
-    assert "Invalid API key" in data["message"]
+    # Error message should be generic (not leak exception details)
+    assert data["message"] == "Connection test failed"
 
 
 @pytest.mark.anyio
@@ -174,7 +177,8 @@ async def test_list_models(mock_get_provider, client: AsyncClient):
 
     resp = await client.post(
         "/api/llm/models",
-        json={"provider": "openai", "api_key": "sk-test"},
+        json={"provider": "openai"},
+        headers={"Authorization": "Bearer sk-test"},
     )
     assert resp.status_code == 200
     data = resp.json()

@@ -24,7 +24,6 @@ def anyio_backend():
 def llm_config():
     return LLMConfig(
         provider=LLMProviderType.OPENAI,
-        api_key="test-key",
         base_url="https://api.openai.com/v1",
         model="gpt-4o",
     )

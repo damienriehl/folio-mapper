@@ -1,4 +1,6 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.rate_limit import limiter
 
 from app.models.mapping_models import (
     BranchInfo,
@@ -12,6 +14,7 @@ from app.models.pipeline_models import (
     MandatoryFallbackRequest,
     MandatoryFallbackResponse,
 )
+from app.services.auth import extract_api_key
 from app.services.folio_service import (
     get_all_branches,
     get_folio_status,
@@ -26,7 +29,8 @@ router = APIRouter(prefix="/api/mapping", tags=["mapping"])
 
 
 @router.post("/candidates", response_model=MappingResponse)
-async def get_candidates(body: CandidateRequest) -> MappingResponse:
+@limiter.limit("60/minute")
+async def get_candidates(request: Request, body: CandidateRequest) -> MappingResponse:
     """Search FOLIO for candidate mappings for all items."""
     item_results = search_all_items(
         items=body.items,
@@ -79,12 +83,18 @@ async def get_concept_detail(iri_hash: str) -> ConceptDetail:
 
 
 @router.post("/mandatory-fallback", response_model=MandatoryFallbackResponse)
-async def mandatory_fallback(body: MandatoryFallbackRequest) -> MandatoryFallbackResponse:
+@limiter.limit("20/minute")
+async def mandatory_fallback(
+    body: MandatoryFallbackRequest,
+    request: Request,
+    api_key: str | None = Depends(extract_api_key),
+) -> MandatoryFallbackResponse:
     """Find candidates for mandatory branches with no existing results."""
     fallback_results = await run_mandatory_fallback(
         item_text=body.item_text,
         branches=body.branches,
         llm_config=body.llm_config,
+        api_key=api_key,
     )
     return MandatoryFallbackResponse(
         item_index=body.item_index,

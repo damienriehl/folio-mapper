@@ -49,7 +49,6 @@ async def client():
 def llm_config():
     return LLMConfig(
         provider=LLMProviderType.OPENAI,
-        api_key="test-key",
         base_url="https://api.openai.com/v1",
         model="gpt-4o",
     )
@@ -794,13 +793,13 @@ async def test_pipeline_endpoint(mock_run, client: AsyncClient):
             "items": [{"text": "Agency investigation", "index": 0, "ancestry": []}],
             "llm_config": {
                 "provider": "openai",
-                "api_key": "test-key",
                 "base_url": "https://api.openai.com/v1",
                 "model": "gpt-4o",
             },
             "threshold": 0.3,
             "max_per_branch": 10,
         },
+        headers={"Authorization": "Bearer test-key"},
     )
     assert resp.status_code == 200
     data = resp.json()

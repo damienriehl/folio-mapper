@@ -66,7 +66,8 @@ def _parse_llm_suggestions(text: str) -> list[str]:
 
 
 async def _llm_suggest_labels(
-    item_text: str, branch_name: str, llm_config: LLMConfig
+    item_text: str, branch_name: str, llm_config: LLMConfig,
+    api_key: str | None = None,
 ) -> list[str]:
     """Ask LLM to suggest concept labels for a branch."""
     try:
@@ -74,7 +75,7 @@ async def _llm_suggest_labels(
 
         provider = get_provider(
             llm_config.provider,
-            api_key=llm_config.api_key,
+            api_key=api_key,
             base_url=llm_config.base_url,
             model=llm_config.model,
         )
@@ -112,6 +113,7 @@ async def run_mandatory_fallback(
     item_text: str,
     branches: list[str],
     llm_config: LLMConfig | None = None,
+    api_key: str | None = None,
 ) -> list[BranchFallbackResult]:
     """Run mandatory fallback for the given branches.
 
@@ -143,7 +145,7 @@ async def run_mandatory_fallback(
 
         # Step 2: LLM fallback if needed
         if len(seen) < _MAX_PER_BRANCH and llm_config is not None:
-            suggested_labels = await _llm_suggest_labels(item_text, branch_name, llm_config)
+            suggested_labels = await _llm_suggest_labels(item_text, branch_name, llm_config, api_key=api_key)
             for label in suggested_labels:
                 llm_results = _search_within_branch(folio, label, branch_hashes, threshold=0.1)
                 for iri_hash, owl_class, score in llm_results:

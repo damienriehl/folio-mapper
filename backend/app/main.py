@@ -1,29 +1,70 @@
+import json
 import os
+import sys
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from app.middleware.auth import LocalAuthMiddleware
+from app.rate_limit import limiter
 from app.routers.export import router as export_router
 from app.routers.github import router as github_router
 from app.routers.llm import router as llm_router
 from app.routers.mapping import router as mapping_router
 from app.routers.parse import router as parse_router
 from app.routers.pipeline import router as pipeline_router
+from app.services.local_auth import get_or_create_token
 
-app = FastAPI(title="FOLIO Mapper API", version="0.1.0")
 
-cors_origins = ["http://localhost:5173"]
-extra_origin = os.environ.get("FOLIO_MAPPER_ORIGIN")
-if extra_origin:
-    cors_origins.append(extra_origin)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Emit local auth token to stdout for the Electron shell to capture."""
+    token = get_or_create_token()
+    if token:
+        print(json.dumps({"local_token": token}), file=sys.stdout, flush=True)
+    yield
+
+
+app = FastAPI(title="FOLIO Mapper API", version="0.1.0", lifespan=lifespan)
+
+# --- Rate limiting (Finding 9) ---
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# --- CORS (Finding 5) ---
+cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+cors_origins = [o.strip() for o in cors_origins if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Local-Token", "X-GitHub-Pat"],
 )
+
+
+# --- Security headers middleware ---
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# --- Local auth middleware (Finding 4) ---
+app.add_middleware(LocalAuthMiddleware)
 
 app.include_router(parse_router)
 app.include_router(mapping_router)

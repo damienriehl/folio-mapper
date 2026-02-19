@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import html as html_mod
 import io
 import json
 from datetime import datetime, timezone
@@ -491,6 +492,6 @@ function toggleView(view) {
 
 
 def _html_escape(s: str) -> str:
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    return html_mod.escape(s, quote=True)
 
 

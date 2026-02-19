@@ -105,6 +105,7 @@ async def _process_item(
     threshold: float,
     max_per_branch: int,
     sem: asyncio.Semaphore,
+    api_key: str | None = None,
 ) -> tuple[ItemMappingResult, PipelineItemMetadata]:
     """Process a single item through the full pipeline (Stages 0→1→1.5→2→3)."""
     async with sem:
@@ -127,7 +128,7 @@ async def _process_item(
         print(f"[item {item.index}] STAGE 1: {len(stage1_candidates)} candidates")
 
         # Stage 1.5: LLM-assisted candidate expansion
-        stage1b_new = await run_stage1b(item.text, prescan, stage1_candidates, llm_config)
+        stage1b_new = await run_stage1b(item.text, prescan, stage1_candidates, llm_config, api_key=api_key)
         stage1b_branches = list({c.branch for c in stage1b_new}) if stage1b_new else []
         if stage1b_new:
             stage1_candidates = stage1_candidates + stage1b_new
@@ -152,7 +153,7 @@ async def _process_item(
 
         # Stage 3: Judge validation — only send top N to reduce output size
         ranked_for_judge = ranked[:_MAX_JUDGE_CANDIDATES]
-        judged = await run_stage3(item.text, prescan, ranked_for_judge, scoped_lookup, llm_config)
+        judged = await run_stage3(item.text, prescan, ranked_for_judge, scoped_lookup, llm_config, api_key=api_key)
 
         # Also pass through any ranked candidates beyond top N (unjudged)
         judged_hashes = {j.iri_hash for j in judged}
@@ -202,6 +203,7 @@ async def run_pipeline(
     llm_config: LLMConfig,
     threshold: float = 0.3,
     max_per_branch: int = 10,
+    api_key: str | None = None,
 ) -> PipelineResponse:
     """Run the full mapping pipeline (Stages 0→1→2→3) for all items.
 
@@ -220,7 +222,7 @@ async def run_pipeline(
     sem = asyncio.Semaphore(_CONCURRENCY_LIMIT)
 
     tasks = [
-        _process_item(item, llm_config, folio, threshold, max_per_branch, sem)
+        _process_item(item, llm_config, folio, threshold, max_per_branch, sem, api_key=api_key)
         for item in items
     ]
     results = await asyncio.gather(*tasks)

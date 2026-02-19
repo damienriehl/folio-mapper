@@ -9,9 +9,15 @@ const STARTUP_TIMEOUT_MS = 60_000; // 60s for first-run FOLIO ontology download
 export class BackendManager {
   private process: ChildProcess | null = null;
   private port: number;
+  private _localToken: string | null = null;
 
   constructor(port: number) {
     this.port = port;
+  }
+
+  /** The local auth token emitted by the backend on startup. */
+  get localToken(): string | null {
+    return this._localToken;
   }
 
   start(resourcesPath: string): void {
@@ -29,7 +35,19 @@ export class BackendManager {
     });
 
     this.process.stdout?.on("data", (data: Buffer) => {
-      log.info(`[backend] ${data.toString().trimEnd()}`);
+      const text = data.toString().trimEnd();
+      log.info(`[backend] ${text}`);
+
+      // Parse local auth token from backend stdout
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.local_token) {
+          this._localToken = parsed.local_token;
+          log.info("[backend] Captured local auth token");
+        }
+      } catch {
+        // Not JSON — normal log output
+      }
     });
 
     this.process.stderr?.on("data", (data: Buffer) => {

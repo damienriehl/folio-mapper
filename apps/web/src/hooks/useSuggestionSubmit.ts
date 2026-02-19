@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { generateIssueTitle, generateIssueBody } from '@folio-mapper/core';
+import { generateIssueTitle, generateIssueBody, buildGitHubHeaders } from '@folio-mapper/core';
 import type { SubmissionMetadata } from '@folio-mapper/core';
 import { useMappingStore } from '../store/mapping-store';
 import { useLLMStore } from '../store/llm-store';
@@ -66,9 +66,8 @@ export function useSuggestionSubmit() {
     try {
       const response = await fetch('/api/github/submit-issue', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildGitHubHeaders(pat),
         body: JSON.stringify({
-          pat,
           owner: ALEA_REPO_OWNER,
           repo: ALEA_REPO_NAME,
           title,

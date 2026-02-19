@@ -87,6 +87,7 @@ async def run_stage2(
     prescan: PreScanResult,
     candidates: list[ScopedCandidate],
     llm_config: LLMConfig,
+    api_key: str | None = None,
 ) -> list[RankedCandidate]:
     """Run Stage 2: LLM-based candidate ranking.
 
@@ -95,6 +96,7 @@ async def run_stage2(
         prescan: Stage 0 output with segments and branch tags.
         candidates: Stage 1 output — scoped candidates.
         llm_config: LLM provider configuration.
+        api_key: API key from Authorization header.
 
     Returns:
         List of RankedCandidate sorted by score descending.
@@ -107,7 +109,7 @@ async def run_stage2(
 
     provider = get_provider(
         provider_type=llm_config.provider,
-        api_key=llm_config.api_key,
+        api_key=api_key,
         base_url=llm_config.base_url,
         model=llm_config.model,
     )

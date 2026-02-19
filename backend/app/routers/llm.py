@@ -1,6 +1,8 @@
 """LLM provider API endpoints."""
 
-from fastapi import APIRouter
+import logging
+
+from fastapi import APIRouter, Depends, Request
 
 from app.models.llm_models import (
     ConnectionTestRequest,
@@ -8,18 +10,27 @@ from app.models.llm_models import (
     ModelInfo,
     ModelListRequest,
 )
+from app.rate_limit import limiter
+from app.services.auth import extract_api_key
 from app.services.llm.registry import KNOWN_MODELS, get_provider
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
 
 
 @router.post("/test-connection", response_model=ConnectionTestResponse)
-async def test_connection(req: ConnectionTestRequest) -> ConnectionTestResponse:
+@limiter.limit("20/minute")
+async def test_connection(
+    req: ConnectionTestRequest,
+    request: Request,
+    api_key: str | None = Depends(extract_api_key),
+) -> ConnectionTestResponse:
     """Test connectivity and credentials for a given LLM provider."""
     try:
         provider = get_provider(
             provider_type=req.provider,
-            api_key=req.api_key,
+            api_key=api_key,
             base_url=req.base_url,
             model=req.model,
         )
@@ -30,9 +41,10 @@ async def test_connection(req: ConnectionTestRequest) -> ConnectionTestResponse:
             model=req.model,
         )
     except Exception as exc:
+        logger.exception("Connection test failed for provider %s", req.provider)
         return ConnectionTestResponse(
             success=False,
-            message=str(exc),
+            message="Connection test failed",
         )
 
 
@@ -43,11 +55,16 @@ async def known_models() -> dict[str, list[ModelInfo]]:
 
 
 @router.post("/models", response_model=list[ModelInfo])
-async def list_models(req: ModelListRequest) -> list[ModelInfo]:
+@limiter.limit("20/minute")
+async def list_models(
+    req: ModelListRequest,
+    request: Request,
+    api_key: str | None = Depends(extract_api_key),
+) -> list[ModelInfo]:
     """List available models for a given provider."""
     provider = get_provider(
         provider_type=req.provider,
-        api_key=req.api_key,
+        api_key=api_key,
         base_url=req.base_url,
     )
     return await provider.list_models()

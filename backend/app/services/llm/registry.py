@@ -7,6 +7,7 @@ from app.services.llm.cohere_provider import CohereProvider
 from app.services.llm.github_models_provider import GitHubModelsProvider
 from app.services.llm.google_provider import GoogleProvider
 from app.services.llm.openai_compat import OpenAICompatProvider
+from app.services.llm.url_validator import validate_base_url
 
 # Default base URLs per provider
 DEFAULT_BASE_URLS: dict[LLMProviderType, str] = {
@@ -165,6 +166,9 @@ def get_provider(
 ) -> BaseLLMProvider:
     """Create a provider instance from the given configuration."""
     resolved_url = base_url or DEFAULT_BASE_URLS[provider_type]
+
+    # SSRF protection: validate URL before creating provider
+    validate_base_url(resolved_url, provider_type)
 
     if provider_type == LLMProviderType.GITHUB_MODELS:
         return GitHubModelsProvider(api_key=api_key, base_url=resolved_url, model=model)

@@ -94,12 +94,15 @@ def _fallback_result(text: str) -> PreScanResult:
     )
 
 
-async def run_stage0(text: str, llm_config: LLMConfig) -> PreScanResult:
+async def run_stage0(
+    text: str, llm_config: LLMConfig, api_key: str | None = None,
+) -> PreScanResult:
     """Run Stage 0: LLM-based branch pre-scan.
 
     Args:
         text: The input text to segment and tag.
         llm_config: LLM provider configuration.
+        api_key: API key from Authorization header.
 
     Returns:
         PreScanResult with segments and branch tags.
@@ -108,7 +111,7 @@ async def run_stage0(text: str, llm_config: LLMConfig) -> PreScanResult:
 
     provider = get_provider(
         provider_type=llm_config.provider,
-        api_key=llm_config.api_key,
+        api_key=api_key,
         base_url=llm_config.base_url,
         model=llm_config.model,
     )

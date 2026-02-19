@@ -15,6 +15,8 @@ from app.services.hierarchy_detector import (
 
 ALLOWED_EXTENSIONS = {".xlsx", ".csv", ".tsv", ".txt", ".md"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_ROWS = 50_000
+MAX_COLUMNS = 50
 
 
 def _detect_headers(rows: list[list[str]]) -> tuple[list[str] | None, list[list[str]]]:
@@ -85,13 +87,26 @@ def _parse_tabular(
     )
 
 
+def _validate_dimensions(rows: list[list[str]]) -> None:
+    """Enforce row and column limits."""
+    if len(rows) > MAX_ROWS:
+        raise ValueError(f"File has too many rows ({len(rows):,}). Maximum is {MAX_ROWS:,}.")
+    for i, row in enumerate(rows):
+        if len(row) > MAX_COLUMNS:
+            raise ValueError(
+                f"Row {i + 1} has too many columns ({len(row)}). Maximum is {MAX_COLUMNS}."
+            )
+
+
 def _read_csv(content: bytes, delimiter: str = ",") -> list[list[str]]:
     """Read CSV/TSV content with encoding fallback."""
     for encoding in ("utf-8-sig", "latin-1"):
         try:
             text = content.decode(encoding)
             reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-            return [row for row in reader]
+            rows = [row for row in reader]
+            _validate_dimensions(rows)
+            return rows
         except UnicodeDecodeError:
             continue
     raise ValueError("Unable to decode file with supported encodings")
@@ -107,6 +122,7 @@ def _read_excel(content: bytes) -> list[list[str]]:
     for row in ws.iter_rows(values_only=True):
         rows.append([str(cell) if cell is not None else "" for cell in row])
     wb.close()
+    _validate_dimensions(rows)
     return rows
 
 

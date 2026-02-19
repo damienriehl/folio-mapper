@@ -1,4 +1,5 @@
 import type { ConnectionTestResponse, LLMProviderType, ModelInfo } from './types';
+import { buildAuthHeaders } from '../auth';
 
 const BASE_URL = '/api/llm';
 
@@ -10,10 +11,9 @@ export async function testConnection(
 ): Promise<ConnectionTestResponse> {
   const res = await fetch(`${BASE_URL}/test-connection`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildAuthHeaders(apiKey),
     body: JSON.stringify({
       provider,
-      api_key: apiKey || null,
       base_url: baseUrl || null,
       model: model || null,
     }),
@@ -42,10 +42,9 @@ export async function fetchModels(
 ): Promise<ModelInfo[]> {
   const res = await fetch(`${BASE_URL}/models`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildAuthHeaders(apiKey),
     body: JSON.stringify({
       provider,
-      api_key: apiKey || null,
       base_url: baseUrl || null,
     }),
   });

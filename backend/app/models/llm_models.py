@@ -23,7 +23,6 @@ class LLMProviderType(str, Enum):
 
 class ConnectionTestRequest(BaseModel):
     provider: LLMProviderType
-    api_key: str | None = None
     base_url: str | None = None
     model: str | None = None
 
@@ -36,7 +35,6 @@ class ConnectionTestResponse(BaseModel):
 
 class ModelListRequest(BaseModel):
     provider: LLMProviderType
-    api_key: str | None = None
     base_url: str | None = None
 
 
@@ -48,6 +46,5 @@ class ModelInfo(BaseModel):
 
 class LLMConfig(BaseModel):
     provider: LLMProviderType
-    api_key: str | None = None
     base_url: str | None = None
     model: str | None = None

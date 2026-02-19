@@ -117,6 +117,7 @@ async def run_stage3(
     ranked: list[RankedCandidate],
     scoped_lookup: dict[str, ScopedCandidate],
     llm_config: LLMConfig,
+    api_key: str | None = None,
 ) -> list[JudgedCandidate]:
     """Run Stage 3: Judge validation.
 
@@ -129,6 +130,7 @@ async def run_stage3(
         ranked: Stage 2 output — ranked candidates.
         scoped_lookup: Stage 1 candidates by iri_hash for definitions/context.
         llm_config: LLM provider configuration.
+        api_key: API key from Authorization header.
 
     Returns:
         List of JudgedCandidate sorted by adjusted_score descending.
@@ -141,7 +143,7 @@ async def run_stage3(
 
     provider = get_provider(
         provider_type=llm_config.provider,
-        api_key=llm_config.api_key,
+        api_key=api_key,
         base_url=llm_config.base_url,
         model=llm_config.model,
     )

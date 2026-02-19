@@ -37,7 +37,6 @@ async def client():
 def llm_config():
     return LLMConfig(
         provider=LLMProviderType.OPENAI,
-        api_key="test-key",
         base_url="https://api.openai.com/v1",
         model="gpt-4o",
     )
@@ -65,7 +64,6 @@ def test_mandatory_fallback_request_with_llm():
         branches=["Area of Law"],
         llm_config=LLMConfig(
             provider=LLMProviderType.OPENAI,
-            api_key="key",
             model="gpt-4o",
         ),
     )
@@ -189,7 +187,6 @@ async def test_run_mandatory_fallback_with_llm():
 
     llm_config = LLMConfig(
         provider=LLMProviderType.OPENAI,
-        api_key="test-key",
         model="gpt-4o",
     )
 
@@ -314,10 +311,10 @@ async def test_mandatory_fallback_endpoint_with_llm(client: AsyncClient):
                 "branches": ["Area of Law"],
                 "llm_config": {
                     "provider": "openai",
-                    "api_key": "test-key",
                     "model": "gpt-4o",
                 },
             },
+            headers={"Authorization": "Bearer test-key"},
         )
 
     assert resp.status_code == 200

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("desktop", {
   isDesktop: true,
+  getLocalToken: () => ipcRenderer.invoke("auth:get-local-token"),
   llamafile: {
     getStatus: () => ipcRenderer.invoke("llamafile:get-status"),
     getPort: () => ipcRenderer.invoke("llamafile:get-port"),

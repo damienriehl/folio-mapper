@@ -63,6 +63,17 @@ export const useLLMStore = create<LLMState>()(
     }),
     {
       name: 'folio-mapper-llm',
+      // Strip API keys from persistence — keys are session-only (memory)
+      partialize: (state) => ({
+        activeProvider: state.activeProvider,
+        configs: Object.fromEntries(
+          Object.entries(state.configs).map(([key, config]) => [
+            key,
+            { ...config, apiKey: '', connectionStatus: 'untested' as const },
+          ]),
+        ),
+        modelsByProvider: state.modelsByProvider,
+      }),
       merge: (persisted, current) => {
         const p = persisted as Partial<LLMState> | undefined;
         return {

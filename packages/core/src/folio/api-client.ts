@@ -1,6 +1,7 @@
 import type { ParseItem } from '../input/types';
 import type { BranchInfo, ConceptDetail, FolioCandidate, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
 import type { PipelineRequestConfig } from '../pipeline/api-client';
+import { buildAuthHeaders } from '../auth';
 
 const BASE_URL = '/api/mapping';
 
@@ -87,7 +88,7 @@ export async function fetchMandatoryFallback(
 ): Promise<MandatoryFallbackResponse> {
   const res = await fetch(`${BASE_URL}/mandatory-fallback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildAuthHeaders(llmConfig?.api_key),
     body: JSON.stringify({
       item_text: itemText,
       item_index: itemIndex,
@@ -95,7 +96,6 @@ export async function fetchMandatoryFallback(
       llm_config: llmConfig
         ? {
             provider: llmConfig.provider,
-            api_key: llmConfig.api_key,
             base_url: llmConfig.base_url,
             model: llmConfig.model,
           }

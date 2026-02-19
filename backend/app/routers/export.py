@@ -1,5 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import Response
+
+from app.rate_limit import limiter
 
 from app.models.export_models import ExportPreviewRow, ExportRequest, TranslationRequest
 from app.services.branch_config import get_branch_color
@@ -34,7 +36,8 @@ FORMAT_GENERATORS = {
 
 
 @router.post("/generate")
-async def export_generate(body: ExportRequest) -> Response:
+@limiter.limit("60/minute")
+async def export_generate(request: Request, body: ExportRequest) -> Response:
     fmt = body.options.format
     if fmt not in FORMAT_GENERATORS:
         return Response(
