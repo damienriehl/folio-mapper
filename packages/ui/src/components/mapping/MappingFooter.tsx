@@ -44,6 +44,8 @@ export function MappingFooter({
             {suggestionCount} suggestion{suggestionCount !== 1 ? 's' : ''}
           </span>
         )}
+        {/* Export button moved to MappingToolbar (amber style). Ctrl+E shortcut still works.
+           Uncomment to restore footer Export:
         {onExport && (
           <button
             onClick={onExport}
@@ -53,6 +55,7 @@ export function MappingFooter({
             Export
           </button>
         )}
+        */}
         <span className="text-xs text-gray-500">
           Branches: {enabledBranchCount}/{branchCount}
         </span>
