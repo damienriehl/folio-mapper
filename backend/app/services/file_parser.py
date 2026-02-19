@@ -19,7 +19,7 @@ MAX_ROWS = 50_000
 MAX_COLUMNS = 50
 
 
-def _detect_headers(rows: list[list[str]]) -> tuple[list[str] | None, list[list[str]]]:
+def detect_headers(rows: list[list[str]]) -> tuple[list[str] | None, list[list[str]]]:
     """Heuristic: if the first row has all non-empty cells and the second row
     has a different pattern, treat the first row as headers."""
     if len(rows) < 2:
@@ -47,7 +47,7 @@ def _detect_headers(rows: list[list[str]]) -> tuple[list[str] | None, list[list[
     return None, rows
 
 
-def _parse_tabular(
+def parse_tabular(
     rows: list[list[str]], filename: str | None = None
 ) -> ParseResult:
     """Process tabular data: detect headers, check for hierarchy, extract items."""
@@ -59,7 +59,7 @@ def _parse_tabular(
             source_filename=filename,
         )
 
-    headers, data_rows = _detect_headers(rows)
+    headers, data_rows = detect_headers(rows)
 
     if detect_hierarchy(data_rows):
         return parse_hierarchical(data_rows, headers=headers, filename=filename)
@@ -161,5 +161,5 @@ def parse_file(content: bytes, filename: str) -> ParseResult:
     else:
         raise ValueError(f"Unsupported file type: {ext}")
 
-    result = _parse_tabular(rows, filename=filename)
+    result = parse_tabular(rows, filename=filename)
     return result

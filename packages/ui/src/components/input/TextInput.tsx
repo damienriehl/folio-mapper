@@ -4,13 +4,14 @@ interface TextInputProps {
   itemCount: number;
   onSubmit: () => void;
   disabled?: boolean;
+  isTabular?: boolean;
 }
 
-export function TextInput({ value, onChange, itemCount, onSubmit, disabled }: TextInputProps) {
+export function TextInput({ value, onChange, itemCount, onSubmit, disabled, isTabular }: TextInputProps) {
   return (
     <div className="w-full">
       <label htmlFor="text-input" className="mb-2 block text-sm font-medium text-gray-700">
-        Paste your items (one per line)
+        {isTabular ? 'Tabular data detected (hierarchy will be extracted)' : 'Paste your items (one per line)'}
       </label>
       <div className="relative">
         <textarea

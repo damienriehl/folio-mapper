@@ -80,7 +80,7 @@ def test_build_tree_skips_blank_rows():
     assert tree[0].children[0].label == "Class Action"
 
 
-def test_parse_hierarchical_leaves():
+def test_parse_hierarchical_all_nodes():
     rows = [
         ["Litigation", "", ""],
         ["", "Class Action", ""],
@@ -91,12 +91,24 @@ def test_parse_hierarchical_leaves():
     ]
     result = parse_hierarchical(rows, filename="test.csv")
     assert result.format == "hierarchical"
-    assert result.total_items == 3  # 3 leaf nodes
-    assert result.items[0].text == "Securities"
-    assert result.items[0].ancestry == ["Litigation", "Class Action"]
-    assert result.items[1].text == "Consumer Protection"
-    assert result.items[2].text == "Personal Injury"
-    assert result.items[2].ancestry == ["Litigation", "Individual"]
+    # All 6 nodes: Litigation, Class Action, Securities, Consumer Protection, Individual, Personal Injury
+    assert result.total_items == 6
+    labels = [item.text for item in result.items]
+    assert labels == [
+        "Litigation",
+        "Class Action",
+        "Securities",
+        "Consumer Protection",
+        "Individual",
+        "Personal Injury",
+    ]
+    # Parent nodes have correct ancestry
+    assert result.items[0].ancestry == []  # Litigation is root
+    assert result.items[1].ancestry == ["Litigation"]  # Class Action
+    assert result.items[2].ancestry == ["Litigation", "Class Action"]  # Securities
+    assert result.items[3].ancestry == ["Litigation", "Class Action"]  # Consumer Protection
+    assert result.items[4].ancestry == ["Litigation"]  # Individual
+    assert result.items[5].ancestry == ["Litigation", "Individual"]  # Personal Injury
     assert result.hierarchy is not None
     assert result.source_filename == "test.csv"
 
@@ -108,4 +120,5 @@ def test_parse_hierarchical_indices():
         ["", "C"],
     ]
     result = parse_hierarchical(rows)
-    assert [item.index for item in result.items] == [0, 1]
+    # All 3 nodes: A, B, C
+    assert [item.index for item in result.items] == [0, 1, 2]

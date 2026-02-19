@@ -98,23 +98,21 @@ def build_tree(rows: list[list[str]]) -> list[HierarchyNode]:
     return root_children
 
 
-def _collect_leaves(
+def _collect_all_nodes(
     nodes: list[HierarchyNode], ancestry: list[str]
 ) -> list[ParseItem]:
-    """Recursively collect leaf nodes with their ancestry paths."""
+    """Recursively collect all nodes (parents and leaves) with their ancestry paths."""
     items: list[ParseItem] = []
     for node in nodes:
-        current_ancestry = ancestry + [node.label]
-        if node.children:
-            items.extend(_collect_leaves(node.children, current_ancestry))
-        else:
-            items.append(
-                ParseItem(
-                    text=node.label,
-                    index=0,  # will be re-indexed
-                    ancestry=ancestry,
-                )
+        items.append(
+            ParseItem(
+                text=node.label,
+                index=0,  # will be re-indexed
+                ancestry=ancestry,
             )
+        )
+        if node.children:
+            items.extend(_collect_all_nodes(node.children, ancestry + [node.label]))
     return items
 
 
@@ -123,20 +121,20 @@ def parse_hierarchical(
     headers: list[str] | None = None,
     filename: str | None = None,
 ) -> ParseResult:
-    """Parse tabular data detected as hierarchical into a tree + leaf items."""
+    """Parse tabular data detected as hierarchical into a tree + all items."""
     tree = build_tree(rows)
-    leaves = _collect_leaves(tree, [])
-    # Re-index leaves
-    for i, item in enumerate(leaves):
+    all_items = _collect_all_nodes(tree, [])
+    # Re-index
+    for i, item in enumerate(all_items):
         item.index = i
 
     raw_preview = rows[:5] if rows else None
 
     return ParseResult(
         format="hierarchical",
-        items=leaves,
+        items=all_items,
         hierarchy=tree,
-        total_items=len(leaves),
+        total_items=len(all_items),
         headers=headers,
         source_filename=filename,
         raw_preview=raw_preview,

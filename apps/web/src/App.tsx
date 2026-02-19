@@ -56,7 +56,7 @@ export function App() {
   const mappingState = useMappingStore();
   const llmState = useLLMStore();
   const { upload } = useFileUpload();
-  const { itemCount } = useTextDetection(textInput);
+  const { itemCount, isTabular } = useTextDetection(textInput);
   const { loadCandidates, loadPipelineCandidates, loadMandatoryFallback, searchCandidates, cancelBatchLoading } = useMapping();
 
   // Hydrate known models on startup
@@ -529,6 +529,7 @@ export function App() {
               itemCount={itemCount}
               onSubmit={handleTextSubmit}
               disabled={isLoading}
+              isTabular={isTabular}
             />
           }
           branchOptions={

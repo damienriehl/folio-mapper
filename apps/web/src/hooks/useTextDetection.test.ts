@@ -27,4 +27,19 @@ describe('useTextDetection', () => {
     const { result } = renderHook(() => useTextDetection('Hello'));
     expect(result.current.itemCount).toBe(1);
   });
+
+  it('detects tab-delimited text as tabular', () => {
+    const { result } = renderHook(() => useTextDetection('Insurance\tFinance\nContract\tParty'));
+    expect(result.current.isTabular).toBe(true);
+  });
+
+  it('detects plain text as non-tabular', () => {
+    const { result } = renderHook(() => useTextDetection('Contract Law\nTort Law'));
+    expect(result.current.isTabular).toBe(false);
+  });
+
+  it('detects empty text as non-tabular', () => {
+    const { result } = renderHook(() => useTextDetection(''));
+    expect(result.current.isTabular).toBe(false);
+  });
 });
