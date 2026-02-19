@@ -1,10 +1,6 @@
 """LLM provider API endpoints."""
 
-import logging
-
 from fastapi import APIRouter
-
-logger = logging.getLogger(__name__)
 
 from app.models.llm_models import (
     ConnectionTestRequest,
@@ -34,10 +30,9 @@ async def test_connection(req: ConnectionTestRequest) -> ConnectionTestResponse:
             model=req.model,
         )
     except Exception as exc:
-        logger.exception("Connection test failed for provider %s", req.provider)
         return ConnectionTestResponse(
             success=False,
-            message="Connection test failed. Check your API key and provider settings.",
+            message=str(exc),
         )
 
 

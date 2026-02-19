@@ -9,20 +9,17 @@ from app.services.llm.base import BaseLLMProvider
 class GoogleProvider(BaseLLMProvider):
     """Provider for Google Gemini models via REST API."""
 
-    def _headers(self) -> dict[str, str]:
-        return {"x-goog-api-key": self.api_key or ""}
-
     async def test_connection(self) -> bool:
         async with httpx.AsyncClient() as client:
-            url = f"{self.base_url}/models"
-            resp = await client.get(url, headers=self._headers(), timeout=15)
+            url = f"{self.base_url}/models?key={self.api_key}"
+            resp = await client.get(url, timeout=15)
             resp.raise_for_status()
             return True
 
     async def list_models(self) -> list[ModelInfo]:
         async with httpx.AsyncClient() as client:
-            url = f"{self.base_url}/models"
-            resp = await client.get(url, headers=self._headers(), timeout=15)
+            url = f"{self.base_url}/models?key={self.api_key}"
+            resp = await client.get(url, timeout=15)
             resp.raise_for_status()
             data = resp.json()
 
@@ -54,10 +51,9 @@ class GoogleProvider(BaseLLMProvider):
             contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
         async with httpx.AsyncClient() as client:
-            url = f"{self.base_url}/models/{self.model}:generateContent"
+            url = f"{self.base_url}/models/{self.model}:generateContent?key={self.api_key}"
             resp = await client.post(
                 url,
-                headers=self._headers(),
                 json={"contents": contents},
                 timeout=60,
             )

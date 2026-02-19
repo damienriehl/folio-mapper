@@ -15,8 +15,6 @@ from app.services.hierarchy_detector import (
 
 ALLOWED_EXTENSIONS = {".xlsx", ".csv", ".tsv", ".txt", ".md"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
-MAX_ROWS = 50_000
-MAX_COLUMNS = 50
 
 
 def _detect_headers(rows: list[list[str]]) -> tuple[list[str] | None, list[list[str]]]:
@@ -146,16 +144,6 @@ def parse_file(content: bytes, filename: str) -> ParseResult:
         rows = _read_text(content)
     else:
         raise ValueError(f"Unsupported file type: {ext}")
-
-    # Enforce row and column limits to prevent memory exhaustion
-    if len(rows) > MAX_ROWS:
-        raise ValueError(
-            f"Too many rows ({len(rows):,}). Maximum: {MAX_ROWS:,}."
-        )
-    if rows and len(rows[0]) > MAX_COLUMNS:
-        raise ValueError(
-            f"Too many columns ({len(rows[0])}). Maximum: {MAX_COLUMNS}."
-        )
 
     result = _parse_tabular(rows, filename=filename)
     return result

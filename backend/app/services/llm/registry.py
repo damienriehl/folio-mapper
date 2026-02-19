@@ -1,9 +1,5 @@
 """Provider factory and metadata registry."""
 
-import ipaddress
-import re
-from urllib.parse import urlparse
-
 from app.models.llm_models import LLMProviderType, ModelInfo
 from app.services.llm.anthropic_provider import AnthropicProvider
 from app.services.llm.base import BaseLLMProvider
@@ -161,84 +157,6 @@ KNOWN_MODELS: dict[LLMProviderType, list["ModelInfo"]] = {
 }
 
 
-# Allowed domains for cloud providers (user-supplied base_url must match)
-_ALLOWED_DOMAINS: dict[LLMProviderType, list[str]] = {
-    LLMProviderType.OPENAI: ["api.openai.com"],
-    LLMProviderType.ANTHROPIC: ["api.anthropic.com"],
-    LLMProviderType.GOOGLE: ["generativelanguage.googleapis.com"],
-    LLMProviderType.MISTRAL: ["api.mistral.ai"],
-    LLMProviderType.COHERE: ["api.cohere.com"],
-    LLMProviderType.META_LLAMA: ["api.llama.com"],
-    LLMProviderType.GROQ: ["api.groq.com"],
-    LLMProviderType.XAI: ["api.x.ai"],
-    LLMProviderType.GITHUB_MODELS: ["models.github.ai"],
-}
-
-# Providers that intentionally target localhost (skip SSRF checks)
-_LOCAL_PROVIDERS = {
-    LLMProviderType.OLLAMA,
-    LLMProviderType.LMSTUDIO,
-    LLMProviderType.CUSTOM,
-    LLMProviderType.LLAMAFILE,
-}
-
-# Private/reserved IP patterns
-_PRIVATE_IP_PATTERNS = [
-    re.compile(r"^127\."),                         # Loopback
-    re.compile(r"^10\."),                          # Private class A
-    re.compile(r"^172\.(1[6-9]|2[0-9]|3[01])\."), # Private class B
-    re.compile(r"^192\.168\."),                    # Private class C
-    re.compile(r"^169\.254\."),                    # Link-local / cloud metadata
-    re.compile(r"^0\."),                           # Current network
-]
-
-_BLOCKED_HOSTNAMES = {
-    "metadata.google.internal",
-    "metadata",
-}
-
-
-def _validate_base_url(url: str, provider_type: LLMProviderType) -> None:
-    """Validate a base URL to prevent SSRF attacks.
-
-    For cloud providers: restricts to known domains.
-    For local providers: allows localhost only.
-    Blocks private/reserved IPs and cloud metadata endpoints for cloud providers.
-    """
-    # Local providers are allowed to target localhost by design
-    if provider_type in _LOCAL_PROVIDERS:
-        return
-
-    parsed = urlparse(url)
-    hostname = (parsed.hostname or "").lower()
-
-    if not hostname:
-        raise ValueError(f"Invalid base URL: {url}")
-
-    # Block cloud metadata hostnames
-    if hostname in _BLOCKED_HOSTNAMES:
-        raise ValueError("Base URL must not target cloud metadata endpoints")
-
-    # Check if hostname is an IP address
-    try:
-        addr = ipaddress.ip_address(hostname)
-        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-            raise ValueError("Base URL must not target private or internal network addresses")
-    except ValueError as e:
-        if "must not target" in str(e):
-            raise
-        # Not an IP address, continue with hostname checks
-
-    # Validate against allowed domains for the provider
-    allowed = _ALLOWED_DOMAINS.get(provider_type)
-    if allowed:
-        if not any(hostname == d or hostname.endswith(f".{d}") for d in allowed):
-            raise ValueError(
-                f'Base URL hostname "{hostname}" is not allowed for provider '
-                f'"{provider_type.value}". Allowed domains: {", ".join(allowed)}'
-            )
-
-
 def get_provider(
     provider_type: LLMProviderType,
     api_key: str | None = None,
@@ -247,10 +165,6 @@ def get_provider(
 ) -> BaseLLMProvider:
     """Create a provider instance from the given configuration."""
     resolved_url = base_url or DEFAULT_BASE_URLS[provider_type]
-
-    # Validate user-supplied base_url against SSRF (skip for default URLs)
-    if base_url is not None:
-        _validate_base_url(base_url, provider_type)
 
     if provider_type == LLMProviderType.GITHUB_MODELS:
         return GitHubModelsProvider(api_key=api_key, base_url=resolved_url, model=model)
