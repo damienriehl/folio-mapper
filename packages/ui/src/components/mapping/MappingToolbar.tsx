@@ -88,7 +88,12 @@ export function MappingToolbar({
               Next &rarr;
             </button>
             <div className="ml-2 flex items-center gap-2 border-l border-gray-200 pl-3">
-              <label className="text-xs font-medium text-gray-500 whitespace-nowrap" htmlFor="toolbar-topn">
+              <label
+                className="cursor-pointer text-xs font-medium text-gray-500 whitespace-nowrap hover:text-blue-600"
+                htmlFor="toolbar-topn"
+                onClick={(e) => { e.preventDefault(); onTopNChange?.(safeDefaultTopN); }}
+                title="Click to reset to default"
+              >
                 Top N
               </label>
               <input
