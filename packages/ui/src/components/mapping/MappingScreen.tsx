@@ -82,6 +82,8 @@ interface MappingScreenProps {
   batchLoadingError?: string | null;
 }
 
+const NUDGE_KEYFRAMES = `@keyframes nudge-bg { 0% { background-color: white; } 40% { background-color: rgb(253 230 138); } 100% { background-color: rgb(254 243 199); } }`;
+
 function sortBranchGroups(
   groups: BranchGroup[],
   mode: BranchSortMode,
@@ -178,6 +180,10 @@ export function MappingScreen({
   const [expandAllSignal, setExpandAllSignal] = useState(0);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
   const [allExpanded, setAllExpanded] = useState(false);
+  const [notesNudge, setNotesNudge] = useState(false);
+
+  // Clear notes nudge when navigating to a different item
+  useEffect(() => { setNotesNudge(false); }, [currentItemIndex]);
 
   const currentItem: ItemMappingResult | undefined = mappingResponse.items[currentItemIndex];
   const currentSelections = selections[currentItemIndex] || [];
@@ -283,6 +289,8 @@ export function MappingScreen({
       }
     }
   };
+
+  const isCurrentSuggested = suggestionQueue.some((s) => s.item_index === currentItemIndex);
 
   const handleClearAll = () => {
     // Remove all currently selected candidates for this item
@@ -452,7 +460,12 @@ export function MappingScreen({
                 ) : (
                   <button
                     type="button"
-                    onClick={onSuggestToFolio}
+                    onClick={() => {
+                      onSuggestToFolio();
+                      if (!notes[currentItemIndex]) {
+                        setNotesNudge(true);
+                      }
+                    }}
                     className="flex items-center gap-1 rounded bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-600"
                     title="Suggest adding this concept to the FOLIO standard (F)"
                   >
@@ -504,22 +517,6 @@ export function MappingScreen({
                 />
               </div>
             </div>
-            {/* Notes */}
-            <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-2">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500" htmlFor="item-note">
-                Notes
-              </label>
-              <textarea
-                id="item-note"
-                value={notes[currentItemIndex] || ''}
-                onChange={(e) => onSetNote(currentItemIndex, e.target.value)}
-                placeholder="Add a note for this item..."
-                rows={notes[currentItemIndex] ? 2 : 1}
-                onFocus={(e) => { if (!notes[currentItemIndex]) (e.target as HTMLTextAreaElement).rows = 2; }}
-                onBlur={(e) => { if (!notes[currentItemIndex]) (e.target as HTMLTextAreaElement).rows = 1; }}
-                className="w-full resize-none rounded border border-gray-200 px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none"
-              />
-            </div>
             {/* Bottom half: Candidate Details */}
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="shrink-0 border-b border-gray-100 bg-white px-4 pt-3 pb-2">
@@ -535,9 +532,35 @@ export function MappingScreen({
                 />
               </div>
             </div>
+            {/* Notes — amber when current item is in suggestion queue */}
+            <div className={`shrink-0 border-b border-gray-200 px-4 py-2 ${notesNudge ? 'animate-[nudge-bg_1s_ease-in-out_forwards]' : isCurrentSuggested ? 'bg-amber-50' : 'bg-white'}`}>
+              <style dangerouslySetInnerHTML={{ __html: NUDGE_KEYFRAMES }} />
+              <div className="mb-1 flex items-center gap-2">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500" htmlFor="item-note">
+                  Notes
+                </label>
+                {notesNudge && (
+                  <span className="text-[10px] font-medium text-amber-600">
+                    Add context to strengthen your suggestion
+                  </span>
+                )}
+              </div>
+              <textarea
+                id="item-note"
+                value={notes[currentItemIndex] || ''}
+                onChange={(e) => { onSetNote(currentItemIndex, e.target.value); if (notesNudge) setNotesNudge(false); }}
+                placeholder="Add a note for this item..."
+                rows={isCurrentSuggested || notes[currentItemIndex] ? 2 : 1}
+                onFocus={(e) => { if (!notes[currentItemIndex]) (e.target as HTMLTextAreaElement).rows = 2; }}
+                onBlur={(e) => { if (!notes[currentItemIndex] && !isCurrentSuggested) (e.target as HTMLTextAreaElement).rows = 1; }}
+                className={`w-full resize-none rounded border bg-white px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none ${isCurrentSuggested ? 'border-amber-300' : 'border-gray-200'}`}
+              />
+            </div>
             {/* Suggestion Queue */}
             <SuggestionQueuePanel
               queue={suggestionQueue}
+              notes={notes}
+              currentItemIndex={currentItemIndex}
               onEdit={onEditSuggestion}
               onRemove={onRemoveSuggestion}
               onSubmit={onOpenSubmission}
