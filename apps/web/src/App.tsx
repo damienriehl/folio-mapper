@@ -373,7 +373,7 @@ export function App() {
   // Mapping screen uses full-width layout (no centering/padding)
   if (screen === 'mapping') {
     return (
-      <div className="flex h-screen flex-col">
+      <div className="flex h-screen flex-col overflow-hidden">
         <Header
           onOpenSettings={() => setShowSettings(true)}
           onRestart={() => {
