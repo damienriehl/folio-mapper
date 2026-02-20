@@ -320,6 +320,15 @@ export function MappingsView({
     }
   }, [selectedConcepts]);
 
+  // Auto-select the first mapped concept when switching input items
+  useEffect(() => {
+    if (selectedConcepts.length > 0 && !selectedConceptIri) {
+      const first = selectedConcepts[0];
+      setSelectedConceptIri(first.iri_hash);
+      setDetailConcept(first as FolioCandidate);
+    }
+  }, [selectedItemIndex, selectedConcepts.length]);
+
   // Current item for DetailPanel
   const currentItem: ItemMappingResult | undefined = selectedItemIndex !== null
     ? mappingResponse.items.find((i) => i.item_index === selectedItemIndex)
