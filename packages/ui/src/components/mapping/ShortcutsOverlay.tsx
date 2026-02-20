@@ -10,6 +10,7 @@ const shortcuts = {
     { keys: ['G'], description: 'Go to item' },
     { keys: ['Shift', 'A'], description: 'Accept all defaults' },
     { keys: ['F'], description: 'Suggest to FOLIO' },
+    { keys: ['R'], description: 'Flag for review' },
   ],
   general: [
     { keys: ['Ctrl', 'S'], description: 'Save session' },

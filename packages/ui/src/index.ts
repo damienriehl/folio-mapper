@@ -24,6 +24,7 @@ export { BranchOptionsModal } from './components/mapping/BranchOptionsModal';
 export { FolioLoadingOverlay } from './components/mapping/FolioLoadingOverlay';
 export { ShortcutsOverlay } from './components/mapping/ShortcutsOverlay';
 export { SuggestionQueuePanel } from './components/mapping/SuggestionQueuePanel';
+export { ReviewQueuePanel } from './components/mapping/ReviewQueuePanel';
 export { MappingsView } from './components/mapping/MappingsView';
 export { SuggestionEditModal } from './components/mapping/SuggestionEditModal';
 export { SubmissionModal } from './components/mapping/SubmissionModal';

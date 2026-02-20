@@ -124,6 +124,7 @@ export function useSession() {
       status_filter: mapping.statusFilter,
 
       suggestion_queue: mapping.suggestionQueue,
+      review_queue: mapping.reviewQueue,
     };
   }, []);
 
@@ -213,6 +214,7 @@ export function useSession() {
           statusFilter: session.status_filter ?? 'all',
           pipelineMetadata: session.pipeline_metadata ?? null,
           suggestionQueue: session.suggestion_queue ?? [],
+          reviewQueue: session.review_queue ?? [],
         });
       }
     } catch (err) {

@@ -3,11 +3,13 @@ import type { NodeStatus } from '@folio-mapper/core';
 interface MappingFooterProps {
   nodeStatuses: Record<number, NodeStatus>;
   suggestionCount?: number;
+  reviewCount?: number;
 }
 
 export function MappingFooter({
   nodeStatuses,
   suggestionCount,
+  reviewCount,
 }: MappingFooterProps) {
   const skippedCount = Object.values(nodeStatuses).filter((s) => s === 'skipped').length;
 
@@ -21,6 +23,11 @@ export function MappingFooter({
         )}
       </div>
       <div className="flex items-center gap-3">
+        {!!reviewCount && reviewCount > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+            {reviewCount} review{reviewCount !== 1 ? 's' : ''}
+          </span>
+        )}
         {!!suggestionCount && suggestionCount > 0 && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
             {suggestionCount} suggestion{suggestionCount !== 1 ? 's' : ''}

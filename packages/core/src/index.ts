@@ -15,5 +15,6 @@ export * from './session/index';
 export * from './export/index';
 export * from './suggestion/types';
 export * from './suggestion/issue-body';
+export * from './review/types';
 export * from './llamafile/types';
 export * from './auth';

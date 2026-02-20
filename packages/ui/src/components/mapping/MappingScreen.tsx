@@ -11,6 +11,7 @@ import type {
   PreScanSegment,
   StatusFilter,
   SuggestionEntry,
+  ReviewEntry,
 } from '@folio-mapper/core';
 import { DEFAULT_BRANCH_ORDER, fetchConcept, computeScoreCutoff } from '@folio-mapper/core';
 import { CandidatePanel } from './CandidatePanel';
@@ -24,6 +25,7 @@ import { PrescanDisplay } from './PrescanDisplay';
 import { SelectionTree } from './SelectionTree';
 import { ShortcutsOverlay } from './ShortcutsOverlay';
 import { SuggestionQueuePanel } from './SuggestionQueuePanel';
+import { ReviewQueuePanel } from './ReviewQueuePanel';
 
 interface MappingScreenProps {
   mappingResponse: MappingResponse;
@@ -74,6 +76,10 @@ interface MappingScreenProps {
   onRemoveSuggestion: (id: string) => void;
   onEditSuggestion: (entry: SuggestionEntry) => void;
   onOpenSubmission: () => void;
+  reviewQueue: ReviewEntry[];
+  onFlagForReview: () => void;
+  onRemoveReview: (id: string) => void;
+  onNavigateToItem: (itemIndex: number) => void;
   searchFilterHashes?: string[] | null;
   onClearSearchFilter?: () => void;
   onMappings?: () => void;
@@ -168,6 +174,10 @@ export function MappingScreen({
   onRemoveSuggestion,
   onEditSuggestion,
   onOpenSubmission,
+  reviewQueue,
+  onFlagForReview,
+  onRemoveReview,
+  onNavigateToItem,
   searchFilterHashes,
   onMappings,
   onClearSearchFilter,
@@ -291,6 +301,7 @@ export function MappingScreen({
   };
 
   const isCurrentSuggested = suggestionQueue.some((s) => s.item_index === currentItemIndex);
+  const isCurrentReviewed = reviewQueue.some((r) => r.item_index === currentItemIndex);
 
   const handleClearAll = () => {
     // Remove all currently selected candidates for this item
@@ -475,6 +486,36 @@ export function MappingScreen({
                     Suggest
                   </button>
                 )}
+                {isCurrentReviewed ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="flex items-center gap-1 rounded border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600"
+                    title="This item is flagged for review"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4l11-11 4 4-11 11H3z" />
+                    </svg>
+                    Flagged
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFlagForReview();
+                      if (!notes[currentItemIndex]) {
+                        setNotesNudge(true);
+                      }
+                    }}
+                    className="flex items-center gap-1 rounded border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                    title="Flag for further review (R)"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4l11-11 4 4-11 11H3z" />
+                    </svg>
+                    Review
+                  </button>
+                )}
               </div>
             </div>
             {/* Scrollable candidate results */}
@@ -532,8 +573,8 @@ export function MappingScreen({
                 />
               </div>
             </div>
-            {/* Notes — amber when current item is in suggestion queue */}
-            <div className={`shrink-0 border-b border-gray-200 px-4 py-2 ${notesNudge ? 'animate-[nudge-bg_1s_ease-in-out_forwards]' : isCurrentSuggested ? 'bg-amber-50' : 'bg-white'}`}>
+            {/* Notes — amber when current item is in suggestion or review queue */}
+            <div className={`shrink-0 border-b border-gray-200 px-4 py-2 ${notesNudge ? 'animate-[nudge-bg_1s_ease-in-out_forwards]' : (isCurrentSuggested || isCurrentReviewed) ? 'bg-amber-50' : 'bg-white'}`}>
               <style dangerouslySetInnerHTML={{ __html: NUDGE_KEYFRAMES }} />
               <div className="mb-1 flex items-center gap-2">
                 <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500" htmlFor="item-note">
@@ -541,7 +582,7 @@ export function MappingScreen({
                 </label>
                 {notesNudge && (
                   <span className="text-[10px] font-medium text-amber-600">
-                    Add context to strengthen your suggestion
+                    Add context to strengthen your {isCurrentReviewed && !isCurrentSuggested ? 'review' : 'suggestion'}
                   </span>
                 )}
               </div>
@@ -550,10 +591,10 @@ export function MappingScreen({
                 value={notes[currentItemIndex] || ''}
                 onChange={(e) => { onSetNote(currentItemIndex, e.target.value); if (notesNudge) setNotesNudge(false); }}
                 placeholder="Add a note for this item..."
-                rows={isCurrentSuggested || notes[currentItemIndex] ? 2 : 1}
+                rows={(isCurrentSuggested || isCurrentReviewed) || notes[currentItemIndex] ? 2 : 1}
                 onFocus={(e) => { if (!notes[currentItemIndex]) (e.target as HTMLTextAreaElement).rows = 2; }}
-                onBlur={(e) => { if (!notes[currentItemIndex] && !isCurrentSuggested) (e.target as HTMLTextAreaElement).rows = 1; }}
-                className={`w-full resize-none rounded border bg-white px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none ${isCurrentSuggested ? 'border-amber-300' : 'border-gray-200'}`}
+                onBlur={(e) => { if (!notes[currentItemIndex] && !isCurrentSuggested && !isCurrentReviewed) (e.target as HTMLTextAreaElement).rows = 1; }}
+                className={`w-full resize-none rounded border bg-white px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none ${(isCurrentSuggested || isCurrentReviewed) ? 'border-amber-300' : 'border-gray-200'}`}
               />
             </div>
             {/* Suggestion Queue */}
@@ -564,6 +605,14 @@ export function MappingScreen({
               onEdit={onEditSuggestion}
               onRemove={onRemoveSuggestion}
               onSubmit={onOpenSubmission}
+            />
+            {/* Review Queue */}
+            <ReviewQueuePanel
+              queue={reviewQueue}
+              notes={notes}
+              currentItemIndex={currentItemIndex}
+              onNavigate={onNavigateToItem}
+              onRemove={onRemoveReview}
             />
           </div>
         </div>
@@ -591,6 +640,7 @@ export function MappingScreen({
       <MappingFooter
         nodeStatuses={nodeStatuses}
         suggestionCount={suggestionQueue.length}
+        reviewCount={reviewQueue.length}
       />
 
       {showGoToDialog && (

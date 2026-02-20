@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { parseText, testConnection, fetchModels, fetchKnownModels, BRANCH_COLORS, PROVIDER_META } from '@folio-mapper/core';
-import type { SuggestionEntry, InputHierarchyNode, HierarchyNode } from '@folio-mapper/core';
+import type { SuggestionEntry, ReviewEntry, InputHierarchyNode, HierarchyNode } from '@folio-mapper/core';
 import {
   AppShell,
   InputScreen,
@@ -183,6 +183,26 @@ export function App() {
     mappingState.addSuggestion(entry);
   }, [mappingState, parseResult]);
 
+  const handleFlagForReview = useCallback(() => {
+    const { mappingResponse, currentItemIndex } = mappingState;
+    if (!mappingResponse) return;
+    const item = mappingResponse.items[currentItemIndex];
+    if (!item) return;
+
+    const entry: ReviewEntry = {
+      id: crypto.randomUUID(),
+      item_index: currentItemIndex,
+      item_text: item.item_text,
+      flagged_at: new Date().toISOString(),
+    };
+
+    mappingState.addReview(entry);
+  }, [mappingState]);
+
+  const handleNavigateToItem = useCallback((itemIndex: number) => {
+    mappingState.goToItem(itemIndex);
+  }, [mappingState]);
+
   // Full FOLIO branch list for input-page Branch Options panel
   const allFolioBranches = Object.values(BRANCH_COLORS).map((b) => ({
     name: b.name,
@@ -254,6 +274,7 @@ export function App() {
     screen === 'mapping',
     () => exportState.setShowExportModal(true),
     handleSuggestToFolio,
+    handleFlagForReview,
   );
 
   // Track whether current pipeline run is LLM-enhanced (for overlay messaging)
@@ -492,6 +513,10 @@ export function App() {
             onSuggestToFolio={handleSuggestToFolio}
             onRemoveSuggestion={mappingState.removeSuggestion}
             onEditSuggestion={(entry) => setEditingSuggestion(entry)}
+            reviewQueue={mappingState.reviewQueue}
+            onFlagForReview={handleFlagForReview}
+            onRemoveReview={mappingState.removeReview}
+            onNavigateToItem={handleNavigateToItem}
             searchFilterHashes={mappingState.searchFilterHashes}
             onClearSearchFilter={mappingState.clearSearchFilter}
             loadedItemCount={mappingState.loadedItemCount}

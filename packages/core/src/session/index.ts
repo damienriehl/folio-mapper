@@ -3,8 +3,9 @@ import type { MappingResponse } from '../folio/types';
 import type { BranchState, BranchSortMode, NodeStatus, StatusFilter } from '../mapping/types';
 import type { PipelineItemMetadata } from '../pipeline/types';
 import type { SuggestionEntry } from '../suggestion/types';
+import type { ReviewEntry } from '../review/types';
 
-export const SESSION_VERSION = '1.2';
+export const SESSION_VERSION = '1.3';
 
 export interface SessionFile {
   // Metadata
@@ -43,6 +44,9 @@ export interface SessionFile {
 
   // Suggestion queue
   suggestion_queue: SuggestionEntry[];
+
+  // Review queue
+  review_queue: ReviewEntry[];
 }
 
 export function validateSession(data: unknown): SessionFile | null {

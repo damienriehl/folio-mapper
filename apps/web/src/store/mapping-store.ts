@@ -11,6 +11,7 @@ import type {
   PipelineItemMetadata,
   StatusFilter,
   SuggestionEntry,
+  ReviewEntry,
 } from '@folio-mapper/core';
 import { computeScoreCutoff } from '@folio-mapper/core';
 import { createDebouncedStorage } from './session-storage';
@@ -54,6 +55,9 @@ interface MappingState {
   // Suggestion queue for ALEA submissions
   suggestionQueue: SuggestionEntry[];
 
+  // Review queue for items flagged for further review
+  reviewQueue: ReviewEntry[];
+
   // Search filter: IRI hashes from last search (null = no filter active)
   searchFilterHashes: string[] | null;
 
@@ -95,6 +99,9 @@ interface MappingState {
   removeSuggestion: (id: string) => void;
   updateSuggestion: (id: string, updates: Partial<SuggestionEntry>) => void;
   clearSuggestionQueue: () => void;
+  addReview: (entry: ReviewEntry) => void;
+  removeReview: (id: string) => void;
+  clearReviewQueue: () => void;
   startMapping: (response: MappingResponse, fullItemCount?: number) => void;
   appendMappingItems: (newItems: ItemMappingResult[], pipelineMetadata?: PipelineItemMetadata[]) => void;
   setBatchLoading: (loading: boolean, error?: string | null) => void;
@@ -158,6 +165,7 @@ export const useMappingStore = create<MappingState>()(
       selectedCandidateIri: null,
       pipelineMetadata: null,
       suggestionQueue: [] as SuggestionEntry[],
+      reviewQueue: [] as ReviewEntry[],
       searchFilterHashes: null,
       loadedItemCount: 0,
       isBatchLoading: false,
@@ -482,6 +490,19 @@ export const useMappingStore = create<MappingState>()(
 
       clearSuggestionQueue: () => set({ suggestionQueue: [] }),
 
+      addReview: (entry) => {
+        const { reviewQueue } = get();
+        if (reviewQueue.some((r) => r.item_index === entry.item_index)) return;
+        set({ reviewQueue: [...reviewQueue, entry] });
+      },
+
+      removeReview: (id) => {
+        const { reviewQueue } = get();
+        set({ reviewQueue: reviewQueue.filter((r) => r.id !== id) });
+      },
+
+      clearReviewQueue: () => set({ reviewQueue: [] }),
+
       startMapping: (response, fullItemCount?) => {
         const { inputBranchStates, branchSortMode, customBranchOrder, defaultTopN } = get();
 
@@ -616,6 +637,7 @@ export const useMappingStore = create<MappingState>()(
           statusFilter: 'all' as StatusFilter,
           pipelineMetadata: null,
           suggestionQueue: [],
+          reviewQueue: [],
           searchFilterHashes: null,
           loadedItemCount: 0,
           isBatchLoading: false,
@@ -641,6 +663,7 @@ export const useMappingStore = create<MappingState>()(
         statusFilter: state.statusFilter,
         pipelineMetadata: state.pipelineMetadata,
         suggestionQueue: state.suggestionQueue,
+        reviewQueue: state.reviewQueue,
         loadedItemCount: state.loadedItemCount,
       }),
       merge: (persisted, current) => {
