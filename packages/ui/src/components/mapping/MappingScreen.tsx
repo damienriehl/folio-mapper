@@ -334,41 +334,8 @@ export function MappingScreen({
                 <PrescanDisplay itemText={currentItem.item_text} segments={prescanSegments ?? null} />
               </div>
               <div className="mt-2 flex items-center gap-2">
-                {visibleCandidateHashes.length > 0 && visibleCandidateHashes.every((h) => currentSelections.includes(h)) ? (
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    className="flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Clear All
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSelectAllVisible}
-                    className="flex items-center gap-1 rounded border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Select All
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowBranchOptions(true)}
-                  className="flex items-center gap-1 rounded border border-purple-300 bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                  </svg>
-                  Branch Options
-                </button>
                 <form
-                  className="ml-auto flex items-center gap-1"
+                  className="flex items-center gap-1"
                   onSubmit={async (e) => {
                     e.preventDefault();
                     const q = searchQuery.trim();
@@ -412,6 +379,30 @@ export function MappingScreen({
                     </button>
                   )}
                 </form>
+                {visibleCandidateHashes.length > 0 && visibleCandidateHashes.every((h) => currentSelections.includes(h)) ? (
+                  <button
+                    type="button"
+                    onClick={handleClearAll}
+                    className="flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear All
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSelectAllVisible}
+                    className="flex items-center gap-1 rounded border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Select All
+                  </button>
+                )}
+                <div className="ml-auto flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -433,6 +424,17 @@ export function MappingScreen({
                   </svg>
                   {allExpanded ? 'Collapse All' : 'Expand All'}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBranchOptions(true)}
+                  className="flex items-center gap-1 rounded border border-purple-300 bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                  </svg>
+                  Branch Options
+                </button>
+                </div>
                 {suggestionQueue.some((s) => s.item_index === currentItemIndex) ? (
                   <button
                     type="button"
