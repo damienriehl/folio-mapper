@@ -127,7 +127,6 @@ function OutputNodeComponent({
       >
         <span data-iri={node.concept!.iri_hash} className="text-xs text-gray-300">{'\u25CF'}</span>
         <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
-        <span className="shrink-0 text-xs text-gray-400">{Math.round(node.concept!.score)}%</span>
       </div>
     );
   }
@@ -152,7 +151,6 @@ function OutputNodeComponent({
             {expanded ? '\u25BC' : '\u25B6'}
           </button>
           <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
-          <span className="shrink-0 text-xs text-gray-400">{Math.round(node.concept!.score)}%</span>
         </div>
         {expanded && (
           <div className="ml-2">
@@ -444,7 +442,7 @@ export function MappingsView({
         {/* Middle pane: FOLIO output tree */}
         <div
           ref={middleRef}
-          className="min-w-0 flex-1 overflow-y-auto border-l border-gray-200 p-4"
+          className="w-[340px] shrink-0 overflow-y-auto border-l border-gray-200 p-4"
         >
           <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-600">
             Mapped FOLIO Concepts
@@ -499,7 +497,7 @@ export function MappingsView({
         </div>
 
         {/* Right pane: Concept details (reuses main DetailPanel) */}
-        <div className="flex w-[320px] shrink-0 flex-col border-l border-gray-200 bg-gray-50">
+        <div className="flex min-w-[320px] flex-1 flex-col border-l border-gray-200 bg-gray-50">
           <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
             <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
               Concept Details
