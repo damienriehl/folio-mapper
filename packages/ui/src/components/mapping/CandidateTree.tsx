@@ -161,10 +161,15 @@ export function CandidateTree({
                 type="button"
                 onClick={() => toggleCollapse(branchKey)}
                 className="shrink-0"
-                style={{ color: group.branch_color + '90' }}
                 aria-label={isBranchCollapsed ? 'Expand branch' : 'Collapse branch'}
               >
-                {isBranchCollapsed ? '\u25B6' : '\u25BC'}
+                <svg className="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {isBranchCollapsed ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  )}
+                </svg>
               </button>
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"

@@ -25,17 +25,19 @@ async def client():
 # --- Unit tests for branch_config ---
 
 
-def test_branch_config_has_24_entries():
-    assert len(BRANCH_CONFIG) == 24
+def test_branch_config_has_26_entries():
+    assert len(BRANCH_CONFIG) == 26
 
 
 def test_get_branch_color_known():
-    assert get_branch_color("Actor / Player") == "#2E86C1"
-    assert get_branch_color("Area of Law") == "#1A5276"
+    assert get_branch_color("Actor / Player") == "#1e6fa0"
+    assert get_branch_color("Area of Law") == "#1a5276"
+    assert get_branch_color("Financial Concepts and Metrics") == "#6e4b00"
+    assert get_branch_color("Legal Use Cases") == "#4a3570"
 
 
 def test_get_branch_color_unknown():
-    assert get_branch_color("Nonexistent Branch") == "#9E9E9E"
+    assert get_branch_color("Nonexistent Branch") == "#4a5568"
 
 
 def test_get_branch_display_name():
@@ -115,8 +117,8 @@ MOCK_CANDIDATES = [
 ]
 
 MOCK_BRANCHES = [
-    BranchInfo(name="Area of Law", color="#1A5276", concept_count=500),
-    BranchInfo(name="Service", color="#138D75", concept_count=200),
+    BranchInfo(name="Area of Law", color="#1a5276", concept_count=500),
+    BranchInfo(name="Service", color="#065e4e", concept_count=200),
 ]
 
 

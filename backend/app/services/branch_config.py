@@ -6,30 +6,32 @@ Keys match FOLIOTypes enum names from folio-python library.
 from __future__ import annotations
 
 BRANCH_CONFIG: dict[str, dict[str, str]] = {
-    "ACTOR_PLAYER": {"name": "Actor / Player", "color": "#2E86C1"},
-    "AREA_OF_LAW": {"name": "Area of Law", "color": "#1A5276"},
-    "ASSET_TYPE": {"name": "Asset Type", "color": "#D4AC0D"},
-    "COMMUNICATION_MODALITY": {"name": "Communication Modality", "color": "#AF7AC5"},
-    "CURRENCY": {"name": "Currency", "color": "#F39C12"},
-    "DATA_FORMAT": {"name": "Data Format", "color": "#85929E"},
-    "DOCUMENT_ARTIFACT": {"name": "Document / Artifact", "color": "#E67E22"},
-    "ENGAGEMENT_TERMS": {"name": "Engagement Attributes", "color": "#2ECC71"},
-    "EVENT": {"name": "Event", "color": "#E74C3C"},
-    "FOLIO_TYPE": {"name": "FOLIO Type", "color": "#F1C40F"},
-    "FORUMS_VENUES": {"name": "Forums and Venues", "color": "#8E44AD"},
-    "GOVERNMENTAL_BODY": {"name": "Governmental Body", "color": "#3498DB"},
-    "INDUSTRY": {"name": "Industry and Market", "color": "#1ABC9C"},
-    "LANGUAGE": {"name": "Language", "color": "#D35400"},
-    "LEGAL_AUTHORITIES": {"name": "Legal Authorities", "color": "#C0392B"},
-    "LEGAL_ENTITY": {"name": "Legal Entity", "color": "#27AE60"},
-    "LOCATION": {"name": "Location", "color": "#16A085"},
-    "MATTER_NARRATIVE": {"name": "Matter Narrative", "color": "#7D3C98"},
-    "MATTER_NARRATIVE_FORMAT": {"name": "Matter Narrative Format", "color": "#2980B9"},
-    "OBJECTIVES": {"name": "Objectives", "color": "#CB4335"},
-    "SERVICE": {"name": "Service", "color": "#138D75"},
-    "STANDARDS_COMPATIBILITY": {"name": "Standards Compatibility", "color": "#5D6D7E"},
-    "STATUS": {"name": "Status", "color": "#CA6F1E"},
-    "SYSTEM_IDENTIFIERS": {"name": "System Identifiers", "color": "#7F8C8D"},
+    "ACTOR_PLAYER": {"name": "Actor / Player", "color": "#1e6fa0"},
+    "AREA_OF_LAW": {"name": "Area of Law", "color": "#1a5276"},
+    "ASSET_TYPE": {"name": "Asset Type", "color": "#6b5600"},
+    "COMMUNICATION_MODALITY": {"name": "Communication Modality", "color": "#7b4d93"},
+    "CURRENCY": {"name": "Currency", "color": "#7a5a00"},
+    "DATA_FORMAT": {"name": "Data Format", "color": "#4a5568"},
+    "DOCUMENT_ARTIFACT": {"name": "Document / Artifact", "color": "#9c4a10"},
+    "ENGAGEMENT_TERMS": {"name": "Engagement Attributes", "color": "#10613a"},
+    "EVENT": {"name": "Event", "color": "#b91c1c"},
+    "FINANCIAL_CONCEPTS": {"name": "Financial Concepts and Metrics", "color": "#6e4b00"},
+    "FOLIO_TYPE": {"name": "FOLIO Type", "color": "#6b5c00"},
+    "FORUMS_VENUES": {"name": "Forums and Venues", "color": "#7b2d8e"},
+    "GOVERNMENTAL_BODY": {"name": "Governmental Body", "color": "#1a6091"},
+    "INDUSTRY": {"name": "Industry and Market", "color": "#065550"},
+    "LANGUAGE": {"name": "Language", "color": "#7a3b10"},
+    "LEGAL_AUTHORITIES": {"name": "Legal Authorities", "color": "#8b1a1a"},
+    "LEGAL_ENTITY": {"name": "Legal Entity", "color": "#085e40"},
+    "LEGAL_USE_CASES": {"name": "Legal Use Cases", "color": "#4a3570"},
+    "LOCATION": {"name": "Location", "color": "#105560"},
+    "MATTER_NARRATIVE": {"name": "Matter Narrative", "color": "#6d3580"},
+    "MATTER_NARRATIVE_FORMAT": {"name": "Matter Narrative Format", "color": "#1a6894"},
+    "OBJECTIVES": {"name": "Objectives", "color": "#b03020"},
+    "SERVICE": {"name": "Service", "color": "#065e4e"},
+    "STANDARDS_COMPATIBILITY": {"name": "Standards Compatibility", "color": "#4a5a6a"},
+    "STATUS": {"name": "Status", "color": "#864a08"},
+    "SYSTEM_IDENTIFIERS": {"name": "System Identifiers", "color": "#3d4d5a"},
 }
 
 # Branches to exclude from search results and branch listings.
@@ -49,7 +51,7 @@ def get_branch_color(branch_name: str) -> str:
     key = _NAME_TO_KEY.get(branch_name)
     if key:
         return BRANCH_CONFIG[key]["color"]
-    return "#9E9E9E"  # fallback gray
+    return "#4a5568"  # fallback dark gray
 
 
 def get_branch_display_name(key: str) -> str:

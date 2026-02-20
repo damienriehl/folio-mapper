@@ -189,7 +189,7 @@ export function MappingScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandAllSignal, setExpandAllSignal] = useState(0);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
-  const [allExpanded, setAllExpanded] = useState(false);
+  const [allExpanded, setAllExpanded] = useState(true);
   const [notesNudge, setNotesNudge] = useState(false);
 
   // Clear notes nudge when navigating to a different item
@@ -405,27 +405,27 @@ export function MappingScreen({
                     </button>
                   )}
                 </form>
-                {visibleCandidateHashes.length > 0 && visibleCandidateHashes.every((h) => currentSelections.includes(h)) ? (
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    className="flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Clear All
-                  </button>
-                ) : (
+                {currentSelections.length === 0 ? (
                   <button
                     type="button"
                     onClick={handleSelectAllVisible}
-                    className="flex items-center gap-1 rounded border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
+                    className="flex items-center gap-1 rounded border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Select All
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleClearAll}
+                    className="flex items-center gap-1 rounded border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear All
                   </button>
                 )}
                 <div className="ml-auto flex items-center gap-2">

@@ -671,7 +671,7 @@ MOCK_JUDGED = [
 ]
 
 MOCK_BRANCHES = [
-    BranchInfo(name="Service", color="#138D75", concept_count=200),
+    BranchInfo(name="Service", color="#065e4e", concept_count=200),
 ]
 
 
@@ -709,7 +709,7 @@ async def test_orchestrator(llm_config):
         patch("app.services.pipeline.orchestrator._build_folio_candidate_from_judged", side_effect=lambda j, sl: FolioCandidate(
             label=sl[j.iri_hash].label, iri=f"https://folio.openlegalstandard.org/{j.iri_hash}",
             iri_hash=j.iri_hash, definition=sl[j.iri_hash].definition, synonyms=[],
-            branch="Service", branch_color="#138D75", hierarchy_path=[{"label": "Service", "iri_hash": "Rservice"}], score=j.adjusted_score,
+            branch="Service", branch_color="#065e4e", hierarchy_path=[{"label": "Service", "iri_hash": "Rservice"}], score=j.adjusted_score,
         ) if j.iri_hash in sl else None),
     ):
         result = await run_pipeline(items, llm_config)
@@ -743,7 +743,7 @@ MOCK_PIPELINE_RESPONSE = PipelineResponse(
                 branch_groups=[
                     BranchGroup(
                         branch="Service",
-                        branch_color="#138D75",
+                        branch_color="#065e4e",
                         candidates=[
                             FolioCandidate(
                                 label="Investigation",
@@ -752,7 +752,7 @@ MOCK_PIPELINE_RESPONSE = PipelineResponse(
                                 definition="An investigation activity",
                                 synonyms=[],
                                 branch="Service",
-                                branch_color="#138D75",
+                                branch_color="#065e4e",
                                 hierarchy_path=[{"label": "Service", "iri_hash": "Rservice"}, {"label": "Investigation", "iri_hash": "Rinvest"}],
                                 score=95.0,
                             ),
@@ -894,19 +894,19 @@ async def test_acceptance_agency_investigation(llm_config):
         FolioCandidate(
             label="Investigation", iri="https://folio.openlegalstandard.org/Rinvest",
             iri_hash="Rinvest", definition="An investigation activity",
-            synonyms=["Inquiry"], branch="Service", branch_color="#138D75",
+            synonyms=["Inquiry"], branch="Service", branch_color="#065e4e",
             hierarchy_path=[{"label": "Service", "iri_hash": "Rservice"}, {"label": "Investigation", "iri_hash": "Rinvest"}], score=85.0,
         ),
         FolioCandidate(
             label="Enforcement", iri="https://folio.openlegalstandard.org/Renforce",
             iri_hash="Renforce", definition="Enforcement activity",
-            synonyms=[], branch="Service", branch_color="#138D75",
+            synonyms=[], branch="Service", branch_color="#065e4e",
             hierarchy_path=[{"label": "Service", "iri_hash": "Rservice"}, {"label": "Enforcement", "iri_hash": "Renforce"}], score=80.0,
         ),
         FolioCandidate(
             label="Agency", iri="https://folio.openlegalstandard.org/Ragency",
             iri_hash="Ragency", definition="A governmental agency",
-            synonyms=["Bureau"], branch="Actor / Player", branch_color="#2E86C1",
+            synonyms=["Bureau"], branch="Actor / Player", branch_color="#1e6fa0",
             hierarchy_path=[{"label": "Actor / Player", "iri_hash": "Ractor"}, {"label": "Agency", "iri_hash": "Ragency"}], score=70.0,
         ),
     ]
@@ -921,7 +921,7 @@ async def test_acceptance_agency_investigation(llm_config):
         patch("app.services.pipeline.orchestrator._build_folio_candidate_from_judged", side_effect=lambda j, sl: FolioCandidate(
             label=sl[j.iri_hash].label, iri=f"https://folio.openlegalstandard.org/{j.iri_hash}",
             iri_hash=j.iri_hash, definition=sl[j.iri_hash].definition, synonyms=[],
-            branch="Service", branch_color="#138D75", hierarchy_path=[{"label": "Service", "iri_hash": "Rservice"}], score=j.adjusted_score,
+            branch="Service", branch_color="#065e4e", hierarchy_path=[{"label": "Service", "iri_hash": "Rservice"}], score=j.adjusted_score,
         ) if j.iri_hash in sl else None),
     ):
         result = await run_pipeline(items, llm_config)
