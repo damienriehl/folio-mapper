@@ -334,27 +334,29 @@ export function MappingScreen({
                 <PrescanDisplay itemText={currentItem.item_text} segments={prescanSegments ?? null} />
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSelectAllVisible}
-                  className="flex items-center gap-1 rounded border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Select All
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  disabled={currentSelections.length === 0}
-                  className="flex items-center gap-1 self-stretch rounded border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-40"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear
-                </button>
+                {visibleCandidateHashes.length > 0 && visibleCandidateHashes.every((h) => currentSelections.includes(h)) ? (
+                  <button
+                    type="button"
+                    onClick={handleClearAll}
+                    className="flex items-center gap-1 rounded border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear All
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSelectAllVisible}
+                    className="flex items-center gap-1 rounded border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Select All
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowBranchOptions(true)}
