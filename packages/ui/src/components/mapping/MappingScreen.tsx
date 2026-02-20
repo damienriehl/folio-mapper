@@ -329,8 +329,8 @@ export function MappingScreen({
           <div className="flex w-1/2 flex-col border-r border-gray-200">
             {/* Sticky "Your Input" header + Select All / Clear / Branch Options */}
             <div className="shrink-0 border-b border-gray-200 bg-white px-4 pt-3 pb-3">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Your Input</p>
               <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Your Input</p>
                 <PrescanDisplay itemText={currentItem.item_text} segments={prescanSegments ?? null} />
               </div>
               <div className="mt-2 flex items-center gap-2">
