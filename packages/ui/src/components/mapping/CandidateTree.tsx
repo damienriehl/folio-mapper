@@ -283,7 +283,7 @@ function HierarchyNodeComponent({
           />
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <span className="truncate font-medium">{node.label}</span>
-            <ConfidenceBadge score={node.candidate!.score} />
+            <ConfidenceBadge score={node.candidate!.score} isSelected={isSelected} />
           </span>
         </div>
         {!isCollapsed && (
@@ -401,7 +401,7 @@ function CandidateLeaf({
       />
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <span className="truncate font-medium">{candidate.label}</span>
-        <ConfidenceBadge score={candidate.score} />
+        <ConfidenceBadge score={candidate.score} isSelected={isSelected} />
       </span>
     </div>
   );
