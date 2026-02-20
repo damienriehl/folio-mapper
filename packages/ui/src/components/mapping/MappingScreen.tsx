@@ -192,8 +192,8 @@ export function MappingScreen({
   const [allExpanded, setAllExpanded] = useState(true);
   const [notesNudge, setNotesNudge] = useState(false);
 
-  // Clear notes nudge when navigating to a different item
-  useEffect(() => { setNotesNudge(false); }, [currentItemIndex]);
+  // Clear notes nudge and search query when navigating to a different item
+  useEffect(() => { setNotesNudge(false); setSearchQuery(''); }, [currentItemIndex]);
 
   const currentItem: ItemMappingResult | undefined = mappingResponse.items[currentItemIndex];
   const currentSelections = selections[currentItemIndex] || [];
