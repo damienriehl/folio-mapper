@@ -107,10 +107,15 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart,
           </span>
         )}
         {llmStatus === 'disconnected' && (
-          <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-600" title={llmProviderLabel ? `${llmProviderLabel} disconnected` : 'LLM disconnected'}>
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
-            LLM Disconnected
-          </span>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+            title={llmProviderLabel ? `${llmProviderLabel} not connected — click to configure` : 'LLM not connected — click to configure'}
+          >
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+            LLM Not Connected
+          </button>
         )}
         {onOpenSettings && (
           <button

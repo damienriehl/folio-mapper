@@ -73,7 +73,7 @@ export function App() {
   // Derive simplified LLM status for header badge
   const activeConfig = llmState.configs[llmState.activeProvider];
   const llmStatus = (() => {
-    if (!activeConfig || activeConfig.connectionStatus === 'untested') return 'none' as const;
+    if (!activeConfig) return 'none' as const;
     return activeConfig.connectionStatus === 'valid' ? 'connected' as const : 'disconnected' as const;
   })();
   const llmProviderLabel = PROVIDER_META[llmState.activeProvider]?.displayName ?? '';
