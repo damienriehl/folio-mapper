@@ -108,7 +108,7 @@ function OutputNodeComponent({
   node: OutputTreeNode;
   depth: number;
   selectedConceptIri: string | null;
-  onSelectConcept: (iri: string) => void;
+  onSelectConcept: (iri: string, label?: string) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
@@ -123,7 +123,7 @@ function OutputNodeComponent({
           isSelected ? 'bg-blue-100 ring-1 ring-blue-400' : 'text-gray-800 hover:bg-gray-50'
         }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        onClick={() => onSelectConcept(node.concept!.iri_hash)}
+        onClick={() => onSelectConcept(node.concept!.iri_hash, node.label)}
       >
         <span data-iri={node.concept!.iri_hash} className="text-xs text-gray-300">{'\u25CF'}</span>
         <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
@@ -140,7 +140,7 @@ function OutputNodeComponent({
             isSelected ? 'bg-blue-100 ring-1 ring-blue-400' : 'text-gray-800 hover:bg-gray-50'
           }`}
           style={{ paddingLeft: `${depth * 16 + 4}px` }}
-          onClick={() => onSelectConcept(node.concept!.iri_hash)}
+          onClick={() => onSelectConcept(node.concept!.iri_hash, node.label)}
         >
           <button
             data-iri={node.concept!.iri_hash}
@@ -169,17 +169,21 @@ function OutputNodeComponent({
     );
   }
 
-  // Structural (non-mapped) node
+  // Structural (non-mapped) node — clickable to show details
+  const isStructuralSelected = node.iriHash === selectedConceptIri;
   return (
     <div>
       <div
-        className="flex items-center gap-1.5 rounded py-1 text-sm text-gray-500"
+        className={`flex items-center gap-1.5 rounded py-1 text-sm ${
+          isStructuralSelected ? 'bg-blue-100 text-gray-700 ring-1 ring-blue-400' : 'cursor-pointer text-gray-500 hover:bg-gray-50'
+        }`}
         style={{ paddingLeft: `${depth * 16 + 4}px` }}
+        onClick={() => node.iriHash && onSelectConcept(node.iriHash, node.label)}
       >
         {hasChildren && (
           <button
             type="button"
-            onClick={() => setExpanded(!expanded)}
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
             className="shrink-0 text-xs text-gray-400"
           >
             {expanded ? '\u25BC' : '\u25B6'}
@@ -283,6 +287,7 @@ export function MappingsView({
 }: MappingsViewProps) {
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
   const [selectedConceptIri, setSelectedConceptIri] = useState<string | null>(null);
+  const [detailConcept, setDetailConcept] = useState<FolioCandidate | null>(null);
   const leftRef = useRef<HTMLDivElement>(null);
   const middleRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -293,10 +298,27 @@ export function MappingsView({
     : [];
   const branchGroups = groupByBranch(selectedConcepts);
 
-  // Detail concept (cast MappedConcept to FolioCandidate — same shape)
-  const detailConcept: FolioCandidate | null = selectedConceptIri
-    ? (selectedConcepts.find((c) => c.iri_hash === selectedConceptIri) as FolioCandidate) ?? null
-    : null;
+  // Select a concept for detail — works for both mapped and structural nodes
+  const selectConcept = useCallback((iriHash: string, label?: string) => {
+    setSelectedConceptIri(iriHash);
+    const mapped = selectedConcepts.find((c) => c.iri_hash === iriHash);
+    if (mapped) {
+      setDetailConcept(mapped as FolioCandidate);
+    } else {
+      // Structural node — create a stub; DetailPanel will fetch full details
+      setDetailConcept({
+        label: label || iriHash,
+        iri: '',
+        iri_hash: iriHash,
+        definition: null,
+        synonyms: [],
+        branch: '',
+        branch_color: '#6b7280',
+        hierarchy_path: [],
+        score: -1,
+      });
+    }
+  }, [selectedConcepts]);
 
   // Current item for DetailPanel
   const currentItem: ItemMappingResult | undefined = selectedItemIndex !== null
@@ -428,6 +450,7 @@ export function MappingsView({
                 onSelect={(idx) => {
                   setSelectedItemIndex(idx);
                   setSelectedConceptIri(null);
+                  setDetailConcept(null);
                 }}
                 mappingResponse={mappingResponse}
                 selections={selections}
@@ -486,7 +509,7 @@ export function MappingsView({
                         node={node}
                         depth={0}
                         selectedConceptIri={selectedConceptIri}
-                        onSelectConcept={(iri) => setSelectedConceptIri(iri)}
+                        onSelectConcept={selectConcept}
                       />
                     ))}
                   </div>

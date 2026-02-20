@@ -156,6 +156,9 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
     );
   }
 
+  // Prefer fetched detail over the passed-in candidate for display (handles stub candidates)
+  const display = detail ?? selectedCandidate;
+
   const availableLanguages = detail ? Object.keys(detail.translations) : [];
   const filteredTranslations = detail
     ? Object.entries(detail.translations).filter(([lang]) => selectedLanguages.includes(lang))
@@ -167,23 +170,25 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
         {/* Header: Label + Score + Branch + Options */}
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-900">{selectedCandidate.label}</h3>
-            {selectedCandidate.score >= 0 && <ConfidenceBadge score={selectedCandidate.score} />}
+            <h3 className="text-sm font-semibold text-gray-900">{display.label}</h3>
+            {display.score >= 0 && <ConfidenceBadge score={display.score} />}
           </div>
           <div className="mt-1 flex items-center gap-2">
+            {display.branch && (
             <span
               className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
               style={{
-                backgroundColor: selectedCandidate.branch_color + '15',
-                color: selectedCandidate.branch_color,
+                backgroundColor: display.branch_color + '15',
+                color: display.branch_color,
               }}
             >
               <span
                 className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: selectedCandidate.branch_color }}
+                style={{ backgroundColor: display.branch_color }}
               />
-              {selectedCandidate.branch}
+              {display.branch}
             </span>
+            )}
             {/* Options button */}
             <div className="relative" ref={optionsRef}>
               <button
@@ -228,21 +233,21 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
               )}
             </div>
             {/* IRI inline */}
-            {selectedCandidate.iri && (
-              <IriDisplay iri={selectedCandidate.iri} iriHash={selectedCandidate.iri_hash} />
+            {display.iri && (
+              <IriDisplay iri={display.iri} iriHash={display.iri_hash} />
             )}
           </div>
         </div>
 
         {/* Definition (truncated to 3 lines) */}
-        {selectedCandidate.definition && (
+        {display.definition && (
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Definition</p>
             <p
               ref={defRef}
               className={`mt-0.5 text-sm text-gray-700 ${!defExpanded ? 'line-clamp-3' : ''}`}
             >
-              {selectedCandidate.definition}
+              {display.definition}
             </p>
             {(defClamped || defExpanded) && (
               <button
@@ -256,12 +261,12 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
           </div>
         )}
 
-        {/* Synonyms (immediate, no loading needed) */}
-        {selectedCandidate.synonyms.length > 0 && (
+        {/* Synonyms */}
+        {display.synonyms.length > 0 && (
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Synonyms</p>
             <div className="mt-0.5 flex flex-wrap gap-1">
-              {selectedCandidate.synonyms.map((syn) => (
+              {display.synonyms.map((syn) => (
                 <span
                   key={syn}
                   className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
@@ -348,9 +353,9 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
                   <div className="mt-1">
                     <ConceptDAG
                       concept={{
-                        label: selectedCandidate.label,
-                        iri_hash: selectedCandidate.iri_hash,
-                        branch_color: selectedCandidate.branch_color,
+                        label: display.label,
+                        iri_hash: display.iri_hash,
+                        branch_color: display.branch_color,
                       }}
                       parents={dagParents}
                       children={detail.children}
@@ -371,7 +376,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
                   items={detail.siblings}
                   cutoff={5}
                   renderItem={renderClickablePill}
-                  selectedIriHash={selectedCandidate.iri_hash}
+                  selectedIriHash={display.iri_hash}
                 />
               </div>
             )}
@@ -386,7 +391,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
                   items={detail.related}
                   cutoff={5}
                   renderItem={renderClickablePill}
-                  selectedIriHash={selectedCandidate.iri_hash}
+                  selectedIriHash={display.iri_hash}
                 />
               </div>
             )}
@@ -403,7 +408,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
                   renderItem={(example, i) => (
                     <p key={i} className="text-xs text-gray-600">{example}</p>
                   )}
-                  selectedIriHash={selectedCandidate.iri_hash}
+                  selectedIriHash={display.iri_hash}
                 />
               </div>
             )}
