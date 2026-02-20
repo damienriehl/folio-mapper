@@ -4,7 +4,9 @@ import type {
   BranchState,
   InputHierarchyNode,
   FolioCandidate,
+  ItemMappingResult,
 } from '@folio-mapper/core';
+import { DetailPanel } from './DetailPanel';
 
 interface MappingsViewProps {
   inputHierarchy: InputHierarchyNode[] | null;
@@ -15,6 +17,7 @@ interface MappingsViewProps {
 }
 
 interface MappedConcept {
+  iri: string;
   iri_hash: string;
   label: string;
   branch: string;
@@ -39,6 +42,7 @@ function collectMappedConcepts(
     for (const c of group.candidates) {
       if (selectedHashes.includes(c.iri_hash)) {
         concepts.push({
+          iri: c.iri,
           iri_hash: c.iri_hash,
           label: c.label,
           branch: c.branch,
@@ -291,10 +295,15 @@ export function MappingsView({
     : [];
   const branchGroups = groupByBranch(selectedConcepts);
 
-  // Detail concept
-  const detailConcept = selectedConceptIri
-    ? selectedConcepts.find((c) => c.iri_hash === selectedConceptIri) ?? null
+  // Detail concept (cast MappedConcept to FolioCandidate — same shape)
+  const detailConcept: FolioCandidate | null = selectedConceptIri
+    ? (selectedConcepts.find((c) => c.iri_hash === selectedConceptIri) as FolioCandidate) ?? null
     : null;
+
+  // Current item for DetailPanel
+  const currentItem: ItemMappingResult | undefined = selectedItemIndex !== null
+    ? mappingResponse.items.find((i) => i.item_index === selectedItemIndex)
+    : undefined;
 
   // Draw SVG lines
   const drawLines = useCallback(() => {
@@ -407,7 +416,7 @@ export function MappingsView({
           ref={leftRef}
           className="w-[280px] shrink-0 overflow-y-auto border-r border-gray-200 bg-gray-50 p-3"
         >
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-600">
             Input Items
           </p>
           {nodes.length === 0 ? (
@@ -437,7 +446,7 @@ export function MappingsView({
           ref={middleRef}
           className="min-w-0 flex-1 overflow-y-auto border-l border-gray-200 p-4"
         >
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-600">
             Mapped FOLIO Concepts
           </p>
           {selectedItemIndex === null ? (
@@ -489,71 +498,25 @@ export function MappingsView({
           )}
         </div>
 
-        {/* Right pane: Concept details */}
-        <div className="w-[320px] shrink-0 overflow-y-auto border-l border-gray-200 bg-gray-50 p-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Concept Details
-          </p>
-          {detailConcept ? (
-            <div className="space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-800">
-                  {detailConcept.label}
-                </h3>
-                <p className="mt-0.5 text-xs text-gray-500">{detailConcept.iri_hash}</p>
+        {/* Right pane: Concept details (reuses main DetailPanel) */}
+        <div className="flex w-[320px] shrink-0 flex-col border-l border-gray-200 bg-gray-50">
+          <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
+            <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+              Concept Details
+            </h2>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {currentItem ? (
+              <DetailPanel
+                currentItem={currentItem}
+                selectedCandidate={detailConcept}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-xs text-gray-400">Select an input item, then click a concept</p>
               </div>
-              {detailConcept.definition && (
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                    Definition
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-700">{detailConcept.definition}</p>
-                </div>
-              )}
-              {detailConcept.synonyms.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                    Synonyms
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-700">
-                    {detailConcept.synonyms.join(', ')}
-                  </p>
-                </div>
-              )}
-              {detailConcept.hierarchy_path.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                    Hierarchy
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-700">
-                    {detailConcept.hierarchy_path.map((p) => p.label).join(' > ')}
-                  </p>
-                </div>
-              )}
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                  Branch
-                </p>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: detailConcept.branch_color }}
-                  />
-                  <span className="text-xs text-gray-700">{detailConcept.branch}</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                  Confidence
-                </p>
-                <p className="mt-0.5 text-xs text-gray-700">{Math.round(detailConcept.score)}%</p>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-8 text-center text-xs text-gray-400">
-              Click a concept to see details
-            </p>
-          )}
+            )}
+          </div>
         </div>
       </div>
       </div>
