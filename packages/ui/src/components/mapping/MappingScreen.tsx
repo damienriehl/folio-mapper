@@ -17,7 +17,7 @@ import { DEFAULT_BRANCH_ORDER, fetchConcept, computeScoreCutoff } from '@folio-m
 import { CandidatePanel } from './CandidatePanel';
 import { DetailPanel } from './DetailPanel';
 import { MappingToolbar } from './MappingToolbar';
-import { MappingFooter } from './MappingFooter';
+
 import { FolioLoadingOverlay } from './FolioLoadingOverlay';
 import { GoToDialog } from './GoToDialog';
 import { BranchOptionsModal } from './BranchOptionsModal';
@@ -643,12 +643,6 @@ export function MappingScreen({
           </div>
         </div>
       )}
-
-      <MappingFooter
-        nodeStatuses={nodeStatuses}
-        suggestionCount={suggestionQueue.length}
-        reviewCount={reviewQueue.length}
-      />
 
       {showGoToDialog && (
         <GoToDialog totalItems={totalItems} onGoTo={onGoTo} onClose={onCloseGoTo} />

@@ -16,7 +16,7 @@ export { CandidateTree } from './components/mapping/CandidateTree';
 export { BranchFilter } from './components/mapping/BranchFilter';
 export { DetailPanel } from './components/mapping/DetailPanel';
 export { MappingToolbar } from './components/mapping/MappingToolbar';
-export { MappingFooter } from './components/mapping/MappingFooter';
+
 export { ConfidenceBadge } from './components/mapping/ConfidenceBadge';
 export { IriDisplay } from './components/mapping/IriDisplay';
 export { GoToDialog } from './components/mapping/GoToDialog';
