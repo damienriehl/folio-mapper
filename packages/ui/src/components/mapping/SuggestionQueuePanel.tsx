@@ -37,14 +37,14 @@ export function SuggestionQueuePanel({
   }, [currentItemIndex, collapsed, queue.length]);
 
   return (
-    <div className="shrink-0 border-t border-gray-200 bg-white">
+    <div className="shrink-0 border-t border-gray-300 bg-gray-200">
       <button
         type="button"
         onClick={() => setCollapsed((p) => !p)}
-        className="flex w-full items-center justify-between px-4 py-2 text-left hover:bg-gray-50"
+        className="flex w-full items-center justify-between px-4 py-1.5 text-left hover:bg-gray-300/50"
       >
         <span className="flex items-center gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
             Suggestion Queue
           </p>
           {queue.length > 0 && (

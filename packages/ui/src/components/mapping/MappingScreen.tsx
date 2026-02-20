@@ -546,12 +546,12 @@ export function MappingScreen({
           <div className="flex w-1/2 flex-col">
             {/* Top half: Current Selection(s) */}
             <div className="flex min-h-0 flex-1 flex-col border-b border-gray-200">
-              <div className="shrink-0 border-b border-gray-100 bg-white px-4 pt-3 pb-2">
+              <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
                     Current Selection(s)
-                  </p>
-                  <span className="text-xs text-gray-400">
+                  </h2>
+                  <span className="text-[11px] text-gray-500">
                     {currentSelections.length} of {visibleCandidateHashes.length} selected
                   </span>
                 </div>
@@ -567,10 +567,10 @@ export function MappingScreen({
             </div>
             {/* Bottom half: Candidate Details */}
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="shrink-0 border-b border-gray-100 bg-white px-4 pt-3 pb-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
                   Candidate Details
-                </p>
+                </h2>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 <DetailPanel
@@ -581,10 +581,10 @@ export function MappingScreen({
               </div>
             </div>
             {/* Notes — amber when current item is in suggestion or review queue */}
-            <div className={`shrink-0 border-b border-gray-200 px-4 py-2 ${notesNudge ? 'animate-[nudge-bg_1s_ease-in-out_forwards]' : (isCurrentSuggested || isCurrentReviewed) ? 'bg-amber-50' : 'bg-white'}`}>
+            <div className={`shrink-0 border-b border-gray-300 px-4 py-2 ${notesNudge ? 'animate-[nudge-bg_1s_ease-in-out_forwards]' : (isCurrentSuggested || isCurrentReviewed) ? 'bg-amber-50' : 'bg-gray-200'}`}>
               <style dangerouslySetInnerHTML={{ __html: NUDGE_KEYFRAMES }} />
               <div className="mb-1 flex items-center gap-2">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500" htmlFor="item-note">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600" htmlFor="item-note">
                   Notes
                 </label>
                 {notesNudge && (
