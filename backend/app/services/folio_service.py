@@ -202,6 +202,28 @@ def _build_hierarchy_path(folio: FOLIO, iri_hash: str) -> list[HierarchyPathEntr
     return path
 
 
+def _get_all_parents(folio: FOLIO, iri_hash: str) -> list[HierarchyPathEntry]:
+    """Return all immediate parents of a class (for polyhierarchy DAG display)."""
+    owl_class = folio[iri_hash]
+    if not owl_class or not owl_class.sub_class_of:
+        return []
+
+    owl_thing = "http://www.w3.org/2002/07/owl#Thing"
+    parents: list[HierarchyPathEntry] = []
+    for parent_iri in owl_class.sub_class_of:
+        if parent_iri == owl_thing:
+            continue
+        parent_hash = _extract_iri_hash(parent_iri)
+        parent_class = folio[parent_hash]
+        if parent_class:
+            parents.append(HierarchyPathEntry(
+                label=parent_class.label or parent_hash,
+                iri_hash=parent_hash,
+            ))
+    parents.sort(key=lambda e: e.label)
+    return parents
+
+
 def _tokenize(text: str) -> list[str]:
     """Split text into lowercase alphabetic tokens (2+ chars)."""
     return [w.lower() for w in re.findall(r"[a-zA-Z]+", text) if len(w) >= 2]
@@ -447,6 +469,7 @@ def lookup_concept_detail(iri_hash: str) -> ConceptDetail | None:
         branch_color=get_branch_color(branch_name),
         hierarchy_path=_build_hierarchy_path(folio, iri_hash),
         score=-1,
+        all_parents=_get_all_parents(folio, iri_hash),
         children=children,
         siblings=siblings,
         related=related,

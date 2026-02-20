@@ -195,6 +195,9 @@ def test_concept_detail_model():
             {"label": "Contract Law", "iri_hash": "RCIPwpgRpMs1eVz4vPid0pV"},
         ],
         score=-1,
+        all_parents=[
+            HierarchyPathEntry(label="Area of Law", iri_hash="RAoL"),
+        ],
         children=[
             HierarchyPathEntry(label="Commercial Contracts", iri_hash="Rchild1"),
             HierarchyPathEntry(label="Consumer Contracts", iri_hash="Rchild2"),
@@ -209,6 +212,8 @@ def test_concept_detail_model():
         translations={"es": "Derecho Contractual", "fr": "Droit des contrats"},
     )
     assert cd.label == "Contract Law"
+    assert len(cd.all_parents) == 1
+    assert cd.all_parents[0].label == "Area of Law"
     assert len(cd.children) == 2
     assert cd.children[0].label == "Commercial Contracts"
     assert len(cd.siblings) == 1
@@ -226,6 +231,7 @@ def test_concept_detail_defaults():
         branch_color="#1A5276",
         score=-1,
     )
+    assert cd.all_parents == []
     assert cd.children == []
     assert cd.siblings == []
     assert cd.related == []
@@ -249,6 +255,7 @@ MOCK_CONCEPT_DETAIL = ConceptDetail(
         {"label": "Animal Law", "iri_hash": "Rtest1"},
     ],
     score=-1,
+    all_parents=[HierarchyPathEntry(label="Area of Law", iri_hash="RAoL")],
     children=[HierarchyPathEntry(label="Wildlife Law", iri_hash="Rchild1")],
     siblings=[HierarchyPathEntry(label="Environmental Law", iri_hash="Rsib1")],
     related=[],
@@ -264,6 +271,8 @@ async def test_get_concept_detail(mock_lookup, client: AsyncClient):
     assert resp.status_code == 200
     data = resp.json()
     assert data["label"] == "Animal Law"
+    assert len(data["all_parents"]) == 1
+    assert data["all_parents"][0]["label"] == "Area of Law"
     assert len(data["children"]) == 1
     assert data["children"][0]["label"] == "Wildlife Law"
     assert len(data["siblings"]) == 1

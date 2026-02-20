@@ -3,6 +3,7 @@ import type { ConceptDetail, FolioCandidate, HierarchyPathEntry, ItemMappingResu
 import { fetchConceptDetail } from '@folio-mapper/core';
 import { IriDisplay } from './IriDisplay';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import { ConceptDAG } from './ConceptDAG';
 
 interface DetailPanelProps {
   currentItem: ItemMappingResult;
@@ -263,40 +264,33 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
               </div>
             )}
 
-            {/* Parents (hierarchy breadcrumb) */}
-            {detail.hierarchy_path.length > 0 && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Parents</p>
-                <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs">
-                  {detail.hierarchy_path.map((entry, i) => (
-                    <span key={i} className="flex items-center gap-1">
-                      {i > 0 && <span className="text-blue-300">&rsaquo;</span>}
-                      <span
-                        onClick={() => onSelectForDetail?.(entry.iri_hash)}
-                        className={`rounded px-1.5 py-0.5 font-medium ${i === detail.hierarchy_path.length - 1 ? 'bg-blue-200 text-blue-900' : 'bg-blue-50 text-blue-600'} ${onSelectForDetail ? 'cursor-pointer hover:bg-blue-200 hover:text-blue-900' : ''}`}
-                      >
-                        {entry.label}
-                      </span>
-                    </span>
-                  ))}
+            {/* Ontology Context (DAG visualization) */}
+            {(() => {
+              const dagParents = detail.all_parents?.length
+                ? detail.all_parents
+                : detail.hierarchy_path.length > 1
+                  ? detail.hierarchy_path.slice(0, -1)
+                  : [];
+              return (dagParents.length > 0 || detail.children.length > 0) ? (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Ontology Context
+                  </p>
+                  <div className="mt-1">
+                    <ConceptDAG
+                      concept={{
+                        label: selectedCandidate.label,
+                        iri_hash: selectedCandidate.iri_hash,
+                        branch_color: selectedCandidate.branch_color,
+                      }}
+                      parents={dagParents}
+                      children={detail.children}
+                      onSelectForDetail={onSelectForDetail}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* Children */}
-            {detail.children.length > 0 && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Children ({detail.children.length})
-                </p>
-                <ExpandableList
-                  items={detail.children}
-                  cutoff={5}
-                  renderItem={renderClickablePill}
-                  selectedIriHash={selectedCandidate.iri_hash}
-                />
-              </div>
-            )}
+              ) : null;
+            })()}
 
             {/* Siblings */}
             {detail.siblings.length > 0 && (

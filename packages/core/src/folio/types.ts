@@ -16,6 +16,7 @@ export interface FolioCandidate {
 }
 
 export interface ConceptDetail extends FolioCandidate {
+  all_parents?: HierarchyPathEntry[];
   children: HierarchyPathEntry[];
   siblings: HierarchyPathEntry[];
   related: HierarchyPathEntry[];

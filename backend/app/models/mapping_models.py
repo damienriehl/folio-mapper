@@ -29,6 +29,7 @@ class FolioCandidate(BaseModel):
 
 
 class ConceptDetail(FolioCandidate):
+    all_parents: list[HierarchyPathEntry] = []
     children: list[HierarchyPathEntry] = []
     siblings: list[HierarchyPathEntry] = []
     related: list[HierarchyPathEntry] = []
