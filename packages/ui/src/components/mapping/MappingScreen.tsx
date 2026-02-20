@@ -360,41 +360,48 @@ export function MappingScreen({
                     const q = searchQuery.trim();
                     if (!q || isSearching) return;
                     await onSearch(q);
-                    setSearchQuery('');
                   }}
                 >
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      // Clear filter when user edits the search term
+                      if (searchFilterHashes && onClearSearchFilter) onClearSearchFilter();
+                    }}
                     placeholder="Search and filter candidates..."
                     disabled={isSearching}
-                    className="w-44 rounded border border-gray-300 px-2 py-1 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none disabled:opacity-50"
+                    className={`w-44 rounded border px-2 py-1 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none disabled:opacity-50 ${
+                      searchFilterHashes ? 'border-blue-400 bg-blue-50 text-blue-800' : 'border-gray-300'
+                    }`}
                   />
-                  <button
-                    type="submit"
-                    disabled={isSearching || !searchQuery.trim()}
-                    className="flex items-center gap-1 rounded border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-40"
-                  >
-                    {isSearching ? (
-                      <span className="inline-block h-3 w-3 animate-spin rounded-full border border-blue-300 border-t-blue-600" />
-                    ) : (
-                      <>
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        Search
-                      </>
-                    )}
-                  </button>
-                  {searchFilterHashes && (
+                  {searchFilterHashes ? (
                     <button
                       type="button"
-                      onClick={onClearSearchFilter}
-                      className="flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-200"
+                      onClick={() => { onClearSearchFilter?.(); setSearchQuery(''); }}
+                      className="flex items-center gap-1 rounded border border-blue-300 bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-200"
+                      title="Clear search filter"
                     >
-                      {searchFilterHashes.length} found
                       <span className="text-blue-500">&times;</span>
+                      Clear
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={isSearching || !searchQuery.trim()}
+                      className="flex items-center gap-1 rounded border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-40"
+                    >
+                      {isSearching ? (
+                        <span className="inline-block h-3 w-3 animate-spin rounded-full border border-blue-300 border-t-blue-600" />
+                      ) : (
+                        <>
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          Search
+                        </>
+                      )}
                     </button>
                   )}
                 </form>
