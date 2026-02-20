@@ -92,9 +92,9 @@ export function MappingToolbar({
                 className="cursor-pointer text-xs font-medium text-gray-500 whitespace-nowrap hover:text-blue-600"
                 htmlFor="toolbar-topn"
                 onClick={(e) => { e.preventDefault(); onTopNChange?.(safeDefaultTopN); }}
-                title="Click to reset to default"
+                title="Reset to default"
               >
-                Top N
+                Show
               </label>
               <input
                 id="toolbar-topn"
@@ -111,9 +111,9 @@ export function MappingToolbar({
                   type="button"
                   onClick={() => onDefaultTopNChange?.(safeTopN)}
                   className="rounded border border-blue-300 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 hover:bg-blue-100"
-                  title="Set current Top N as the default for all items"
+                  title="Save current value as the default for all items"
                 >
-                  Set default
+                  Save as default
                 </button>
               )}
             </div>
