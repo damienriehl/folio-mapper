@@ -52,12 +52,26 @@ function ExpandableList<T>({
   );
 }
 
+/** Map a locale code like "de-de" or "ja-jp" to a flag emoji using the country portion. */
+function localeToFlag(locale: string): string {
+  const parts = locale.split('-');
+  const country = (parts[1] || parts[0]).toUpperCase();
+  if (country.length !== 2) return '';
+  return String.fromCodePoint(
+    ...Array.from(country).map((c) => 0x1f1a5 + c.charCodeAt(0)),
+  );
+}
+
 export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail }: DetailPanelProps) {
   const [detail, setDetail] = useState<ConceptDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [showTranslations, setShowTranslations] = useState(true);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [defExpanded, setDefExpanded] = useState(false);
+  const [defClamped, setDefClamped] = useState(false);
+  const [transExpanded, setTransExpanded] = useState(false);
+  const defRef = useRef<HTMLParagraphElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
 
   // Fetch extended detail when candidate changes
@@ -70,6 +84,8 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
     let cancelled = false;
     setIsLoading(true);
     setDetail(null);
+    setDefExpanded(false);
+    setTransExpanded(false);
 
     fetchConceptDetail(selectedCandidate.iri_hash)
       .then((d) => {
@@ -88,6 +104,16 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
 
     return () => { cancelled = true; };
   }, [selectedCandidate?.iri_hash]);
+
+  // Detect whether definition text is actually clamped
+  useEffect(() => {
+    const el = defRef.current;
+    if (!el) { setDefClamped(false); return; }
+    // Wait a frame for line-clamp to take effect
+    requestAnimationFrame(() => {
+      setDefClamped(el.scrollHeight > el.clientHeight + 1);
+    });
+  }, [selectedCandidate?.iri_hash, selectedCandidate?.definition]);
 
   // Close options popover on click outside
   useEffect(() => {
@@ -193,7 +219,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
                             onChange={() => toggleLanguage(lang)}
                             className="rounded border-gray-300"
                           />
-                          {lang}
+                          {localeToFlag(lang)} {lang}
                         </label>
                       ))}
                     </div>
@@ -201,22 +227,32 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
                 </div>
               )}
             </div>
+            {/* IRI inline */}
+            {selectedCandidate.iri && (
+              <IriDisplay iri={selectedCandidate.iri} iriHash={selectedCandidate.iri_hash} />
+            )}
           </div>
         </div>
 
-        {/* IRI */}
-        {selectedCandidate.iri && (
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">IRI</p>
-            <IriDisplay iri={selectedCandidate.iri} iriHash={selectedCandidate.iri_hash} />
-          </div>
-        )}
-
-        {/* Definition */}
+        {/* Definition (truncated to 3 lines) */}
         {selectedCandidate.definition && (
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Definition</p>
-            <p className="mt-0.5 text-sm text-gray-700">{selectedCandidate.definition}</p>
+            <p
+              ref={defRef}
+              className={`mt-0.5 text-sm text-gray-700 ${!defExpanded ? 'line-clamp-3' : ''}`}
+            >
+              {selectedCandidate.definition}
+            </p>
+            {(defClamped || defExpanded) && (
+              <button
+                type="button"
+                onClick={() => setDefExpanded(!defExpanded)}
+                className="text-xs text-blue-600 hover:text-blue-800"
+              >
+                {defExpanded ? 'Show less' : 'See more...'}
+              </button>
+            )}
           </div>
         )}
 
@@ -247,20 +283,53 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
 
         {detail && (
           <>
-            {/* Translations */}
+            {/* Translations (collapsed to one line by default) */}
             {showTranslations && filteredTranslations.length > 0 && (
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Translations</p>
-                <div className="mt-0.5 flex flex-wrap gap-1">
-                  {filteredTranslations.map(([lang, text]) => (
-                    <span
-                      key={lang}
-                      className="rounded bg-purple-50 px-1.5 py-0.5 text-xs text-purple-700"
-                    >
-                      <span className="font-medium">{lang}:</span> {text}
-                    </span>
-                  ))}
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Translations</p>
+                  <button
+                    type="button"
+                    onClick={() => setTransExpanded(!transExpanded)}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    {transExpanded ? 'collapse' : `(${filteredTranslations.length})`}
+                  </button>
                 </div>
+                {transExpanded ? (
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {filteredTranslations.map(([lang, text]) => (
+                      <span
+                        key={lang}
+                        className="rounded bg-purple-50 px-1.5 py-0.5 text-xs text-purple-700"
+                      >
+                        <span className="font-medium">{localeToFlag(lang)}</span> {text}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-0.5 flex items-center gap-1 overflow-hidden">
+                    <div className="flex gap-1 overflow-hidden">
+                      {filteredTranslations.slice(0, 3).map(([lang, text]) => (
+                        <span
+                          key={lang}
+                          className="shrink-0 rounded bg-purple-50 px-1.5 py-0.5 text-xs text-purple-700"
+                        >
+                          <span className="font-medium">{localeToFlag(lang)}</span> {text}
+                        </span>
+                      ))}
+                    </div>
+                    {filteredTranslations.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setTransExpanded(true)}
+                        className="shrink-0 text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        +{filteredTranslations.length - 3} more
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
