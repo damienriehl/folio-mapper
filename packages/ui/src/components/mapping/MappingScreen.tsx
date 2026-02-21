@@ -536,6 +536,7 @@ export function MappingScreen({
                 expandAllSignal={expandAllSignal}
                 collapseAllSignal={collapseAllSignal}
                 searchFilterHashes={searchFilterHashes}
+                isProcessing={isBatchLoading || isLoadingCandidates}
               />
             </div>
           </div>

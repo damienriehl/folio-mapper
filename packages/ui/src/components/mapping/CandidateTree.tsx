@@ -52,6 +52,7 @@ interface CandidateTreeProps {
   expandAllSignal?: number;
   collapseAllSignal?: number;
   searchFilterHashes?: string[] | null;
+  isProcessing?: boolean;
 }
 
 export function CandidateTree({
@@ -66,6 +67,7 @@ export function CandidateTree({
   expandAllSignal,
   collapseAllSignal,
   searchFilterHashes,
+  isProcessing,
 }: CandidateTreeProps) {
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
 
@@ -118,6 +120,14 @@ export function CandidateTree({
   });
 
   if (visibleGroups.length === 0) {
+    if (isProcessing) {
+      return (
+        <div className="flex items-center justify-center gap-2 py-4">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+          <span className="text-sm text-gray-500">Processing with LLM...</span>
+        </div>
+      );
+    }
     return (
       <p className="py-4 text-center text-sm text-gray-400">
         No candidates match the current filters
@@ -198,11 +208,18 @@ export function CandidateTree({
             {!isBranchCollapsed && (
               <div className="ml-4 border-l border-gray-100 pl-1">
                 {tree.length === 0 ? (
+                  isProcessing ? (
+                    <div className="flex items-center gap-2 py-1">
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+                      <span className="text-xs text-gray-500">Processing with LLM...</span>
+                    </div>
+                  ) : (
                   <p className="py-1 text-xs text-gray-400">
                     {isMandatory
                       ? 'No candidates found \u2014 try a manual search or expand the Top N slider above'
                       : 'No candidates in Top N filter \u2014 try expanding the slider above or a manual search'}
                   </p>
+                  )
                 ) : (
                   tree.map((node) => (
                     <HierarchyNodeComponent

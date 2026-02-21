@@ -13,6 +13,7 @@ interface CandidatePanelProps {
   expandAllSignal?: number;
   collapseAllSignal?: number;
   searchFilterHashes?: string[] | null;
+  isProcessing?: boolean;
 }
 
 export function CandidatePanel({
@@ -27,6 +28,7 @@ export function CandidatePanel({
   expandAllSignal,
   collapseAllSignal,
   searchFilterHashes,
+  isProcessing,
 }: CandidatePanelProps) {
   return (
     <div className="flex h-full flex-col">
@@ -43,6 +45,7 @@ export function CandidatePanel({
           expandAllSignal={expandAllSignal}
           collapseAllSignal={collapseAllSignal}
           searchFilterHashes={searchFilterHashes}
+          isProcessing={isProcessing}
         />
       </div>
     </div>
