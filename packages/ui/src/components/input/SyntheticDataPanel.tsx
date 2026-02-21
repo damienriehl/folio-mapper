@@ -3,6 +3,7 @@ import { useState } from 'react';
 interface SyntheticDataPanelProps {
   llmConnected: boolean;
   isGenerating: boolean;
+  error?: string | null;
   onGenerate: (count: number) => void;
   onOpenSettings: () => void;
 }
@@ -10,6 +11,7 @@ interface SyntheticDataPanelProps {
 export function SyntheticDataPanel({
   llmConnected,
   isGenerating,
+  error,
   onGenerate,
   onOpenSettings,
 }: SyntheticDataPanelProps) {
@@ -60,6 +62,9 @@ export function SyntheticDataPanel({
               </>
             )}
           </button>
+          {error && (
+            <p className="text-xs text-red-600">{error}</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

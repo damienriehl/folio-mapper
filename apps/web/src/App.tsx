@@ -71,6 +71,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isGeneratingSynthetic, setIsGeneratingSynthetic] = useState(false);
+  const [syntheticError, setSyntheticError] = useState<string | null>(null);
 
   // Derive simplified LLM status for header badge
   const activeConfig = llmState.configs[llmState.activeProvider];
@@ -295,6 +296,7 @@ export function App() {
   const handleGenerateSynthetic = async (count: number) => {
     const cfg = llmState.configs[llmState.activeProvider];
     if (cfg?.connectionStatus !== 'valid') return;
+    setSyntheticError(null);
     setIsGeneratingSynthetic(true);
     try {
       const result = await fetchSyntheticData(count, {
@@ -305,7 +307,7 @@ export function App() {
       });
       setTextInput(result.text);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Synthetic generation failed');
+      setSyntheticError(err instanceof Error ? err.message : 'Synthetic generation failed');
     } finally {
       setIsGeneratingSynthetic(false);
     }
@@ -623,6 +625,7 @@ export function App() {
             <SyntheticDataPanel
               llmConnected={llmStatus === 'connected'}
               isGenerating={isGeneratingSynthetic}
+              error={syntheticError}
               onGenerate={handleGenerateSynthetic}
               onOpenSettings={() => setShowSettings(true)}
             />

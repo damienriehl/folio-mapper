@@ -28,6 +28,9 @@ async def synthetic_generate(
             llm_config=body.llm_config,
             api_key=api_key,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Synthetic generation failed")
-        raise HTTPException(status_code=500, detail="Synthetic generation failed") from exc
+        detail = str(exc) if str(exc) else "Synthetic generation failed"
+        raise HTTPException(status_code=500, detail=detail) from exc
