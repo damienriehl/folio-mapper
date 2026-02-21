@@ -38,8 +38,12 @@ async def generate_synthetic_data(
 
     text = sanitize_output(raw)
 
-    # Count non-empty lines
+    # Truncate to requested count (LLMs often overshoot)
     lines = [line for line in text.splitlines() if line.strip()]
+    if len(lines) > count:
+        lines = lines[:count]
+        text = "\n".join(lines)
+
     item_count = len(lines)
 
     return SyntheticResponse(text=text, item_count=item_count)
