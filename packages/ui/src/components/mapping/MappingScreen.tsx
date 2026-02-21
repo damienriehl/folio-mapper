@@ -347,7 +347,7 @@ export function MappingScreen({
               <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-3">
                 <PrescanDisplay itemText={currentItem.item_text} segments={prescanSegments ?? null} />
               </div>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <form
                   className="flex items-center gap-1"
                   onSubmit={async (e) => {
@@ -423,7 +423,7 @@ export function MappingScreen({
                     Clear All
                   </button>
                 )}
-                <div className="ml-auto flex items-center gap-2">
+                <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
