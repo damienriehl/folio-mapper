@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { parseText, testConnection, fetchModels, fetchKnownModels, BRANCH_COLORS, PROVIDER_META } from '@folio-mapper/core';
+import { parseText, testConnection, fetchModels, fetchKnownModels, fetchSyntheticData, BRANCH_COLORS, PROVIDER_META } from '@folio-mapper/core';
 import type { SuggestionEntry, ReviewEntry, InputHierarchyNode, HierarchyNode } from '@folio-mapper/core';
 import {
   AppShell,
@@ -13,6 +13,7 @@ import {
   LLMSettings,
   ModelChooser,
   BranchOptionsPanel,
+  SyntheticDataPanel,
   SessionRecoveryModal,
   NewProjectModal,
   ExportModal,
@@ -69,6 +70,7 @@ export function App() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isGeneratingSynthetic, setIsGeneratingSynthetic] = useState(false);
 
   // Derive simplified LLM status for header badge
   const activeConfig = llmState.configs[llmState.activeProvider];
@@ -287,6 +289,25 @@ export function App() {
       setParseResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Parse failed');
+    }
+  };
+
+  const handleGenerateSynthetic = async (count: number) => {
+    const cfg = llmState.configs[llmState.activeProvider];
+    if (cfg?.connectionStatus !== 'valid') return;
+    setIsGeneratingSynthetic(true);
+    try {
+      const result = await fetchSyntheticData(count, {
+        provider: llmState.activeProvider,
+        api_key: cfg.apiKey || null,
+        base_url: cfg.baseUrl || null,
+        model: cfg.model || null,
+      });
+      setTextInput(result.text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Synthetic generation failed');
+    } finally {
+      setIsGeneratingSynthetic(false);
     }
   };
 
@@ -596,6 +617,14 @@ export function App() {
               onSubmit={handleTextSubmit}
               disabled={isLoading}
               isTabular={isTabular}
+            />
+          }
+          syntheticDataPanel={
+            <SyntheticDataPanel
+              llmConnected={llmStatus === 'connected'}
+              isGenerating={isGeneratingSynthetic}
+              onGenerate={handleGenerateSynthetic}
+              onOpenSettings={() => setShowSettings(true)}
             />
           }
           branchOptions={
