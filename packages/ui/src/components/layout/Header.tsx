@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 type LLMStatus = 'connected' | 'disconnected' | 'none';
 
 interface HeaderProps {
@@ -9,9 +11,10 @@ interface HeaderProps {
   hasActiveSession?: boolean;
   llmStatus?: LLMStatus;
   llmProviderLabel?: string;
+  newProjectPopover?: ReactNode;
 }
 
-export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession, llmStatus, llmProviderLabel }: HeaderProps) {
+export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession, llmStatus, llmProviderLabel, newProjectPopover }: HeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
       <h1 className="text-xl font-semibold text-gray-900">FOLIO Mapper</h1>
@@ -83,22 +86,25 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart,
         )}
         */}
         {hasActiveSession && onNewProject && (
-          <button
-            onClick={onNewProject}
-            className="flex items-center gap-1 rounded px-2 py-1.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            title="Start New Project"
-            aria-label="New project"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            New
-          </button>
+          <div className="relative">
+            <button
+              onClick={onNewProject}
+              className="flex items-center gap-1 rounded px-2 py-1.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Start New Project"
+              aria-label="New project"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              New
+            </button>
+            {newProjectPopover}
+          </div>
         )}
         {onOpenSettings && llmStatus === 'connected' && (
           <button

@@ -411,6 +411,13 @@ export function App() {
           hasActiveSession={session.hasActiveSession}
           llmStatus={llmStatus}
           llmProviderLabel={llmProviderLabel}
+          newProjectPopover={session.showNewProjectModal ? (
+            <NewProjectModal
+              onSaveAndNew={session.handleSaveAndNew}
+              onDiscardAndNew={session.handleDiscardAndNew}
+              onCancel={session.handleCancelNewProject}
+            />
+          ) : null}
         />
         {showDisconnectToast && (
           <div className="flex items-center justify-center gap-2 bg-amber-50 px-4 py-2 text-sm text-amber-800 border-b border-amber-200">
@@ -426,13 +433,6 @@ export function App() {
           </div>
         )}
         {settingsModal}
-        {session.showNewProjectModal && (
-          <NewProjectModal
-            onSaveAndNew={session.handleSaveAndNew}
-            onDiscardAndNew={session.handleDiscardAndNew}
-            onCancel={session.handleCancelNewProject}
-          />
-        )}
         {showMappingsView && mappingState.mappingResponse && (
           <MappingsView
             inputHierarchy={inputHierarchy}
@@ -591,14 +591,6 @@ export function App() {
           onResume={session.handleResume}
           onStartFresh={session.handleStartFresh}
           onDownload={session.handleDownloadSession}
-        />
-      )}
-
-      {session.showNewProjectModal && (
-        <NewProjectModal
-          onSaveAndNew={session.handleSaveAndNew}
-          onDiscardAndNew={session.handleDiscardAndNew}
-          onCancel={session.handleCancelNewProject}
         />
       )}
 
