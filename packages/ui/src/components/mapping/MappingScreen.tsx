@@ -322,7 +322,6 @@ export function MappingScreen({
         nodeStatuses={nodeStatuses}
         topN={topN}
         defaultTopN={defaultTopN}
-        statusFilter={statusFilter}
         onPrev={onPrev}
         onNext={onNext}
         onSkip={onSkip}
@@ -331,7 +330,6 @@ export function MappingScreen({
         onEdit={onEdit}
         onTopNChange={onTopNChange}
         onDefaultTopNChange={onDefaultTopNChange}
-        onStatusFilterChange={onStatusFilterChange}
         onShowShortcuts={onShowShortcuts}
         onMappings={onMappings}
         onExport={onExport}

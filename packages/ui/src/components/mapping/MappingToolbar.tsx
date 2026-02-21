@@ -1,4 +1,4 @@
-import type { NodeStatus, StatusFilter } from '@folio-mapper/core';
+import type { NodeStatus } from '@folio-mapper/core';
 
 interface MappingToolbarProps {
   currentIndex: number;
@@ -6,7 +6,6 @@ interface MappingToolbarProps {
   nodeStatuses: Record<number, NodeStatus>;
   topN: number;
   defaultTopN: number;
-  statusFilter: StatusFilter;
   onPrev: () => void;
   onNext: () => void;
   onSkip: () => void;
@@ -15,7 +14,6 @@ interface MappingToolbarProps {
   onEdit: () => void;
   onTopNChange: (value: number) => void;
   onDefaultTopNChange: (value: number) => void;
-  onStatusFilterChange: (filter: StatusFilter) => void;
   onShowShortcuts: () => void;
   onMappings?: () => void;
   onExport?: () => void;
@@ -29,7 +27,6 @@ export function MappingToolbar({
   nodeStatuses,
   topN,
   defaultTopN,
-  statusFilter,
   onPrev,
   onNext,
   onSkip,
@@ -38,7 +35,6 @@ export function MappingToolbar({
   onEdit,
   onTopNChange,
   onDefaultTopNChange,
-  onStatusFilterChange,
   onShowShortcuts,
   onMappings,
   onExport,
@@ -121,17 +117,6 @@ export function MappingToolbar({
         </div>
 
         <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => onStatusFilterChange(e.target.value as StatusFilter)}
-            className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 focus:border-blue-400 focus:outline-none"
-          >
-            <option value="all">All items</option>
-            <option value="pending">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="skipped">Skipped</option>
-            <option value="needs_attention">Needs attention</option>
-          </select>
           {onMappings && (
             <button
               type="button"
