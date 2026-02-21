@@ -222,19 +222,10 @@ export function MappingScreen({
     return sortBranchGroups(combined, branchSortMode, customBranchOrder);
   })();
 
-  // Compute effective threshold from Top N (scoped to search results when filter is active)
   const safeTopN = topN ?? 5;
-  const effectiveThreshold = (() => {
-    if (searchFilterHashes) {
-      const filterSet = new Set(searchFilterHashes);
-      const filtered = completeBranchGroups.map((g) => ({
-        ...g,
-        candidates: g.candidates.filter((c) => filterSet.has(c.iri_hash)),
-      }));
-      return computeScoreCutoff(filtered, safeTopN, branchStates);
-    }
-    return computeScoreCutoff(completeBranchGroups, safeTopN, branchStates);
-  })();
+
+  // Compute global threshold for non-mandatory branches
+  const effectiveThreshold = computeScoreCutoff(completeBranchGroups, safeTopN, branchStates);
 
   // Find the selected candidate for the detail panel
   let candidateFromData: FolioCandidate | null = null;
@@ -264,8 +255,9 @@ export function MappingScreen({
 
   const selectedCandidate = candidateFromData ?? fetchedConcept;
 
-  // Collect all visible candidate IRI hashes for current item (respecting threshold + branch filters + search filter)
+  // Collect all visible candidate IRI hashes for current item (hybrid: per-branch for mandatory, threshold for non-mandatory)
   const searchFilterSet = searchFilterHashes ? new Set(searchFilterHashes) : null;
+  const showAll = safeTopN >= 50;
   const visibleCandidateHashes: string[] = currentItem
     ? completeBranchGroups
         .filter((g) => {
@@ -277,12 +269,17 @@ export function MappingScreen({
         })
         .flatMap((g) => {
           const isMandatory = branchStates[g.branch] === 'mandatory';
-          let candidates = g.candidates.filter((c) => c.score >= effectiveThreshold);
-          // Mandatory branches always show at least 3 candidates
-          if (isMandatory && candidates.length < 3 && g.candidates.length > 0) {
-            candidates = [...g.candidates]
-              .sort((a, b) => b.score - a.score)
-              .slice(0, Math.max(3, candidates.length));
+          const sorted = [...g.candidates].sort((a, b) => b.score - a.score);
+          let candidates: typeof sorted;
+          if (showAll) {
+            candidates = sorted;
+          } else if (isMandatory) {
+            const branchLimit = Math.max(safeTopN, 3);
+            candidates = sorted.slice(0, branchLimit);
+          } else {
+            candidates = effectiveThreshold > 0
+              ? sorted.filter((c) => c.score >= effectiveThreshold)
+              : sorted;
           }
           if (searchFilterSet && !isMandatory) {
             candidates = candidates.filter((c) => searchFilterSet.has(c.iri_hash));
@@ -532,6 +529,7 @@ export function MappingScreen({
                 branchStates={branchStates}
                 selectedIriHashes={currentSelections}
                 selectedCandidateIri={selectedCandidateIri}
+                topN={safeTopN}
                 threshold={effectiveThreshold}
                 onToggleCandidate={(iriHash) => onToggleCandidate(iriHash)}
                 onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}

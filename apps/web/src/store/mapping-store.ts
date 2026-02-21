@@ -273,6 +273,7 @@ export const useMappingStore = create<MappingState>()(
 
         const updatedSelections = { ...selections };
         const updatedStatuses = { ...nodeStatuses };
+        const showAll = defaultTopN >= 50;
 
         for (let i = 0; i < mappingResponse.items.length; i++) {
           // Only auto-select for items that haven't been completed
@@ -281,20 +282,27 @@ export const useMappingStore = create<MappingState>()(
           const item = mappingResponse.items[i];
           if (!item) continue;
 
-          const cutoff = computeScoreCutoff(item.branch_groups, defaultTopN, branchStates);
+          // Compute non-mandatory threshold for this item's branches
+          const threshold = computeScoreCutoff(item.branch_groups, defaultTopN, branchStates);
+
           const visible: string[] = [];
           for (const group of item.branch_groups) {
             const state = branchStates[group.branch];
             if (state === 'excluded') continue;
             const isMandatory = state === 'mandatory';
-            let aboveCutoff = group.candidates.filter((c) => c.score >= cutoff);
-            // Mandatory branches always include at least 3 candidates
-            if (isMandatory && aboveCutoff.length < 3 && group.candidates.length > 0) {
-              aboveCutoff = [...group.candidates]
-                .sort((a, b) => b.score - a.score)
-                .slice(0, Math.max(3, aboveCutoff.length));
+            const sorted = [...group.candidates].sort((a, b) => b.score - a.score);
+            let topCandidates: typeof sorted;
+            if (showAll) {
+              topCandidates = sorted;
+            } else if (isMandatory) {
+              const branchLimit = Math.max(defaultTopN, 3);
+              topCandidates = sorted.slice(0, branchLimit);
+            } else {
+              topCandidates = threshold > 0
+                ? sorted.filter((c) => c.score >= threshold)
+                : sorted;
             }
-            for (const candidate of aboveCutoff) {
+            for (const candidate of topCandidates) {
               visible.push(candidate.iri_hash);
             }
           }

@@ -45,6 +45,7 @@ interface CandidateTreeProps {
   branchStates: Record<string, BranchState>;
   selectedIriHashes: string[];
   selectedCandidateIri: string | null;
+  topN: number;
   threshold: number;
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string) => void;
@@ -58,6 +59,7 @@ export function CandidateTree({
   branchStates,
   selectedIriHashes,
   selectedCandidateIri,
+  topN,
   threshold,
   onToggleCandidate,
   onSelectForDetail,
@@ -112,7 +114,7 @@ export function CandidateTree({
     if (filterSet) {
       return g.candidates.some((c) => filterSet.has(c.iri_hash));
     }
-    return g.candidates.some((c) => c.score >= threshold);
+    return g.candidates.length > 0;
   });
 
   if (visibleGroups.length === 0) {
@@ -129,15 +131,29 @@ export function CandidateTree({
         const branchKey = group.branch;
         const isBranchCollapsed = collapsedNodes.has(branchKey);
         const isMandatory = branchStates[group.branch] === 'mandatory';
-        // Always include selected candidates (e.g. auto-selected) even if below threshold
-        let visibleCandidates = group.candidates.filter(
-          (c) => c.score >= threshold || selectedSet.has(c.iri_hash),
-        );
-        // Mandatory branches always show at least 3 candidates (sorted by score)
-        if (isMandatory && visibleCandidates.length < 3 && group.candidates.length > 0) {
-          visibleCandidates = [...group.candidates]
-            .sort((a, b) => b.score - a.score)
-            .slice(0, Math.max(3, visibleCandidates.length));
+        const showAll = topN >= 50;
+        // Mandatory branches: per-branch top N slicing (at least 3)
+        // Non-mandatory branches: global threshold filtering
+        const sorted = [...group.candidates].sort((a, b) => b.score - a.score);
+        let visibleCandidates: FolioCandidate[];
+        if (showAll) {
+          visibleCandidates = sorted;
+        } else if (isMandatory) {
+          const branchLimit = Math.max(topN, 3);
+          visibleCandidates = sorted.slice(0, branchLimit);
+        } else {
+          visibleCandidates = threshold > 0
+            ? sorted.filter((c) => c.score >= threshold)
+            : sorted;
+        }
+        // Always include selected candidates even if outside top N
+        if (!showAll) {
+          const visibleSet = new Set(visibleCandidates.map((c) => c.iri_hash));
+          for (const c of sorted) {
+            if (selectedSet.has(c.iri_hash) && !visibleSet.has(c.iri_hash)) {
+              visibleCandidates.push(c);
+            }
+          }
         }
         if (filterSet && !isMandatory) {
           visibleCandidates = visibleCandidates.filter(

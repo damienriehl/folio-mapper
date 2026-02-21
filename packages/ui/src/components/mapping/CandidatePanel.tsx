@@ -6,6 +6,7 @@ interface CandidatePanelProps {
   branchStates: Record<string, BranchState>;
   selectedIriHashes: string[];
   selectedCandidateIri: string | null;
+  topN: number;
   threshold: number;
   onToggleCandidate: (iriHash: string) => void;
   onSelectForDetail: (iriHash: string) => void;
@@ -19,6 +20,7 @@ export function CandidatePanel({
   branchStates,
   selectedIriHashes,
   selectedCandidateIri,
+  topN,
   threshold,
   onToggleCandidate,
   onSelectForDetail,
@@ -34,6 +36,7 @@ export function CandidatePanel({
           branchStates={branchStates}
           selectedIriHashes={selectedIriHashes}
           selectedCandidateIri={selectedCandidateIri}
+          topN={topN}
           threshold={threshold}
           onToggleCandidate={onToggleCandidate}
           onSelectForDetail={onSelectForDetail}

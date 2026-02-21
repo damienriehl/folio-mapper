@@ -22,7 +22,7 @@ function makeBranchGroup(branch: string, scores: number[]): BranchGroup {
 }
 
 describe('computeScoreCutoff', () => {
-  it('returns 0 when topN >= total candidates', () => {
+  it('returns 0 when topN >= total non-mandatory candidates', () => {
     const groups = [makeBranchGroup('A', [90, 80, 70])];
     const states: Record<string, BranchState> = { A: 'normal' };
     expect(computeScoreCutoff(groups, 5, states)).toBe(0);
@@ -42,23 +42,32 @@ describe('computeScoreCutoff', () => {
     expect(computeScoreCutoff(groups, 3, states)).toBe(70);
   });
 
-  it('includes mandatory branches in score count', () => {
+  it('excludes mandatory branches from score pool', () => {
     const groups = [
       makeBranchGroup('Mandatory', [100, 95]),
       makeBranchGroup('Normal', [80, 60, 40]),
     ];
     const states: Record<string, BranchState> = { Mandatory: 'mandatory', Normal: 'normal' };
-    // All scores: [100, 95, 80, 60, 40], topN=2 → cutoff at index 1 = 95
-    expect(computeScoreCutoff(groups, 2, states)).toBe(95);
+    // Only Normal scores pooled: [80, 60, 40], topN=2 → cutoff = 60
+    expect(computeScoreCutoff(groups, 2, states)).toBe(60);
   });
 
-  it('excludes excluded branches from score count', () => {
+  it('returns 0 when only mandatory branches have candidates', () => {
+    const groups = [
+      makeBranchGroup('Mandatory', [100, 95, 90]),
+    ];
+    const states: Record<string, BranchState> = { Mandatory: 'mandatory' };
+    // No non-mandatory scores → 0
+    expect(computeScoreCutoff(groups, 2, states)).toBe(0);
+  });
+
+  it('excludes excluded branches from score pool', () => {
     const groups = [
       makeBranchGroup('Excluded', [100, 95]),
       makeBranchGroup('Normal', [80, 60, 40]),
     ];
     const states: Record<string, BranchState> = { Excluded: 'excluded', Normal: 'normal' };
-    // Only Normal branch scores: [80, 60, 40], topN=1 → cutoff = 80
+    // Only Normal scores: [80, 60, 40], topN=1 → cutoff = 80
     expect(computeScoreCutoff(groups, 1, states)).toBe(80);
   });
 
@@ -81,13 +90,38 @@ describe('computeScoreCutoff', () => {
     expect(computeScoreCutoff(groups, 50, states)).toBe(0);
   });
 
-  it('works across multiple normal branches', () => {
+  it('pools scores across multiple non-mandatory branches', () => {
     const groups = [
       makeBranchGroup('A', [90, 70]),
       makeBranchGroup('B', [85, 50]),
     ];
     const states: Record<string, BranchState> = { A: 'normal', B: 'normal' };
-    // All scores: [90, 85, 70, 50], topN=2 → cutoff at index 1 = 85
+    // Pooled: [90, 85, 70, 50], topN=2 → cutoff = 85
     expect(computeScoreCutoff(groups, 2, states)).toBe(85);
+  });
+
+  it('pools across branches — topN=3 returns 3rd best score globally', () => {
+    const groups = [
+      makeBranchGroup('A', [90, 70]),
+      makeBranchGroup('B', [85, 75, 65, 50]),
+    ];
+    const states: Record<string, BranchState> = { A: 'normal', B: 'normal' };
+    // Pooled: [90, 85, 75, 70, 65, 50], topN=3 → cutoff = 75
+    expect(computeScoreCutoff(groups, 3, states)).toBe(75);
+  });
+
+  it('mandatory + non-mandatory mix — only non-mandatory pooled', () => {
+    const groups = [
+      makeBranchGroup('Area of Law', [95, 88, 72]),
+      makeBranchGroup('Format', [60, 55]),
+      makeBranchGroup('Objective', [70, 45, 30]),
+    ];
+    const states: Record<string, BranchState> = {
+      'Area of Law': 'mandatory',
+      'Format': 'normal',
+      'Objective': 'normal',
+    };
+    // Non-mandatory pooled: [70, 60, 55, 45, 30], topN=3 → cutoff = 55
+    expect(computeScoreCutoff(groups, 3, states)).toBe(55);
   });
 });
