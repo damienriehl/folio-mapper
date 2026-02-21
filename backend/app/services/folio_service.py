@@ -33,6 +33,27 @@ SEARCH_STOPWORDS = frozenset({
     "law", "legal", "type", "types", "general",
 })
 
+# Domain-aware expansions: common legal content words → FOLIO label suffixes.
+# When a content word matches a key, we also search compound phrases like
+# "litigation practice" and re-score candidates against those expansions.
+LEGAL_TERM_EXPANSIONS: dict[str, list[str]] = {
+    "litigation": ["practice", "service"],
+    "transactional": ["practice", "service"],
+    "transaction": ["practice", "service"],
+    "transactions": ["practice", "service"],
+    "dispute": ["service", "resolution"],
+    "disputes": ["service", "resolution"],
+    "regulatory": ["practice", "compliance"],
+    "compliance": ["practice", "service"],
+    "advisory": ["practice", "service"],
+    "mediation": ["service"],
+    "arbitration": ["service"],
+    "prosecution": ["service"],
+    "enforcement": ["service", "action"],
+    "negotiation": ["service"],
+    "investigation": ["service"],
+}
+
 # Module-level singleton
 _folio_instance: FOLIO | None = None
 _folio_lock = threading.Lock()
@@ -368,6 +389,13 @@ def _generate_search_terms(term: str) -> list[str]:
         if len(w) >= 3:
             terms.append(w)
 
+    # Domain-aware expansions: "litigation" → "litigation practice", "litigation service"
+    for w in content:
+        suffixes = LEGAL_TERM_EXPANSIONS.get(w)
+        if suffixes:
+            for suffix in suffixes:
+                terms.append(f"{w} {suffix}")
+
     # Deduplicate preserving order
     seen: set[str] = set()
     result: list[str] = []
@@ -554,6 +582,47 @@ def search_candidates(
         )
         if score >= min_score:
             scored.append((iri_hash, owl_class, score))
+
+    # Phase 2.1: Expansion re-scoring — re-score candidates against expanded
+    # queries (e.g. "litigation practice") so that exact-match labels aren't
+    # crowded out by partial-overlap scores against the original query.
+    expansion_queries: list[tuple[set[str], str]] = []
+    for w in content_words:
+        suffixes = LEGAL_TERM_EXPANSIONS.get(w)
+        if suffixes:
+            for suffix in suffixes:
+                eq = f"{w} {suffix}"
+                expansion_queries.append((_content_words(eq), eq))
+
+    if expansion_queries:
+        best_scores: dict[str, float] = {h: s for h, _, s in scored}
+        # Also re-score candidates that were below threshold against original
+        for iri_hash, owl_class in raw.items():
+            for eq_content, eq_full in expansion_queries:
+                exp_score = _compute_relevance_score(
+                    eq_content,
+                    eq_full,
+                    owl_class.label or iri_hash,
+                    owl_class.definition,
+                    owl_class.alternative_labels or [],
+                )
+                if exp_score >= min_score and exp_score > best_scores.get(iri_hash, 0):
+                    best_scores[iri_hash] = exp_score
+
+        # Rebuild scored list with best scores
+        scored_map: dict[str, tuple[str, object, float]] = {
+            h: (h, c, s) for h, c, s in scored
+        }
+        for iri_hash, new_score in best_scores.items():
+            if iri_hash in scored_map:
+                _, owl_class, old_score = scored_map[iri_hash]
+                if new_score > old_score:
+                    scored_map[iri_hash] = (iri_hash, owl_class, new_score)
+            elif new_score >= min_score:
+                # Candidate was below threshold before but now qualifies
+                scored_map[iri_hash] = (iri_hash, raw[iri_hash], new_score)
+
+        scored = list(scored_map.values())
 
     # Phase 2.5: Surface ancestor concepts of high-scoring matches
     # (e.g., "Dog Bite Strict Liability" → parent "Personal Injury and Tort Law")
