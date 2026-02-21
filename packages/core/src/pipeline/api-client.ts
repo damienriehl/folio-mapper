@@ -16,6 +16,7 @@ export async function fetchPipelineCandidates(
   llmConfig: PipelineRequestConfig,
   threshold = 0.3,
   maxPerBranch = 10,
+  mandatoryBranches: string[] = [],
 ): Promise<PipelineResponse> {
   const res = await fetch(`${BASE_URL}/map`, {
     method: 'POST',
@@ -29,6 +30,7 @@ export async function fetchPipelineCandidates(
       },
       threshold,
       max_per_branch: maxPerBranch,
+      mandatory_branches: mandatoryBranches,
     }),
   });
 

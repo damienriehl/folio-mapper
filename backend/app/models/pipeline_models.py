@@ -76,6 +76,7 @@ class PipelineRequest(BaseModel):
     llm_config: LLMConfig
     threshold: float = 0.3
     max_per_branch: int = 10
+    mandatory_branches: list[str] = []
 
 
 class PipelineResponse(BaseModel):

@@ -27,4 +27,5 @@ async def pipeline_map(
         threshold=body.threshold,
         max_per_branch=body.max_per_branch,
         api_key=api_key,
+        mandatory_branches=body.mandatory_branches,
     )

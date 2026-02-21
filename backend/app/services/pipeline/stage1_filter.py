@@ -157,6 +157,7 @@ def run_stage1(
     prescan: PreScanResult,
     threshold: float = 0.3,
     max_per_branch: int = 10,
+    mandatory_branches: list[str] | None = None,
 ) -> list[ScopedCandidate]:
     """Run Stage 1: branch-scoped local search.
 
@@ -237,6 +238,45 @@ def run_stage1(
                     existing.score = score
                 if branch_name not in existing.source_branches:
                     existing.source_branches.append(branch_name)
+
+    # Mandatory branches: search any mandatory branches not already covered by segments
+    if mandatory_branches:
+        searched_branches = set()
+        for segment in prescan.segments:
+            searched_branches.update(segment.branches)
+
+        for branch_name in mandatory_branches:
+            if branch_name in searched_branches:
+                continue
+            branch_hashes = _resolve_branch_children(folio, branch_name)
+            if branch_hashes is None:
+                continue
+            results = _search_within_branch(folio, prescan.raw_text, branch_hashes, threshold)
+            for iri_hash, owl_class, score, in results:
+                if owl_class is None:
+                    continue
+                existing = best.get(iri_hash)
+                if existing is None:
+                    actual_branch = get_branch_for_class(folio, iri_hash)
+                    best[iri_hash] = ScopedCandidate(
+                        iri_hash=iri_hash,
+                        label=owl_class.label or iri_hash,
+                        definition=owl_class.definition,
+                        synonyms=owl_class.alternative_labels or [],
+                        branch=actual_branch,
+                        score=score,
+                        source_branches=[branch_name],
+                    )
+                else:
+                    if score > existing.score:
+                        existing.score = score
+                    if branch_name not in existing.source_branches:
+                        existing.source_branches.append(branch_name)
+
+            logger.info(
+                "Stage 1: Mandatory branch '%s' searched with %d results",
+                branch_name, len(results),
+            )
 
     # Sort by score descending and cap at max
     candidates = sorted(best.values(), key=lambda c: c.score, reverse=True)

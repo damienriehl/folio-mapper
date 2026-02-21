@@ -37,21 +37,61 @@ SEARCH_STOPWORDS = frozenset({
 # When a content word matches a key, we also search compound phrases like
 # "litigation practice" and re-score candidates against those expansions.
 LEGAL_TERM_EXPANSIONS: dict[str, list[str]] = {
+    # Core practice types
     "litigation": ["practice", "service"],
     "transactional": ["practice", "service"],
     "transaction": ["practice", "service"],
     "transactions": ["practice", "service"],
-    "dispute": ["service", "resolution"],
-    "disputes": ["service", "resolution"],
     "regulatory": ["practice", "compliance"],
     "compliance": ["practice", "service"],
     "advisory": ["practice", "service"],
+    # Dispute resolution
+    "dispute": ["service", "resolution"],
+    "disputes": ["service", "resolution"],
     "mediation": ["service"],
     "arbitration": ["service"],
+    "negotiation": ["service"],
+    "settlement": ["service", "practice"],
+    "appellate": ["practice", "service"],
+    "trial": ["practice", "service"],
+    "appeals": ["practice", "service"],
+    # Enforcement & prosecution
     "prosecution": ["service"],
     "enforcement": ["service", "action"],
-    "negotiation": ["service"],
     "investigation": ["service"],
+    # Practice areas
+    "corporate": ["practice", "service", "law"],
+    "employment": ["practice", "service", "law"],
+    "intellectual": ["property", "practice"],
+    "bankruptcy": ["practice", "service", "law"],
+    "family": ["practice", "law"],
+    "immigration": ["practice", "service", "law"],
+    "environmental": ["practice", "law", "compliance"],
+    "antitrust": ["practice", "law", "compliance"],
+    "tax": ["practice", "service", "law"],
+    "real": ["estate", "property"],
+    "estate": ["planning", "practice", "law"],
+    # Advisory & counseling
+    "counsel": ["service", "practice"],
+    "counseling": ["service", "practice"],
+    "consulting": ["service", "practice"],
+    # Recovery & collections
+    "collection": ["service", "practice"],
+    "recovery": ["service", "practice"],
+    "foreclosure": ["service", "practice"],
+    # Investigation & due diligence
+    "discovery": ["service", "practice"],
+    "diligence": ["service", "practice"],
+    "audit": ["service", "practice"],
+    # Documentation & filing
+    "drafting": ["service", "practice"],
+    "documentation": ["service", "practice"],
+    "filing": ["service", "practice"],
+    # Strategy & planning
+    "strategy": ["service", "practice"],
+    "planning": ["service", "practice"],
+    "risk": ["service", "management"],
+    "structuring": ["service", "practice"],
 }
 
 # Module-level singleton

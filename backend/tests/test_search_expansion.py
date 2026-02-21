@@ -8,6 +8,7 @@ import pytest
 
 from app.services.folio_service import (
     LEGAL_TERM_EXPANSIONS,
+    SEARCH_STOPWORDS,
     _compute_relevance_score,
     _content_words,
     _generate_search_terms,
@@ -151,3 +152,80 @@ def test_search_candidates_expansion_rescoring():
     lp = next((c for c in candidates if c.label == "Litigation Practice"), None)
     assert lp is not None, "Litigation Practice should appear in results"
     assert lp.score >= 95.0, f"Expected score >= 95.0, got {lp.score}"
+
+
+# --- New expansion term tests ---
+
+
+@pytest.mark.parametrize("term,expected_phrases", [
+    # Practice areas
+    ("corporate", ["corporate practice", "corporate service", "corporate law"]),
+    ("employment", ["employment practice", "employment service"]),
+    ("bankruptcy", ["bankruptcy practice", "bankruptcy service"]),
+    ("immigration", ["immigration practice", "immigration service"]),
+    ("environmental", ["environmental practice", "environmental law"]),
+    ("antitrust", ["antitrust practice", "antitrust law"]),
+    ("tax", ["tax practice", "tax service"]),
+    # Dispute/court
+    ("settlement", ["settlement service", "settlement practice"]),
+    ("appellate", ["appellate practice", "appellate service"]),
+    ("trial", ["trial practice", "trial service"]),
+    ("appeals", ["appeals practice", "appeals service"]),
+    # Advisory
+    ("counsel", ["counsel service", "counsel practice"]),
+    ("counseling", ["counseling service", "counseling practice"]),
+    ("consulting", ["consulting service", "consulting practice"]),
+    # Recovery
+    ("collection", ["collection service", "collection practice"]),
+    ("recovery", ["recovery service", "recovery practice"]),
+    ("foreclosure", ["foreclosure service", "foreclosure practice"]),
+    # Investigation
+    ("discovery", ["discovery service", "discovery practice"]),
+    ("diligence", ["diligence service", "diligence practice"]),
+    ("audit", ["audit service", "audit practice"]),
+    # Documentation
+    ("drafting", ["drafting service", "drafting practice"]),
+    ("documentation", ["documentation service", "documentation practice"]),
+    ("filing", ["filing service", "filing practice"]),
+    # Strategy
+    ("strategy", ["strategy service", "strategy practice"]),
+    ("planning", ["planning service", "planning practice"]),
+    ("risk", ["risk service", "risk management"]),
+    ("structuring", ["structuring service", "structuring practice"]),
+])
+def test_new_expansion_terms_generate_expected_phrases(term, expected_phrases):
+    """New expansion terms should generate expected compound search phrases."""
+    terms = _generate_search_terms(term)
+    terms_lower = [t.lower() for t in terms]
+    for phrase in expected_phrases:
+        assert phrase in terms_lower, f"Expected '{phrase}' in search terms for '{term}'"
+
+
+@pytest.mark.parametrize("term,label", [
+    ("corporate", "Corporate Practice"),
+    ("settlement", "Settlement Service"),
+    ("appellate", "Appellate Practice"),
+    ("counsel", "Counsel Service"),
+    ("collection", "Collection Service"),
+    ("discovery", "Discovery Service"),
+    ("drafting", "Drafting Service"),
+    ("strategy", "Strategy Service"),
+])
+def test_expansion_scoring_boosts_new_terms(term, label):
+    """Expanded queries should score matching labels at 95+."""
+    suffixes = LEGAL_TERM_EXPANSIONS[term]
+    best_score = 0.0
+    for suffix in suffixes:
+        eq = f"{term} {suffix}"
+        eq_content = _content_words(eq)
+        score = _compute_relevance_score(eq_content, eq, label, None, [])
+        best_score = max(best_score, score)
+    assert best_score >= 95.0, f"Expected score >= 95.0 for '{term}' → '{label}', got {best_score}"
+
+
+def test_expansion_keys_are_valid():
+    """All expansion keys should be lowercase, no spaces, and not stopwords."""
+    for key in LEGAL_TERM_EXPANSIONS:
+        assert key == key.lower(), f"Key '{key}' is not lowercase"
+        assert " " not in key, f"Key '{key}' contains spaces"
+        assert key not in SEARCH_STOPWORDS, f"Key '{key}' is a stopword"

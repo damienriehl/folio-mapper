@@ -321,13 +321,16 @@ export function App() {
     const activeConfig = llmState.configs[llmState.activeProvider];
     if (activeConfig?.connectionStatus === 'valid') {
       setIsPipelineRun(true);
+      const mandatoryBranches = Object.entries(mappingState.inputBranchStates)
+        .filter(([, state]) => state === 'mandatory')
+        .map(([name]) => name);
       try {
         await loadPipelineCandidates(parseResult.items, {
           provider: llmState.activeProvider,
           api_key: activeConfig.apiKey || null,
           base_url: activeConfig.baseUrl || null,
           model: activeConfig.model || null,
-        });
+        }, mandatoryBranches);
       } catch (err) {
         console.error('Pipeline failed:', err);
       }

@@ -104,17 +104,19 @@ export function useMapping() {
   );
 
   const loadPipelineCandidates = useCallback(
-    async (items: ParseItem[], llmConfig: PipelineRequestConfig) => {
+    async (items: ParseItem[], llmConfig: PipelineRequestConfig, mandatoryBranches?: string[]) => {
       // Cancel any in-flight batches from a previous run
       cancelBatchLoading();
 
       setLoadingCandidates(true);
       setError(null);
 
+      const branches = mandatoryBranches ?? [];
+
       try {
         // Batch 1: first item only — show mapping screen immediately
         const firstBatch = items.slice(0, 1);
-        const response = await fetchPipelineCandidates(firstBatch, llmConfig, 0, 10);
+        const response = await fetchPipelineCandidates(firstBatch, llmConfig, 0, 10, branches);
         startMapping(response.mapping, items.length);
         setPipelineMetadata(response.pipeline_metadata);
       } catch (err) {
@@ -143,7 +145,7 @@ export function useMapping() {
         const size = BATCH_SEQUENCE[Math.min(step, BATCH_SEQUENCE.length - 1)];
         const batch = remaining.slice(offset, offset + size);
         try {
-          const response = await fetchPipelineCandidates(batch, llmConfig, 0, 10);
+          const response = await fetchPipelineCandidates(batch, llmConfig, 0, 10, branches);
           if (controller.signal.aborted) break;
           appendMappingItems(response.mapping.items, response.pipeline_metadata);
         } catch (err) {

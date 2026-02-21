@@ -106,6 +106,7 @@ async def _process_item(
     max_per_branch: int,
     sem: asyncio.Semaphore,
     api_key: str | None = None,
+    mandatory_branches: list[str] | None = None,
 ) -> tuple[ItemMappingResult, PipelineItemMetadata]:
     """Process a single item through the full pipeline (Stages 0→1→1.5→2→3)."""
     async with sem:
@@ -123,7 +124,7 @@ async def _process_item(
 
         # Stage 1: Branch-scoped local search
         stage1_candidates = await asyncio.get_event_loop().run_in_executor(
-            None, run_stage1, folio, prescan, threshold, max_per_branch,
+            None, run_stage1, folio, prescan, threshold, max_per_branch, mandatory_branches,
         )
         print(f"[item {item.index}] STAGE 1: {len(stage1_candidates)} candidates")
 
@@ -204,6 +205,7 @@ async def run_pipeline(
     threshold: float = 0.3,
     max_per_branch: int = 10,
     api_key: str | None = None,
+    mandatory_branches: list[str] | None = None,
 ) -> PipelineResponse:
     """Run the full mapping pipeline (Stages 0→1→2→3) for all items.
 
@@ -222,7 +224,7 @@ async def run_pipeline(
     sem = asyncio.Semaphore(_CONCURRENCY_LIMIT)
 
     tasks = [
-        _process_item(item, llm_config, folio, threshold, max_per_branch, sem, api_key=api_key)
+        _process_item(item, llm_config, folio, threshold, max_per_branch, sem, api_key=api_key, mandatory_branches=mandatory_branches)
         for item in items
     ]
     results = await asyncio.gather(*tasks)
