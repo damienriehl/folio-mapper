@@ -20,7 +20,7 @@ export function ConfidenceBadge({ score, isSelected }: ConfidenceBadgeProps) {
       }}
       title={label}
     >
-      {rounded}
+      {rounded}{rounded >= 90 && <span aria-hidden="true" className="ml-0.5">★</span>}
     </span>
   );
 }

@@ -35,8 +35,8 @@ export const BRANCH_COLORS: Record<string, { name: string; color: string }> = {
 export function getConfidenceColor(score: number): string {
   if (score >= 90) return '#15803d'; // green-700 - excellent
   if (score >= 75) return '#16a34a'; // green-600 - strong
-  if (score >= 60) return '#ca8a04'; // yellow-600 - moderate
-  if (score >= 45) return '#ea580c'; // orange-600 - weak
+  if (score >= 60) return '#ea580c'; // orange-600 - moderate
+  if (score >= 45) return '#a16207'; // yellow-700 - weak
   return '#6b7280'; // gray-500 - poor
 }
 
