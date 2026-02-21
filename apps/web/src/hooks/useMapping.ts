@@ -13,7 +13,9 @@ import type {
 import { useMappingStore } from '../store/mapping-store';
 import { useLLMStore } from '../store/llm-store';
 
-const BATCH_SIZE = 10;
+/** Progressive batch sizes: 1, 2, 4, 8, then cap at 16.
+ *  Ensures item 2 arrives almost immediately after item 1. */
+const BATCH_SEQUENCE = [1, 2, 4, 8, 16];
 
 /**
  * Hook to trigger candidate fetching and initialize mapping state.
@@ -70,10 +72,13 @@ export function useMapping() {
       abortRef.current = controller;
       const remaining = items.slice(1);
 
-      for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
+      let offset = 0;
+      let step = 0;
+      while (offset < remaining.length) {
         if (controller.signal.aborted) break;
 
-        const batch = remaining.slice(i, i + BATCH_SIZE);
+        const size = BATCH_SEQUENCE[Math.min(step, BATCH_SEQUENCE.length - 1)];
+        const batch = remaining.slice(offset, offset + size);
         try {
           const response = await fetchCandidates(batch, 0, 10);
           if (controller.signal.aborted) break;
@@ -84,6 +89,8 @@ export function useMapping() {
           console.warn('Batch loading error:', err);
           setBatchLoading(true, err instanceof Error ? err.message : 'Batch loading error');
         }
+        offset += size;
+        step++;
       }
 
       if (!controller.signal.aborted) {
@@ -128,10 +135,13 @@ export function useMapping() {
       abortRef.current = controller;
       const remaining = items.slice(1);
 
-      for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
+      let offset = 0;
+      let step = 0;
+      while (offset < remaining.length) {
         if (controller.signal.aborted) break;
 
-        const batch = remaining.slice(i, i + BATCH_SIZE);
+        const size = BATCH_SEQUENCE[Math.min(step, BATCH_SEQUENCE.length - 1)];
+        const batch = remaining.slice(offset, offset + size);
         try {
           const response = await fetchPipelineCandidates(batch, llmConfig, 0, 10);
           if (controller.signal.aborted) break;
@@ -142,6 +152,8 @@ export function useMapping() {
           console.warn('Pipeline batch loading error:', err);
           setBatchLoading(true, err instanceof Error ? err.message : 'Batch loading error');
         }
+        offset += size;
+        step++;
       }
 
       if (!controller.signal.aborted) {
