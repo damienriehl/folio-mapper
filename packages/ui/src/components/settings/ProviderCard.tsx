@@ -11,6 +11,7 @@ interface ProviderCardProps {
   onUpdateConfig: (provider: LLMProviderType, updates: Partial<LLMProviderConfig>) => void;
   onTest: (provider: LLMProviderType) => void;
   onRefreshModels: (provider: LLMProviderType) => void;
+  prices?: Record<string, number>;
 }
 
 function maskKey(key: string): string {
@@ -29,6 +30,11 @@ function statusIndicator(status: ConnectionStatus) {
   }
 }
 
+function formatCost(cost: number): string {
+  if (cost >= 0.01) return `~$${cost.toFixed(3)}`;
+  return `~$${cost.toFixed(4)}`;
+}
+
 export function ProviderCard({
   meta,
   config,
@@ -40,9 +46,20 @@ export function ProviderCard({
   onUpdateConfig,
   onTest,
   onRefreshModels,
+  prices,
 }: ProviderCardProps) {
   const showKeyInput = meta.requiresApiKey;
   const showUrlInput = meta.isLocal || meta.type === 'custom';
+  const isLocal = meta.isLocal;
+
+  const costLabel = (() => {
+    if (!config.model) return null;
+    if (isLocal) return 'Free (local)';
+    if (!prices || Object.keys(prices).length === 0) return null;
+    const cost = prices[config.model];
+    if (cost == null) return null;
+    return `Est. cost: ${formatCost(cost)} per pipeline node`;
+  })();
 
   return (
     <div
@@ -145,6 +162,13 @@ export function ProviderCard({
               {isLoadingModels ? '...' : '↻'}
             </button>
           </div>
+
+          {/* Per-model cost estimate */}
+          {costLabel && (
+            <div className="mt-1 ml-12 text-xs text-gray-400">
+              {costLabel}
+            </div>
+          )}
         </div>
       </div>
     </div>

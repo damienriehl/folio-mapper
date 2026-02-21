@@ -19,6 +19,7 @@ from app.routers.llm import router as llm_router
 from app.routers.mapping import router as mapping_router
 from app.routers.parse import router as parse_router
 from app.routers.pipeline import router as pipeline_router
+from app.routers.pricing import router as pricing_router
 from app.routers.synthetic import router as synthetic_router
 from app.services.local_auth import get_or_create_token
 
@@ -74,6 +75,7 @@ app.include_router(pipeline_router)
 app.include_router(export_router)
 app.include_router(github_router)
 app.include_router(synthetic_router)
+app.include_router(pricing_router)
 
 
 @app.get("/api/health")
