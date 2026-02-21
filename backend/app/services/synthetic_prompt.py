@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 
 
@@ -14,9 +15,56 @@ def _hierarchy_depth(count: int) -> int:
     return 4
 
 
+# Pool of example taxonomies — one is randomly selected per call so the LLM
+# doesn't anchor on the same starting point every time.
+_EXAMPLE_POOL = [
+    (
+        "Corporate & Transactional\n"
+        "\tMergers & Acquisitions\n"
+        "\tPrivate Equity\n"
+        "Litigation\n"
+        "\tCommercial Litigation\n"
+        "\tSecurities Litigation"
+    ),
+    (
+        "Employment & Labor\n"
+        "\tWorkplace Discrimination\n"
+        "\tWage & Hour\n"
+        "Regulatory & Compliance\n"
+        "\tAntitrust\n"
+        "\tEnvironmental Compliance"
+    ),
+    (
+        "Intellectual Property\n"
+        "\tPatent Prosecution\n"
+        "\tTrademark Licensing\n"
+        "Real Estate & Land Use\n"
+        "\tCommercial Leasing\n"
+        "\tZoning & Development"
+    ),
+    (
+        "Tax & Wealth Planning\n"
+        "\tEstate & Trust Administration\n"
+        "\tInternational Tax\n"
+        "Healthcare & Life Sciences\n"
+        "\tFDA Regulatory\n"
+        "\tHealth IT & Privacy"
+    ),
+    (
+        "Bankruptcy & Restructuring\n"
+        "\tDebtor Representation\n"
+        "\tCreditor Rights\n"
+        "Government Contracts\n"
+        "\tDefense Procurement\n"
+        "\tBid Protests"
+    ),
+]
+
+
 def build_synthetic_prompt(count: int) -> list[dict[str, str]]:
     """Build chat messages that instruct the LLM to generate tab-indented legal taxonomy items."""
     depth = _hierarchy_depth(count)
+    example = random.choice(_EXAMPLE_POOL)
 
     return [
         {
@@ -35,12 +83,9 @@ def build_synthetic_prompt(count: int) -> list[dict[str, str]]:
                 f"CRITICAL: The output must have EXACTLY {count} lines total. "
                 f"Every line counts — both parent categories AND their children. "
                 f"For example, this is 6 lines (not 2):\n"
-                f"Corporate & Transactional\n"
-                f"\tMergers & Acquisitions\n"
-                f"\tPrivate Equity\n"
-                f"Litigation\n"
-                f"\tCommercial Litigation\n"
-                f"\tSecurities Litigation\n\n"
+                f"{example}\n\n"
+                f"Generate a COMPLETELY DIFFERENT taxonomy — do NOT reuse the example "
+                f"categories above. Pick different practice areas each time.\n\n"
                 f"Rules:\n"
                 f"- Use REAL TAB characters (\\t) for indentation, not spaces\n"
                 f"- Each line is one taxonomy item — count ALL lines toward the {count} total\n"
