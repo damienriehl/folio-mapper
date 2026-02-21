@@ -577,7 +577,7 @@ export function App() {
   }
 
   return (
-    <AppShell onOpenSettings={() => setShowSettings(true)}>
+    <AppShell onOpenSettings={() => setShowSettings(true)} llmStatus={llmStatus} llmProviderLabel={llmProviderLabel}>
       {settingsModal}
 
       {recoveryData && (
