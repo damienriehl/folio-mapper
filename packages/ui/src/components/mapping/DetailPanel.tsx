@@ -139,7 +139,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail,
       <span
         key={`${entry.iri_hash}-${index}`}
         onClick={() => onSelectForDetail?.(entry.iri_hash)}
-        className={`rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 ${onSelectForDetail ? 'cursor-pointer hover:bg-blue-200 hover:text-blue-900' : ''}`}
+        className={`rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 ${onSelectForDetail ? 'cursor-pointer hover:bg-gray-200 hover:text-gray-900' : ''}`}
       >
         {entry.label}
       </span>
@@ -307,7 +307,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail,
                     {filteredTranslations.map(([lang, text]) => (
                       <span
                         key={lang}
-                        className="rounded bg-purple-50 px-1.5 py-0.5 text-xs text-purple-700"
+                        className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700"
                       >
                         <span className="font-medium">{localeToFlag(lang)}</span> {text}
                       </span>
@@ -319,7 +319,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail,
                       {filteredTranslations.slice(0, 3).map(([lang, text]) => (
                         <span
                           key={lang}
-                          className="shrink-0 rounded bg-purple-50 px-1.5 py-0.5 text-xs text-purple-700"
+                          className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700"
                         >
                           <span className="font-medium">{localeToFlag(lang)}</span> {text}
                         </span>
