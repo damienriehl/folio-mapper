@@ -56,10 +56,10 @@ export function EntityGraphModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:text-gray-900 active:bg-gray-100"
           >
             Close
-            <kbd className="ml-0.5 rounded bg-gray-200 px-1 py-0.5 text-[10px] font-mono text-gray-500">
+            <kbd className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-500">
               Esc
             </kbd>
           </button>
