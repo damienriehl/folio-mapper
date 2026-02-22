@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react';
 import type {
   MappingResponse,
   BranchState,
@@ -8,6 +8,10 @@ import type {
 } from '@folio-mapper/core';
 import { DetailPanel } from './DetailPanel';
 import { EntityGraphModal } from './EntityGraphModal';
+
+const EntityGraph = lazy(() =>
+  import('./graph/EntityGraph').then((m) => ({ default: m.EntityGraph })),
+);
 
 interface MappingsViewProps {
   inputHierarchy: InputHierarchyNode[] | null;
@@ -550,26 +554,68 @@ export function MappingsView({
           )}
         </div>
 
-        {/* Right pane: Concept details (reuses main DetailPanel) */}
+        {/* Right pane: Concept details + Entity Graph */}
         <div className="flex min-w-[320px] flex-1 flex-col border-l border-gray-200 bg-gray-50">
-          <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
-            <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
-              Concept Details
-            </h2>
+          {/* Top: Concept Details */}
+          <div className={`flex ${detailConcept ? 'h-1/2' : 'flex-1'} flex-col`}>
+            <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                Concept Details
+              </h2>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {currentItem ? (
+                <DetailPanel
+                  currentItem={currentItem}
+                  selectedCandidate={detailConcept}
+                  onOpenGraph={(iriHash, label) => setGraphTarget({ iriHash, label })}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-xs text-gray-400">Select an input item, then click a concept</p>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {currentItem ? (
-              <DetailPanel
-                currentItem={currentItem}
-                selectedCandidate={detailConcept}
-                onOpenGraph={(iriHash, label) => setGraphTarget({ iriHash, label })}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <p className="text-xs text-gray-400">Select an input item, then click a concept</p>
+
+          {/* Bottom: Entity Graph (inline) */}
+          {detailConcept && (
+            <div className="flex h-1/2 flex-col border-t border-gray-200">
+              <div className="flex shrink-0 items-center justify-between border-b border-gray-300 bg-gray-200 px-4 py-1.5">
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                  Entity Graph
+                </h2>
+                <button
+                  type="button"
+                  title="Expand to full screen"
+                  onClick={() => setGraphTarget({ iriHash: detailConcept.iri_hash, label: detailConcept.label })}
+                  className="rounded p-0.5 text-gray-400 hover:bg-gray-300 hover:text-gray-600"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                  </svg>
+                </button>
               </div>
-            )}
-          </div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+                        <span className="text-xs text-gray-500">Loading graph...</span>
+                      </div>
+                    </div>
+                  }
+                >
+                  <EntityGraph
+                    iriHash={detailConcept.iri_hash}
+                    label={detailConcept.label}
+                    onNavigateToConcept={(iriHash) => selectConcept(iriHash)}
+                  />
+                </Suspense>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       </div>
