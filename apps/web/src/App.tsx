@@ -33,6 +33,7 @@ import { useSession } from './hooks/useSession';
 import { useExport } from './hooks/useExport';
 import { useSuggestionSubmit } from './hooks/useSuggestionSubmit';
 import { useLlamafile } from './hooks/useLlamafile';
+import { useEmbeddingStatus } from './hooks/useEmbeddingStatus';
 
 export function App() {
   const {
@@ -80,6 +81,22 @@ export function App() {
     return activeConfig.connectionStatus === 'valid' ? 'connected' as const : 'disconnected' as const;
   })();
   const llmProviderLabel = PROVIDER_META[llmState.activeProvider]?.displayName ?? '';
+
+  // Derive embedding status for header badge
+  const embeddingRaw = useEmbeddingStatus();
+  const embeddingStatus = (() => {
+    if (!embeddingRaw) return 'none' as const;
+    if (embeddingRaw.available) return 'ready' as const;
+    if (embeddingRaw.error?.toLowerCase().includes('building') || embeddingRaw.error?.toLowerCase().includes('not built')) return 'building' as const;
+    return 'unavailable' as const;
+  })();
+  const embeddingDetail = (() => {
+    if (!embeddingRaw) return '';
+    if (embeddingRaw.available) {
+      return `Semantic search active — ${embeddingRaw.num_concepts?.toLocaleString()} concepts indexed (${embeddingRaw.model})`;
+    }
+    return embeddingRaw.error || 'Embedding index not available';
+  })();
 
   // Toast banner on valid → invalid transition
   const [showDisconnectToast, setShowDisconnectToast] = useState(false);
@@ -414,6 +431,8 @@ export function App() {
           hasActiveSession={session.hasActiveSession}
           llmStatus={llmStatus}
           llmProviderLabel={llmProviderLabel}
+          embeddingStatus={embeddingStatus}
+          embeddingDetail={embeddingDetail}
           newProjectPopover={session.showNewProjectModal ? (
             <NewProjectModal
               onSaveAndNew={session.handleSaveAndNew}
@@ -582,7 +601,7 @@ export function App() {
   }
 
   return (
-    <AppShell onOpenSettings={() => setShowSettings(true)} llmStatus={llmStatus} llmProviderLabel={llmProviderLabel}>
+    <AppShell onOpenSettings={() => setShowSettings(true)} llmStatus={llmStatus} llmProviderLabel={llmProviderLabel} embeddingStatus={embeddingStatus} embeddingDetail={embeddingDetail}>
       {settingsModal}
 
       {recoveryData && (

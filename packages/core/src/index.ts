@@ -18,4 +18,6 @@ export * from './suggestion/issue-body';
 export * from './review/types';
 export * from './llamafile/types';
 export * from './synthetic/api-client';
+export * from './embedding/types';
+export * from './embedding/api-client';
 export * from './auth';

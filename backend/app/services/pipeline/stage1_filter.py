@@ -2,6 +2,7 @@
 
 For each pre-scan segment, resolves branch names to IRI hashes,
 searches within those branches, and deduplicates across segments.
+Optionally augments results with embedding-based semantic search.
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ from app.services.folio_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Embedding scores are scaled to this max to sit below keyword exact-match scores (88-99)
+_EMBEDDING_SCORE_MAX = 85.0
 
 # Map display names → FOLIOTypes enum names
 _DISPLAY_TO_ENUM_KEY: dict[str, str] = {
@@ -278,10 +282,87 @@ def run_stage1(
                 branch_name, len(results),
             )
 
+    # Embedding-based candidate discovery: find semantic matches that keyword search missed
+    embedding_added = _add_embedding_candidates(folio, prescan.raw_text, best, prescan)
+
     # Sort by score descending and cap at max
     candidates = sorted(best.values(), key=lambda c: c.score, reverse=True)
     if len(candidates) > _MAX_TOTAL_CANDIDATES:
         candidates = candidates[:_MAX_TOTAL_CANDIDATES]
 
-    logger.info("Stage 1: %d candidates after dedup and cap", len(candidates))
+    logger.info(
+        "Stage 1: %d candidates after dedup and cap (%d from embeddings)",
+        len(candidates),
+        embedding_added,
+    )
     return candidates
+
+
+def _add_embedding_candidates(
+    folio: FOLIO,
+    raw_text: str,
+    best: dict[str, ScopedCandidate],
+    prescan: PreScanResult,
+) -> int:
+    """Query the embedding index and merge new candidates into best.
+
+    Returns the number of new candidates added.
+    """
+    try:
+        from app.services.embedding.service import get_embedding_index
+    except ImportError:
+        return 0
+
+    index = get_embedding_index()
+    if index is None:
+        return 0
+
+    # Determine branch filter from prescan segments
+    branch_filter: set[str] | None = None
+    all_branches: set[str] = set()
+    for segment in prescan.segments:
+        all_branches.update(segment.branches)
+    if all_branches:
+        branch_filter = all_branches
+
+    # Query embedding index
+    try:
+        results = index.query(raw_text, top_k=30, branch_filter=branch_filter)
+    except Exception as e:
+        logger.warning("Embedding query failed: %s", e)
+        return 0
+
+    added = 0
+    for iri_hash, label, cosine_score in results:
+        if iri_hash in best:
+            continue  # Already found by keyword search
+
+        # Scale cosine similarity (typically 0.3-0.9 for relevant matches) to 0-85 range
+        # Clamp to [0, 1] then scale
+        clamped = max(0.0, min(1.0, cosine_score))
+        scaled_score = round(clamped * _EMBEDDING_SCORE_MAX, 1)
+
+        if scaled_score < 30:  # Below useful threshold
+            continue
+
+        # Look up full concept data
+        owl_class = folio[iri_hash]
+        if owl_class is None:
+            continue
+
+        actual_branch = get_branch_for_class(folio, iri_hash)
+        best[iri_hash] = ScopedCandidate(
+            iri_hash=iri_hash,
+            label=owl_class.label or iri_hash,
+            definition=owl_class.definition,
+            synonyms=owl_class.alternative_labels or [],
+            branch=actual_branch,
+            score=scaled_score,
+            source_branches=["embedding"],
+        )
+        added += 1
+
+    if added > 0:
+        logger.info("Stage 1: Embedding search added %d new candidates", added)
+
+    return added

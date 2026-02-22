@@ -13,6 +13,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.middleware.auth import LocalAuthMiddleware
 from app.rate_limit import limiter
+from app.routers.embedding import router as embedding_router
 from app.routers.export import router as export_router
 from app.routers.github import router as github_router
 from app.routers.llm import router as llm_router
@@ -72,6 +73,7 @@ app.include_router(parse_router)
 app.include_router(mapping_router)
 app.include_router(llm_router)
 app.include_router(pipeline_router)
+app.include_router(embedding_router)
 app.include_router(export_router)
 app.include_router(github_router)
 app.include_router(synthetic_router)

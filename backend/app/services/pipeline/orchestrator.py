@@ -96,6 +96,69 @@ def _assemble_item_result(
 
 _MAX_JUDGE_CANDIDATES = 10  # Cap candidates sent to Stage 3 judge
 _CONCURRENCY_LIMIT = 3       # Max items processed in parallel
+_KEYWORD_WEIGHT = 0.6        # Blend weight for keyword scores in re-ranking
+_EMBEDDING_WEIGHT = 0.4      # Blend weight for embedding scores in re-ranking
+
+
+def _embedding_rerank(
+    item_text: str,
+    stage1_candidates: list[ScopedCandidate],
+    top_k: int = 20,
+) -> list[RankedCandidate]:
+    """Re-rank Stage 1 candidates using embedding similarity scores.
+
+    Blends keyword scores (60%) with embedding cosine similarity (40%).
+    Falls back to keyword-only sorting if embeddings are unavailable.
+    """
+    sorted_candidates = sorted(stage1_candidates, key=lambda c: c.score, reverse=True)[:top_k]
+
+    # Try embedding re-ranking
+    try:
+        from app.services.embedding.service import get_embedding_index
+
+        index = get_embedding_index()
+        if index is not None:
+            candidate_hashes = [c.iri_hash for c in sorted_candidates]
+            embedding_scores = index.score_candidates(item_text, candidate_hashes)
+
+            if embedding_scores:
+                # Normalize embedding scores to 0-100 range for blending
+                # Cosine similarities typically range 0.2-0.9 for relevant matches
+                max_emb = max(embedding_scores.values()) if embedding_scores else 1.0
+                min_emb = min(embedding_scores.values()) if embedding_scores else 0.0
+                emb_range = max_emb - min_emb if max_emb > min_emb else 1.0
+
+                ranked = []
+                for c in sorted_candidates:
+                    emb_raw = embedding_scores.get(c.iri_hash)
+                    if emb_raw is not None:
+                        # Scale to 0-100
+                        emb_scaled = ((emb_raw - min_emb) / emb_range) * 100.0
+                        blended = c.score * _KEYWORD_WEIGHT + emb_scaled * _EMBEDDING_WEIGHT
+                        ranked.append(RankedCandidate(
+                            iri_hash=c.iri_hash,
+                            score=round(blended, 1),
+                            reasoning=f"keyword={c.score:.0f} emb={emb_scaled:.0f}",
+                        ))
+                    else:
+                        ranked.append(RankedCandidate(
+                            iri_hash=c.iri_hash,
+                            score=c.score,
+                            reasoning="keyword only (no embedding)",
+                        ))
+
+                ranked.sort(key=lambda r: r.score, reverse=True)
+                return ranked
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning("Embedding re-rank failed, using keyword scores: %s", e)
+
+    # Fallback: keyword-only scores
+    return [
+        RankedCandidate(iri_hash=c.iri_hash, score=c.score, reasoning="local score")
+        for c in sorted_candidates
+    ]
 
 
 async def _process_item(
@@ -137,13 +200,9 @@ async def _process_item(
         else:
             print(f"[item {item.index}] STAGE 1.5: No expansion needed")
 
-        # Stage 2: LLM ranking — DISABLED, using local scores instead
-        # ranked = await run_stage2(item.text, prescan, stage1_candidates, llm_config)
-        ranked = [
-            RankedCandidate(iri_hash=c.iri_hash, score=c.score, reasoning="local score")
-            for c in sorted(stage1_candidates, key=lambda c: c.score, reverse=True)[:20]
-        ]
-        print(f"[item {item.index}] STAGE 2: {len(ranked)} candidates (local scores, LLM disabled)")
+        # Stage 2: Embedding re-ranking (replaces disabled LLM ranking)
+        ranked = _embedding_rerank(item.text, stage1_candidates)
+        print(f"[item {item.index}] STAGE 2: {len(ranked)} candidates (embedding re-rank)")
         for r in ranked[:3]:
             sc = {c.iri_hash: c for c in stage1_candidates}.get(r.iri_hash)
             label = sc.label if sc else r.iri_hash[:20]

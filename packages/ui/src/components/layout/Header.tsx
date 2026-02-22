@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 type LLMStatus = 'connected' | 'disconnected' | 'none';
+type EmbeddingStatusType = 'ready' | 'building' | 'unavailable' | 'none';
 
 interface HeaderProps {
   onOpenSettings?: () => void;
@@ -11,10 +12,12 @@ interface HeaderProps {
   hasActiveSession?: boolean;
   llmStatus?: LLMStatus;
   llmProviderLabel?: string;
+  embeddingStatus?: EmbeddingStatusType;
+  embeddingDetail?: string;
   newProjectPopover?: ReactNode;
 }
 
-export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession, llmStatus, llmProviderLabel, newProjectPopover }: HeaderProps) {
+export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession, llmStatus, llmProviderLabel, embeddingStatus, embeddingDetail, newProjectPopover }: HeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
       <h1 className="text-xl font-semibold text-gray-900">FOLIO Mapper</h1>
@@ -106,6 +109,38 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart,
             {newProjectPopover}
           </div>
         )}
+        {/* Embedding status indicator */}
+        {embeddingStatus === 'ready' && (
+          <span
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-gray-400"
+            title={embeddingDetail || 'Semantic search active'}
+            aria-label="Embedding status"
+          >
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+            Embeddings
+          </span>
+        )}
+        {embeddingStatus === 'building' && (
+          <span
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-gray-400"
+            title={embeddingDetail || 'Building embedding index...'}
+            aria-label="Embedding status"
+          >
+            <span className="h-2 w-2 animate-pulse rounded-full bg-blue-400" />
+            Embeddings
+          </span>
+        )}
+        {embeddingStatus === 'unavailable' && (
+          <span
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-gray-400"
+            title={embeddingDetail || 'Embedding dependencies not installed'}
+            aria-label="Embedding status"
+          >
+            <span className="h-2 w-2 rounded-full bg-gray-300" />
+            Embeddings
+          </span>
+        )}
+        {/* LLM status indicator */}
         {onOpenSettings && llmStatus === 'connected' && (
           <button
             onClick={onOpenSettings}
