@@ -546,13 +546,15 @@ export function MappingScreen({
             {/* Top half: Current Selection(s) */}
             <div className="flex min-h-0 flex-1 flex-col border-b border-gray-200">
               <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
                     Current Selection(s)
                   </h2>
-                  <span className="text-[11px] text-gray-500">
-                    {currentSelections.length} of {visibleCandidateHashes.length} selected
-                  </span>
+                  {currentSelections.length > 0 && (
+                    <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-bold text-white">
+                      {currentSelections.length}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
