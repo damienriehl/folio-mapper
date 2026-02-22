@@ -7,6 +7,7 @@ import type {
   ItemMappingResult,
 } from '@folio-mapper/core';
 import { DetailPanel } from './DetailPanel';
+import { EntityGraphModal } from './EntityGraphModal';
 
 interface MappingsViewProps {
   inputHierarchy: InputHierarchyNode[] | null;
@@ -288,6 +289,7 @@ export function MappingsView({
   const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
   const [selectedConceptIri, setSelectedConceptIri] = useState<string | null>(null);
   const [detailConcept, setDetailConcept] = useState<FolioCandidate | null>(null);
+  const [graphTarget, setGraphTarget] = useState<{ iriHash: string; label: string } | null>(null);
   const leftRef = useRef<HTMLDivElement>(null);
   const middleRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -540,6 +542,7 @@ export function MappingsView({
               <DetailPanel
                 currentItem={currentItem}
                 selectedCandidate={detailConcept}
+                onOpenGraph={(iriHash, label) => setGraphTarget({ iriHash, label })}
               />
             ) : (
               <div className="flex h-full items-center justify-center">
@@ -550,6 +553,15 @@ export function MappingsView({
         </div>
       </div>
       </div>
+
+      {graphTarget && (
+        <EntityGraphModal
+          iriHash={graphTarget.iriHash}
+          label={graphTarget.label}
+          onNavigateToConcept={() => setGraphTarget(null)}
+          onClose={() => setGraphTarget(null)}
+        />
+      )}
     </div>
   );
 }

@@ -26,6 +26,7 @@ import { SelectionTree } from './SelectionTree';
 import { ShortcutsOverlay } from './ShortcutsOverlay';
 import { SuggestionQueuePanel } from './SuggestionQueuePanel';
 import { ReviewQueuePanel } from './ReviewQueuePanel';
+import { EntityGraphModal } from './EntityGraphModal';
 
 interface MappingScreenProps {
   mappingResponse: MappingResponse;
@@ -191,6 +192,7 @@ export function MappingScreen({
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
   const [allExpanded, setAllExpanded] = useState(true);
   const [notesNudge, setNotesNudge] = useState(false);
+  const [graphTarget, setGraphTarget] = useState<{ iriHash: string; label: string } | null>(null);
 
   // Clear notes nudge and search query when navigating to a different item
   useEffect(() => { setNotesNudge(false); setSearchQuery(''); }, [currentItemIndex]);
@@ -564,16 +566,45 @@ export function MappingScreen({
             </div>
             {/* Bottom half: Candidate Details */}
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="shrink-0 border-b border-gray-300 bg-gray-200 px-4 py-1.5">
-                <h2 className="text-[11px] font-bold uppercase tracking-wider text-gray-600">
-                  Candidate Details
-                </h2>
+              <div className="shrink-0 border-b border-gray-300 bg-gray-200">
+                <div className="flex">
+                  {/* Candidate Details tab — always active */}
+                  <div className="flex-1 border-b-2 border-gray-600 bg-white/60 px-4 py-1.5 text-center">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-700">
+                      Candidate Details
+                    </span>
+                  </div>
+                  {/* Entity Graph tab — clickable when candidate selected */}
+                  <button
+                    type="button"
+                    disabled={!selectedCandidate}
+                    onClick={() => selectedCandidate && setGraphTarget({ iriHash: selectedCandidate.iri_hash, label: selectedCandidate.label })}
+                    className={`flex flex-1 items-center justify-center gap-1.5 px-4 py-1.5 text-center transition-colors ${
+                      selectedCandidate
+                        ? 'cursor-pointer text-gray-500 hover:bg-white/40 hover:text-gray-700'
+                        : 'cursor-default text-gray-400'
+                    }`}
+                    title={selectedCandidate ? 'Open full entity graph' : 'Select a candidate first'}
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <circle cx="6" cy="6" r="2" />
+                      <circle cx="18" cy="6" r="2" />
+                      <circle cx="12" cy="18" r="2" />
+                      <line x1="7.5" y1="7.5" x2="11" y2="16" strokeLinecap="round" />
+                      <line x1="16.5" y1="7.5" x2="13" y2="16" strokeLinecap="round" />
+                    </svg>
+                    <span className="text-[11px] font-bold uppercase tracking-wider">
+                      Entity Graph
+                    </span>
+                  </button>
+                </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 <DetailPanel
                   currentItem={currentItem}
                   selectedCandidate={selectedCandidate}
                   onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
+                  onOpenGraph={(iriHash, label) => setGraphTarget({ iriHash, label })}
                 />
               </div>
             </div>
@@ -659,6 +690,18 @@ export function MappingScreen({
           onSetBranchSortMode={onSetBranchSortMode}
           onSetCustomBranchOrder={onSetCustomBranchOrder}
           onClose={() => setShowBranchOptions(false)}
+        />
+      )}
+
+      {graphTarget && (
+        <EntityGraphModal
+          iriHash={graphTarget.iriHash}
+          label={graphTarget.label}
+          onNavigateToConcept={(iriHash) => {
+            onSelectForDetail(iriHash);
+            setGraphTarget(null);
+          }}
+          onClose={() => setGraphTarget(null)}
         />
       )}
     </div>

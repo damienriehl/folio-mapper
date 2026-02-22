@@ -1,5 +1,6 @@
 import type { ParseItem } from '../input/types';
 import type { BranchInfo, ConceptDetail, FolioCandidate, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
+import type { EntityGraphResponse } from './graph-types';
 import type { PipelineRequestConfig } from '../pipeline/api-client';
 import { buildAuthHeaders } from '../auth';
 
@@ -75,6 +76,33 @@ export async function fetchConceptDetail(iriHash: string): Promise<ConceptDetail
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Concept detail lookup failed' }));
     throw new Error(err.detail || `Concept detail lookup failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function fetchEntityGraph(
+  iriHash: string,
+  options?: {
+    ancestorsDepth?: number;
+    descendantsDepth?: number;
+    maxNodes?: number;
+    includeSeeAlso?: boolean;
+  },
+): Promise<EntityGraphResponse> {
+  const params = new URLSearchParams();
+  if (options?.ancestorsDepth != null) params.set('ancestors_depth', String(options.ancestorsDepth));
+  if (options?.descendantsDepth != null) params.set('descendants_depth', String(options.descendantsDepth));
+  if (options?.maxNodes != null) params.set('max_nodes', String(options.maxNodes));
+  if (options?.includeSeeAlso != null) params.set('include_see_also', String(options.includeSeeAlso));
+
+  const qs = params.toString();
+  const url = `${BASE_URL}/concept/${encodeURIComponent(iriHash)}/graph${qs ? `?${qs}` : ''}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Graph fetch failed' }));
+    throw new Error(err.detail || `Graph fetch failed (${res.status})`);
   }
 
   return res.json();

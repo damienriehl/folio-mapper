@@ -27,6 +27,7 @@ export { ShortcutsOverlay } from './components/mapping/ShortcutsOverlay';
 export { SuggestionQueuePanel } from './components/mapping/SuggestionQueuePanel';
 export { ReviewQueuePanel } from './components/mapping/ReviewQueuePanel';
 export { MappingsView } from './components/mapping/MappingsView';
+export { EntityGraphModal } from './components/mapping/EntityGraphModal';
 export { SuggestionEditModal } from './components/mapping/SuggestionEditModal';
 export { SubmissionModal } from './components/mapping/SubmissionModal';
 

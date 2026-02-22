@@ -6,6 +6,7 @@ interface ConceptDAGProps {
   parents: HierarchyPathEntry[];
   children: HierarchyPathEntry[];
   childrenCutoff?: number;
+  hideDescendants?: boolean;
   onSelectForDetail?: (iriHash: string) => void;
 }
 
@@ -14,18 +15,29 @@ export function ConceptDAG({
   parents,
   children,
   childrenCutoff = 6,
+  hideDescendants = false,
   onSelectForDetail,
 }: ConceptDAGProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showDescendants, setShowDescendants] = useState(!hideDescendants);
   const [lineKey, setLineKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const visibleChildren = expanded ? children : children.slice(0, childrenCutoff);
+  const visibleChildren = showDescendants
+    ? expanded
+      ? children
+      : children.slice(0, childrenCutoff)
+    : [];
   const remaining = children.length - childrenCutoff;
 
   const handleExpand = useCallback(() => {
     setExpanded((prev) => !prev);
+    setLineKey((k) => k + 1);
+  }, []);
+
+  const handleToggleDescendants = useCallback(() => {
+    setShowDescendants((prev) => !prev);
     setLineKey((k) => k + 1);
   }, []);
 
@@ -123,38 +135,59 @@ export function ConceptDAG({
         </span>
       </div>
 
-      {/* Spacer */}
-      {children.length > 0 && <div className="py-4" />}
-
-      {/* Children row */}
+      {/* Descendants toggle + children */}
       {children.length > 0 && (
-        <div className="relative z-10">
-          <div className="flex flex-wrap justify-center gap-2">
-            {visibleChildren.map((c) => (
-              <span
-                key={c.iri_hash}
-                data-dag-id={c.iri_hash}
-                data-dag-role="child"
-                title={c.label}
-                onClick={() => onSelectForDetail?.(c.iri_hash)}
-                className={`max-w-[130px] truncate rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200 ${onSelectForDetail ? 'cursor-pointer' : ''}`}
-              >
-                {c.label}
-              </span>
-            ))}
-          </div>
-          {remaining > 0 && (
-            <div className="mt-1 flex justify-center">
+        <>
+          {showDescendants ? (
+            <>
+              <div className="py-4" />
+              <div className="relative z-10">
+                <div className="flex flex-wrap justify-center gap-2">
+                  {visibleChildren.map((c) => (
+                    <span
+                      key={c.iri_hash}
+                      data-dag-id={c.iri_hash}
+                      data-dag-role="child"
+                      title={c.label}
+                      onClick={() => onSelectForDetail?.(c.iri_hash)}
+                      className={`max-w-[130px] truncate rounded-lg border border-gray-300 bg-gray-50 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200 ${onSelectForDetail ? 'cursor-pointer' : ''}`}
+                    >
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-1 flex justify-center gap-2">
+                  {remaining > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleExpand}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      {expanded ? 'Show less' : `Show ${remaining} more`}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleToggleDescendants}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    Hide descendants
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="relative z-10 mt-2 flex justify-center">
               <button
                 type="button"
-                onClick={handleExpand}
+                onClick={handleToggleDescendants}
                 className="text-xs text-blue-600 hover:text-blue-800"
               >
-                {expanded ? 'Show less' : `Show ${remaining} more`}
+                Show descendants ({children.length})
               </button>
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

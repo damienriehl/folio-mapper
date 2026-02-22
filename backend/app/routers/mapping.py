@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.rate_limit import limiter
 
+from app.models.graph_models import EntityGraphResponse
 from app.models.mapping_models import (
     BranchInfo,
     CandidateRequest,
@@ -16,6 +17,7 @@ from app.models.pipeline_models import (
 )
 from app.services.auth import extract_api_key
 from app.services.folio_service import (
+    build_entity_graph,
     get_all_branches,
     get_folio_status,
     lookup_concept,
@@ -77,6 +79,29 @@ async def get_concept(iri_hash: str) -> FolioCandidate:
 async def get_concept_detail(iri_hash: str) -> ConceptDetail:
     """Look up a single FOLIO concept with extended detail (children, siblings, related, etc.)."""
     result = lookup_concept_detail(iri_hash)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Concept not found")
+    return result
+
+
+@router.get("/concept/{iri_hash}/graph", response_model=EntityGraphResponse)
+@limiter.limit("30/minute")
+async def get_concept_graph(
+    request: Request,
+    iri_hash: str,
+    ancestors_depth: int = 2,
+    descendants_depth: int = 2,
+    max_nodes: int = 200,
+    include_see_also: bool = True,
+) -> EntityGraphResponse:
+    """Build a multi-hop entity graph around a FOLIO concept."""
+    result = build_entity_graph(
+        iri_hash,
+        ancestors_depth=min(ancestors_depth, 5),
+        descendants_depth=min(descendants_depth, 5),
+        max_nodes=min(max_nodes, 500),
+        include_see_also=include_see_also,
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Concept not found")
     return result

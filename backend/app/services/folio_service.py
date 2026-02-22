@@ -10,6 +10,7 @@ from functools import lru_cache
 
 from folio import FOLIO, FOLIO_TYPE_IRIS, FOLIOTypes
 
+from app.models.graph_models import EntityGraphResponse, GraphEdge, GraphNode
 from app.models.mapping_models import (
     BranchGroup,
     BranchInfo,
@@ -543,6 +544,172 @@ def lookup_concept_detail(iri_hash: str) -> ConceptDetail | None:
         related=related,
         examples=examples,
         translations=translations,
+    )
+
+
+def build_entity_graph(
+    iri_hash: str,
+    ancestors_depth: int = 2,
+    descendants_depth: int = 2,
+    max_nodes: int = 200,
+    include_see_also: bool = True,
+    max_see_also_per_node: int = 5,
+) -> EntityGraphResponse | None:
+    """Build a multi-hop graph around a FOLIO concept via BFS."""
+    folio = get_folio()
+    owl_class = folio[iri_hash]
+    if not owl_class:
+        return None
+
+    owl_thing = "http://www.w3.org/2002/07/owl#Thing"
+    visited: dict[str, GraphNode] = {}
+    edges: list[GraphEdge] = {}
+    edge_ids: set[str] = set()
+    total_discovered = 0
+
+    def _make_node(h: str, depth: int) -> GraphNode | None:
+        if h in visited:
+            return visited[h]
+        oc = folio[h]
+        if not oc:
+            return None
+        total_discovered_ref[0] += 1
+        if len(visited) >= max_nodes:
+            return None
+        branch_name = get_branch_for_class(folio, h)
+        node = GraphNode(
+            id=h,
+            label=oc.label or h,
+            iri=oc.iri,
+            definition=oc.definition,
+            branch=branch_name,
+            branch_color=get_branch_color(branch_name),
+            is_focus=(h == iri_hash),
+            is_branch_root=(h in _branch_root_iris),
+            depth=depth,
+        )
+        visited[h] = node
+        return node
+
+    def _add_edge(source: str, target: str, edge_type: str, label: str | None = None) -> None:
+        eid = f"{source}->{target}:{edge_type}"
+        if eid in edge_ids:
+            return
+        edge_ids.add(eid)
+        edges.append(GraphEdge(id=eid, source=source, target=target, edge_type=edge_type, label=label))
+
+    # Mutable counter for total discovered (including beyond max_nodes)
+    total_discovered_ref = [0]
+    edges = []
+
+    # Create focus node
+    focus_node = _make_node(iri_hash, 0)
+    if not focus_node:
+        return None
+
+    # BFS upward (ancestors): child -> parent edges become parent -> child in subClassOf direction
+    ancestor_queue: list[tuple[str, int]] = [(iri_hash, 0)]
+    ancestor_visited: set[str] = {iri_hash}
+    while ancestor_queue:
+        current_hash, current_depth = ancestor_queue.pop(0)
+        if current_depth >= ancestors_depth:
+            continue
+        current_oc = folio[current_hash]
+        if not current_oc or not current_oc.sub_class_of:
+            continue
+        for parent_iri in current_oc.sub_class_of:
+            if parent_iri == owl_thing:
+                continue
+            parent_hash = _extract_iri_hash(parent_iri)
+            parent_node = _make_node(parent_hash, -(current_depth + 1))
+            if parent_node is None:
+                continue
+            # Edge: parent --subClassOf--> child (parent is superclass)
+            _add_edge(parent_hash, current_hash, "subClassOf")
+            if parent_hash not in ancestor_visited:
+                ancestor_visited.add(parent_hash)
+                ancestor_queue.append((parent_hash, current_depth + 1))
+
+    # BFS downward (descendants)
+    descendant_queue: list[tuple[str, int]] = [(iri_hash, 0)]
+    descendant_visited: set[str] = {iri_hash}
+    while descendant_queue:
+        current_hash, current_depth = descendant_queue.pop(0)
+        if current_depth >= descendants_depth:
+            continue
+        current_oc = folio[current_hash]
+        if not current_oc or not current_oc.parent_class_of:
+            continue
+        for child_iri in current_oc.parent_class_of:
+            child_hash = _extract_iri_hash(child_iri)
+            child_node = _make_node(child_hash, current_depth + 1)
+            if child_node is None:
+                continue
+            _add_edge(current_hash, child_hash, "subClassOf")
+            if child_hash not in descendant_visited:
+                descendant_visited.add(child_hash)
+                descendant_queue.append((child_hash, current_depth + 1))
+
+    # Collect rdfs:seeAlso cross-links for all visited nodes
+    see_also_nodes: list[str] = []
+    if include_see_also:
+        for node_hash in list(visited.keys()):
+            oc = folio[node_hash]
+            if not oc or not hasattr(oc, "see_also") or not oc.see_also:
+                continue
+            sa_count = 0
+            for related_iri in oc.see_also:
+                if sa_count >= max_see_also_per_node:
+                    break
+                related_hash = _extract_iri_hash(related_iri)
+                # Only add seeAlso edges between nodes already in the graph,
+                # or create the target node if we have room
+                was_new = related_hash not in visited
+                if was_new:
+                    related_node = _make_node(related_hash, 0)
+                    if related_node is None:
+                        continue
+                    see_also_nodes.append(related_hash)
+                # Deduplicate bidirectional: use sorted pair
+                if node_hash < related_hash:
+                    _add_edge(node_hash, related_hash, "seeAlso", "rdfs:seeAlso")
+                else:
+                    _add_edge(related_hash, node_hash, "seeAlso", "rdfs:seeAlso")
+                sa_count += 1
+
+    # BFS upward from seeAlso nodes to their branch roots
+    if see_also_nodes:
+        sa_ancestor_queue: list[tuple[str, int]] = [(h, 0) for h in see_also_nodes]
+        sa_ancestor_visited: set[str] = set(see_also_nodes) | ancestor_visited
+        while sa_ancestor_queue:
+            current_hash, current_depth = sa_ancestor_queue.pop(0)
+            if current_depth >= ancestors_depth:
+                continue
+            current_oc = folio[current_hash]
+            if not current_oc or not current_oc.sub_class_of:
+                continue
+            for parent_iri in current_oc.sub_class_of:
+                if parent_iri == owl_thing:
+                    continue
+                parent_hash = _extract_iri_hash(parent_iri)
+                parent_node = _make_node(parent_hash, -(current_depth + 1))
+                if parent_node is None:
+                    continue
+                _add_edge(parent_hash, current_hash, "subClassOf")
+                if parent_hash not in sa_ancestor_visited:
+                    sa_ancestor_visited.add(parent_hash)
+                    sa_ancestor_queue.append((parent_hash, current_depth + 1))
+
+    truncated = total_discovered_ref[0] > len(visited)
+
+    return EntityGraphResponse(
+        focus_iri_hash=iri_hash,
+        focus_label=owl_class.label or iri_hash,
+        focus_branch=get_branch_for_class(folio, iri_hash),
+        nodes=list(visited.values()),
+        edges=edges,
+        truncated=truncated,
+        total_concept_count=total_discovered_ref[0],
     )
 
 

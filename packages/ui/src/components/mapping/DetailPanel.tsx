@@ -9,6 +9,7 @@ interface DetailPanelProps {
   currentItem: ItemMappingResult;
   selectedCandidate: FolioCandidate | null;
   onSelectForDetail?: (iriHash: string) => void;
+  onOpenGraph?: (iriHash: string, label: string) => void;
 }
 
 function ExpandableList<T>({
@@ -62,7 +63,7 @@ function localeToFlag(locale: string): string {
   );
 }
 
-export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail }: DetailPanelProps) {
+export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail, onOpenGraph }: DetailPanelProps) {
   const [detail, setDetail] = useState<ConceptDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
@@ -359,6 +360,7 @@ export function DetailPanel({ currentItem, selectedCandidate, onSelectForDetail 
                       }}
                       parents={dagParents}
                       children={detail.children}
+                      hideDescendants
                       onSelectForDetail={onSelectForDetail}
                     />
                   </div>
