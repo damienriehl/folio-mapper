@@ -52,6 +52,11 @@ export function LLMSettings({
   const [testingProvider, setTestingProvider] = useState<LLMProviderType | null>(null);
   const [loadingModelsFor, setLoadingModelsFor] = useState<Set<LLMProviderType>>(new Set());
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Clear error when provider changes
+  useEffect(() => { setSaveError(null); }, [activeProvider]);
 
   useEffect(() => {
     fetch('/api/llm/pricing')
@@ -107,6 +112,41 @@ export function LLMSettings({
     [configs, fetchModels, onModelsLoaded],
   );
 
+  const handleSaveAndClose = useCallback(async () => {
+    const config = configs[activeProvider];
+    // If already validated, just close
+    if (config.connectionStatus === 'valid') {
+      setSaveError(null);
+      onClose();
+      return;
+    }
+
+    // Test the active provider's connection
+    setSaveError(null);
+    setIsSaving(true);
+    setTestingProvider(activeProvider);
+    try {
+      const result = await testConnection(
+        activeProvider,
+        config.apiKey || undefined,
+        config.baseUrl || undefined,
+        config.model || undefined,
+      );
+      onSetConnectionStatus(activeProvider, result.success ? 'valid' : 'invalid');
+      if (result.success) {
+        onClose();
+      } else {
+        setSaveError(result.message || 'Connection test failed. Please check your API key and try again.');
+      }
+    } catch {
+      onSetConnectionStatus(activeProvider, 'invalid');
+      setSaveError('Connection test failed. Please check your API key and try again.');
+    } finally {
+      setTestingProvider(null);
+      setIsSaving(false);
+    }
+  }, [activeProvider, configs, testConnection, onSetConnectionStatus, onClose]);
+
   const renderProviderSection = (title: string, providers: LLMProviderType[]) => (
     <div>
       <h3 className="mb-2 text-sm font-semibold text-gray-700">{title}</h3>
@@ -152,12 +192,23 @@ export function LLMSettings({
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">LLM Provider Settings</h2>
           <button
-            onClick={onClose}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            onClick={handleSaveAndClose}
+            disabled={isSaving}
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:text-blue-300"
           >
-            Save &amp; Close
+            {isSaving ? 'Testing...' : 'Save & Close'}
           </button>
         </div>
+
+        {/* Connection error banner */}
+        {saveError && (
+          <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-6 py-3 text-sm text-red-700">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {saveError}
+          </div>
+        )}
 
         {/* Body */}
         <div className="space-y-6 px-6 py-4">
