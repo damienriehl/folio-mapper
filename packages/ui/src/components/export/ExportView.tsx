@@ -117,15 +117,21 @@ export function ExportView({
             {completedCount} of {totalItems} items completed
           </p>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          aria-label="Close export"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isExporting ? 'Exporting...' : `Export as ${formatLabel}`}
+          </button>
+        </div>
       </div>
 
       {/* Options bar */}
@@ -190,22 +196,6 @@ export function ExportView({
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-gray-200 px-6 py-3">
-        <button
-          onClick={onClose}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleExport}
-          disabled={isExporting}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isExporting ? 'Exporting...' : `Export as ${formatLabel}`}
-        </button>
-      </div>
     </div>
   );
 }
