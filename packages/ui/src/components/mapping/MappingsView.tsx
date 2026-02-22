@@ -322,6 +322,26 @@ export function MappingsView({
     }
   }, [selectedConcepts]);
 
+  // Auto-select the first input item on mount
+  useEffect(() => {
+    if (selectedItemIndex !== null) return;
+    // Find the first leaf node (with an item_index)
+    const findFirstLeaf = (nodes: { item_index: number | null; children: any[] }[]): number | null => {
+      for (const node of nodes) {
+        if (node.item_index !== null) return node.item_index;
+        if (node.children?.length) {
+          const found = findFirstLeaf(node.children);
+          if (found !== null) return found;
+        }
+      }
+      return null;
+    };
+    const firstIndex = findFirstLeaf(inputHierarchy);
+    if (firstIndex !== null) {
+      setSelectedItemIndex(firstIndex);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-select the first mapped concept when switching input items
   useEffect(() => {
     if (selectedConcepts.length > 0 && !selectedConceptIri) {
