@@ -934,6 +934,57 @@ def search_candidates(
             )
         )
 
+    # Phase 4: Embedding-based semantic search — add candidates that keyword search missed
+    # These get their own reserved slots (up to 3 per branch) beyond the keyword cap,
+    # so semantic matches like "DUI" → "Driving Under the Influence" aren't crowded out.
+    try:
+        from app.services.embedding.service import get_embedding_index
+
+        embedding_index = get_embedding_index()
+        if embedding_index is not None:
+            existing_hashes = {c.iri_hash for c in candidates}
+            embedding_results = embedding_index.query(term, top_k=20)
+            emb_branch_counts: dict[str, int] = {}
+            embedding_added = 0
+            for emb_hash, emb_label, cosine_score in embedding_results:
+                if emb_hash in existing_hashes:
+                    continue
+                clamped = max(0.0, min(1.0, cosine_score))
+                scaled_score = round(clamped * 85.0, 1)
+                if scaled_score < min_score:
+                    continue
+                emb_class = folio[emb_hash]
+                if emb_class is None:
+                    continue
+                branch_name = get_branch_for_class(folio, emb_hash)
+                if branch_name in EXCLUDED_BRANCHES:
+                    continue
+                emb_count = emb_branch_counts.get(branch_name, 0)
+                if emb_count >= 3:
+                    continue
+                emb_branch_counts[branch_name] = emb_count + 1
+                candidates.append(
+                    FolioCandidate(
+                        label=emb_class.label or emb_hash,
+                        iri=emb_class.iri,
+                        iri_hash=emb_hash,
+                        definition=emb_class.definition,
+                        synonyms=emb_class.alternative_labels or [],
+                        branch=branch_name,
+                        branch_color=get_branch_color(branch_name),
+                        hierarchy_path=_build_hierarchy_path(folio, emb_hash),
+                        score=scaled_score,
+                    )
+                )
+                existing_hashes.add(emb_hash)
+                embedding_added += 1
+            if embedding_added > 0:
+                logger.info("search_candidates(%r): embedding added %d semantic candidates", term, embedding_added)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning("Embedding search failed in search_candidates: %s", e)
+
     return candidates
 
 
