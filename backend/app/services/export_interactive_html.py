@@ -7,6 +7,7 @@ import json
 
 from app.models.export_models import ExportRequest, InputHierarchyNode
 from app.services.branch_config import get_branch_color
+from app.services.folio_service import build_entity_graph
 
 
 def _html_escape(s: str) -> str:
@@ -47,6 +48,35 @@ def _build_mapping_data(request: ExportRequest) -> dict[str, list[dict]]:
     return mapping
 
 
+def _build_graph_data(concept_hashes: list[str]) -> dict[str, dict]:
+    """Pre-compute mini entity graphs for all unique concepts."""
+    graphs: dict[str, dict] = {}
+    for h in concept_hashes:
+        try:
+            result = build_entity_graph(
+                h, ancestors_depth=2, descendants_depth=1,
+                max_nodes=30, include_see_also=False,
+            )
+            if result:
+                graphs[h] = {
+                    "nodes": [
+                        {
+                            "id": n.id, "label": n.label, "branch": n.branch,
+                            "branch_color": n.branch_color, "is_focus": n.is_focus,
+                            "is_branch_root": n.is_branch_root, "depth": n.depth,
+                        }
+                        for n in result.nodes
+                    ],
+                    "edges": [
+                        {"source": e.source, "target": e.target, "edge_type": e.edge_type}
+                        for e in result.edges
+                    ],
+                }
+        except Exception:
+            pass
+    return graphs
+
+
 def generate_interactive_html(request: ExportRequest) -> str:
     """Generate a self-contained HTML section with 3-panel interactive mapping view."""
     input_nodes = request.input_hierarchy or []
@@ -71,9 +101,13 @@ def generate_interactive_html(request: ExportRequest) -> str:
                     "hierarchy_path": concept.hierarchy_path,
                 }
 
+    # Pre-compute entity graphs for each unique concept
+    graph_data = _build_graph_data(list(concept_metadata.keys()))
+
     input_json = json.dumps(input_data, ensure_ascii=False).replace("</", "<\\/")
     mapping_json = json.dumps(mapping_data, ensure_ascii=False).replace("</", "<\\/")
     metadata_json = json.dumps(concept_metadata, ensure_ascii=False).replace("</", "<\\/")
+    graph_json = json.dumps(graph_data, ensure_ascii=False).replace("</", "<\\/")
 
     return f"""<div id="interactive-section">
 <style>
@@ -108,11 +142,109 @@ def generate_interactive_html(request: ExportRequest) -> str:
   .int-right {{
     width: 320px;
     flex-shrink: 0;
-    overflow-y: auto;
     background: #f9fafb;
     border-left: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+  }}
+  .int-right-top {{
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: flex 0.15s;
+  }}
+  .int-right-top.half {{ flex: 1; }}
+  .int-right-top.full {{ flex: 1; }}
+  .int-detail-scroll {{
+    flex: 1;
+    overflow-y: auto;
     padding: 16px;
   }}
+  .int-section-bar {{
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    padding: 6px 16px;
+    background: #e5e7eb;
+    border-bottom: 1px solid #d1d5db;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }}
+  .int-right-bottom {{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid #e5e7eb;
+    overflow: hidden;
+  }}
+  .int-graph-container {{
+    flex: 1;
+    overflow: auto;
+    padding: 8px;
+  }}
+  .int-graph-container svg {{
+    display: block;
+    margin: 0 auto;
+  }}
+  .int-expand-btn {{
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+  }}
+  .int-expand-btn:hover {{
+    background: #d1d5db;
+    color: #4b5563;
+  }}
+  .int-graph-modal {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }}
+  .int-graph-modal-inner {{
+    width: 96vw;
+    height: 94vh;
+    background: white;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+  }}
+  .int-graph-modal-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f3f4f6;
+    flex-shrink: 0;
+  }}
+  .int-graph-modal-body {{
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+  }}
+  .int-graph-modal-body svg {{
+    display: block;
+    margin: 0 auto;
+  }}
+  .int-graph-node {{ cursor: pointer; }}
+  .int-graph-node:hover rect {{ filter: brightness(0.95); }}
   .int-section-title {{
     font-size: 10px;
     font-weight: 600;
@@ -264,6 +396,7 @@ def generate_interactive_html(request: ExportRequest) -> str:
 <script id="interactive-input-data" type="application/json">{input_json}</script>
 <script id="interactive-mapping-data" type="application/json">{mapping_json}</script>
 <script id="interactive-concept-metadata" type="application/json">{metadata_json}</script>
+<script id="interactive-graph-data" type="application/json">{graph_json}</script>
 
 <svg class="int-svg-overlay" id="int-svg-overlay"></svg>
 <div class="int-left" id="int-left-pane">
@@ -278,9 +411,22 @@ def generate_interactive_html(request: ExportRequest) -> str:
   </div>
 </div>
 <div class="int-right">
-  <div class="int-section-title">Concept Details</div>
-  <div id="int-detail-panel">
-    <div class="int-placeholder">Click a concept to see details</div>
+  <div class="int-right-top full" id="int-right-top">
+    <div class="int-section-bar">Concept Details</div>
+    <div class="int-detail-scroll" id="int-detail-panel">
+      <div class="int-placeholder">Click a concept to see details</div>
+    </div>
+  </div>
+  <div class="int-right-bottom" id="int-graph-section" style="display:none">
+    <div class="int-section-bar">
+      <span>Entity Graph</span>
+      <button class="int-expand-btn" onclick="window._expandGraph()" title="Expand to full screen">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/>
+        </svg>
+      </button>
+    </div>
+    <div class="int-graph-container" id="int-graph-panel"></div>
   </div>
 </div>
 
@@ -597,7 +743,171 @@ def generate_interactive_html(request: ExportRequest) -> str:
       + '<div class="int-detail-value">' + Math.round(c.score) + '%</div></div>';
 
     container.innerHTML = html;
+    renderGraphInline();
   }}
+
+  // --- Entity Graph rendering ---
+  var graphData = JSON.parse(document.getElementById('interactive-graph-data').textContent);
+
+  function renderGraphSVG(iriHash, targetEl, scale) {{
+    var gd = graphData[iriHash];
+    if (!gd || !gd.nodes || gd.nodes.length === 0) {{
+      targetEl.innerHTML = '<div class="int-placeholder">No graph data</div>';
+      return;
+    }}
+    var nodes = gd.nodes;
+    var edges = gd.edges;
+    scale = scale || 1;
+
+    // Group nodes by depth layer
+    var layers = {{}};
+    for (var i = 0; i < nodes.length; i++) {{
+      var d = nodes[i].depth;
+      if (!layers[d]) layers[d] = [];
+      layers[d].push(nodes[i]);
+    }}
+    var depths = Object.keys(layers).map(Number).sort(function(a,b) {{ return a - b; }});
+
+    var nodeW = 150 * scale;
+    var nodeH = 28 * scale;
+    var layerGap = 44 * scale;
+    var nodeGap = 12 * scale;
+    var padX = 20 * scale;
+    var padY = 16 * scale;
+    var fs = 11 * scale;
+    var radius = 4 * scale;
+
+    // Compute max row width
+    var maxRowW = 0;
+    for (var di = 0; di < depths.length; di++) {{
+      var row = layers[depths[di]];
+      var w = row.length * (nodeW + nodeGap) - nodeGap;
+      if (w > maxRowW) maxRowW = w;
+    }}
+
+    var svgW = maxRowW + padX * 2;
+    var svgH = depths.length * (nodeH + layerGap) - layerGap + padY * 2;
+
+    // Position nodes
+    var pos = {{}};
+    for (var di = 0; di < depths.length; di++) {{
+      var row = layers[depths[di]];
+      var rowW = row.length * (nodeW + nodeGap) - nodeGap;
+      var sx = (svgW - rowW) / 2;
+      var y = padY + di * (nodeH + layerGap);
+      for (var ni = 0; ni < row.length; ni++) {{
+        var nx = sx + ni * (nodeW + nodeGap);
+        pos[row[ni].id] = {{ x: nx, y: y, cx: nx + nodeW / 2, cy: y + nodeH / 2 }};
+      }}
+    }}
+
+    var svg = '<svg width="' + svgW + '" height="' + svgH + '" xmlns="http://www.w3.org/2000/svg">';
+
+    // Edges
+    for (var ei = 0; ei < edges.length; ei++) {{
+      var e = edges[ei];
+      var sp = pos[e.source];
+      var tp = pos[e.target];
+      if (!sp || !tp) continue;
+      var sY = sp.cy + nodeH / 2;
+      var tY = tp.cy - nodeH / 2;
+      var cpY = (sY + tY) / 2;
+      var sc = e.edge_type === 'seeAlso' ? '#8b5cf6' : '#3b82f6';
+      var dash = e.edge_type === 'seeAlso' ? ' stroke-dasharray="4,3"' : '';
+      svg += '<path d="M' + sp.cx + ',' + sY + ' C' + sp.cx + ',' + cpY + ' ' + tp.cx + ',' + cpY + ' ' + tp.cx + ',' + tY + '" stroke="' + sc + '" stroke-width="' + (1.5 * scale) + '" fill="none" opacity="0.4"' + dash + '/>';
+    }}
+
+    // Nodes
+    for (var ni = 0; ni < nodes.length; ni++) {{
+      var n = nodes[ni];
+      var p = pos[n.id];
+      if (!p) continue;
+      var fill = n.is_focus ? '#eff6ff' : (n.is_branch_root ? '#fef2f2' : '#ffffff');
+      var stroke = n.is_focus ? '#60a5fa' : (n.is_branch_root ? '#ef4444' : '#d1d5db');
+      var fw = n.is_focus ? 'bold' : 'normal';
+      var maxC = Math.floor(nodeW / (fs * 0.62));
+      var lbl = n.label.length > maxC ? n.label.substring(0, maxC - 1) + '\u2026' : n.label;
+
+      svg += '<g class="int-graph-node" data-node-id="' + n.id + '">';
+      svg += '<rect x="' + p.x + '" y="' + p.y + '" width="' + nodeW + '" height="' + nodeH + '" rx="' + radius + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + (1.5 * scale) + '"/>';
+      svg += '<text x="' + p.cx + '" y="' + (p.cy + fs * 0.35) + '" text-anchor="middle" font-size="' + fs + '" font-weight="' + fw + '" fill="#1f2937" font-family="-apple-system,sans-serif">' + escapeHtml(lbl) + '</text>';
+      svg += '</g>';
+    }}
+
+    svg += '</svg>';
+    targetEl.innerHTML = svg;
+
+    // Click handler for graph nodes
+    var gnodes = targetEl.querySelectorAll('.int-graph-node');
+    for (var gi = 0; gi < gnodes.length; gi++) {{
+      (function(g) {{
+        g.addEventListener('click', function() {{
+          var id = g.getAttribute('data-node-id');
+          if (conceptMeta[id]) {{
+            selectedConceptIri = id;
+            highlightConcept();
+            renderDetail();
+          }}
+        }});
+      }})(gnodes[gi]);
+    }}
+  }}
+
+  function renderGraphInline() {{
+    var section = document.getElementById('int-graph-section');
+    var topPane = document.getElementById('int-right-top');
+    if (!selectedConceptIri || !graphData[selectedConceptIri]) {{
+      section.style.display = 'none';
+      topPane.className = 'int-right-top full';
+      return;
+    }}
+    section.style.display = '';
+    topPane.className = 'int-right-top half';
+    var panel = document.getElementById('int-graph-panel');
+    renderGraphSVG(selectedConceptIri, panel, 1);
+  }}
+
+  window._expandGraph = function() {{
+    if (!selectedConceptIri || !graphData[selectedConceptIri]) return;
+
+    var modal = document.createElement('div');
+    modal.className = 'int-graph-modal';
+    modal.onclick = function(e) {{ if (e.target === modal) modal.remove(); }};
+
+    var inner = document.createElement('div');
+    inner.className = 'int-graph-modal-inner';
+
+    var header = document.createElement('div');
+    header.className = 'int-graph-modal-header';
+    var meta = conceptMeta[selectedConceptIri];
+    var title = meta ? meta.label : selectedConceptIri;
+    var titleDiv = document.createElement('div');
+    titleDiv.style.cssText = 'display:flex;align-items:center;gap:12px';
+    titleDiv.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7" x2="11" y2="16" stroke-linecap="round"/><line x1="16" y1="7" x2="13" y2="16" stroke-linecap="round"/></svg>'
+      + '<span style="font-size:16px;font-weight:600"><span style="color:#9ca3af;font-weight:400">Entity Graph</span><span style="color:#d1d5db;margin:0 8px">|</span><span style="color:#1d4ed8">' + escapeHtml(title) + '</span></span>';
+    header.appendChild(titleDiv);
+
+    var closeBtn = document.createElement('button');
+    closeBtn.innerHTML = 'Close <kbd style="margin-left:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;padding:2px 6px;font-size:11px;font-family:monospace;color:#6b7280">Esc</kbd>';
+    closeBtn.style.cssText = 'padding:6px 12px;border:1px solid #d1d5db;border-radius:8px;background:white;cursor:pointer;font-size:13px;color:#374151;display:flex;align-items:center;gap:4px';
+    closeBtn.onmouseover = function() {{ this.style.background = '#f9fafb'; }};
+    closeBtn.onmouseout = function() {{ this.style.background = 'white'; }};
+    closeBtn.onclick = function() {{ modal.remove(); }};
+    header.appendChild(closeBtn);
+
+    var body = document.createElement('div');
+    body.className = 'int-graph-modal-body';
+
+    inner.appendChild(header);
+    inner.appendChild(body);
+    modal.appendChild(inner);
+    document.body.appendChild(modal);
+
+    renderGraphSVG(selectedConceptIri, body, 1.6);
+
+    function onKey(e) {{ if (e.key === 'Escape') {{ modal.remove(); document.removeEventListener('keydown', onKey); }} }}
+    document.addEventListener('keydown', onKey);
+  }};
 
   function drawLines() {{
     var svg = document.getElementById('int-svg-overlay');
