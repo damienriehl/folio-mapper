@@ -191,13 +191,22 @@ export function LLMSettings({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">LLM Provider Settings</h2>
-          <button
-            onClick={handleSaveAndClose}
-            disabled={isSaving}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:text-blue-300"
-          >
-            {isSaving ? 'Testing...' : 'Save & Close'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="text-sm font-medium text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveAndClose}
+              disabled={isSaving}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:text-blue-300"
+            >
+              {isSaving ? 'Testing...' : 'Save & Close'}
+            </button>
+          </div>
         </div>
 
         {/* Connection error banner */}
