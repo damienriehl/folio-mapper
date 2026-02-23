@@ -58,6 +58,15 @@ export function LLMSettings({
   // Clear error when provider changes
   useEffect(() => { setSaveError(null); }, [activeProvider]);
 
+  // Escape key closes modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSaving) onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSaving, onClose]);
+
   useEffect(() => {
     fetch('/api/llm/pricing')
       .then((r) => r.json())
