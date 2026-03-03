@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from app.models.llm_models import LLMConfig
 from app.models.parse_models import ParseItem
 
 
@@ -9,6 +10,8 @@ class CandidateRequest(BaseModel):
     items: list[ParseItem]
     threshold: float = 0.3
     max_per_branch: int = 10
+    mandatory_branches: list[str] | None = None
+    llm_config: LLMConfig | None = None
 
 
 class HierarchyPathEntry(BaseModel):

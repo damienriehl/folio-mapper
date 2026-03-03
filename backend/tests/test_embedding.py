@@ -262,6 +262,75 @@ class TestFOLIOEmbeddingIndex:
         assert "R001" in scores
         assert "UNKNOWN" not in scores
 
+    def test_query_with_concept_filter(self, mock_index):
+        """concept_filter should restrict results to specific IRI hashes."""
+        results = mock_index.query(
+            "legal topic",
+            top_k=10,
+            concept_filter={"R001", "R003", "R005"},
+        )
+        for iri_hash, _, _ in results:
+            assert iri_hash in {"R001", "R003", "R005"}
+
+    def test_query_with_concept_and_branch_filter(self, mock_index):
+        """concept_filter + branch_filter should apply both filters (AND logic)."""
+        results = mock_index.query(
+            "legal area",
+            top_k=10,
+            branch_filter={"Area of Law"},
+            concept_filter={"R005", "R006", "R007"},
+        )
+        for iri_hash, _, _ in results:
+            assert iri_hash in {"R005", "R006", "R007"}
+            idx = mock_index._iri_hashes.index(iri_hash)
+            assert mock_index._branches[idx] == "Area of Law"
+
+    def test_query_concept_filter_empty_set_returns_nothing(self, mock_index):
+        """Empty concept_filter should return no results."""
+        results = mock_index.query("test", top_k=10, concept_filter=set())
+        assert results == []
+
+    def test_query_all_branches_returns_grouped(self, mock_index):
+        """query_all_branches should return results grouped by branch."""
+        results = mock_index.query_all_branches("legal topic", top_k_per_branch=5)
+        assert isinstance(results, dict)
+        for branch, hits in results.items():
+            assert isinstance(branch, str)
+            for iri_hash, label, score in hits:
+                idx = mock_index._iri_hashes.index(iri_hash)
+                assert mock_index._branches[idx] == branch
+
+    def test_query_all_branches_respects_per_branch_limit(self, mock_index):
+        """Each branch should have at most top_k_per_branch results."""
+        results = mock_index.query_all_branches("legal", top_k_per_branch=2)
+        for branch, hits in results.items():
+            assert len(hits) <= 2
+
+    def test_query_all_branches_with_concept_filter(self, mock_index):
+        """query_all_branches should filter by concept_filter."""
+        allowed = {"R001", "R005", "R008"}
+        results = mock_index.query_all_branches(
+            "test", top_k_per_branch=10, concept_filter=allowed,
+        )
+        for branch, hits in results.items():
+            for iri_hash, _, _ in hits:
+                assert iri_hash in allowed
+
+    def test_query_all_branches_without_build_raises(self, sample_concepts):
+        faiss = pytest.importorskip("faiss")
+        from app.services.embedding.folio_index import FOLIOEmbeddingIndex
+
+        provider = MockEmbeddingProvider(dim=32)
+        idx = FOLIOEmbeddingIndex(
+            provider=provider,
+            iri_hashes=sample_concepts["iri_hashes"],
+            labels=sample_concepts["labels"],
+            definitions=sample_concepts["definitions"],
+            branches=sample_concepts["branches"],
+        )
+        with pytest.raises(RuntimeError, match="not built"):
+            idx.query_all_branches("test")
+
     def test_query_without_build_raises(self, sample_concepts):
         faiss = pytest.importorskip("faiss")
         from app.services.embedding.folio_index import FOLIOEmbeddingIndex
@@ -518,14 +587,14 @@ class TestPipelineEmbeddingIntegration:
             with patch("app.services.pipeline.stage1_filter.get_branch_for_class", return_value="Legal Matter Objective"):
                 added = _add_embedding_candidates(mock_folio, "DUI defense", best, prescan)
 
-        assert added == 3
-        assert len(best) == 3
+        assert added == 2  # R003 (cosine 0.45 * 65 = 29.3) falls below threshold 30
+        assert len(best) == 2
         # All added candidates should have "embedding" as source
         for candidate in best.values():
             assert "embedding" in candidate.source_branches
-        # Scores should be scaled from cosine similarity to 0-85 range
-        assert best["R001"].score == round(0.85 * 85.0, 1)
-        assert best["R002"].score == round(0.72 * 85.0, 1)
+        # Scores should be scaled from cosine similarity to 0-65 range
+        assert best["R001"].score == round(0.85 * 65.0, 1)
+        assert best["R002"].score == round(0.72 * 65.0, 1)
 
     def test_stage1_embedding_respects_existing(self, sample_concepts):
         """Embedding candidates should not overwrite existing keyword matches."""

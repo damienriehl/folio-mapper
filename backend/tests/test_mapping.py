@@ -1,6 +1,6 @@
 """Tests for the mapping endpoints with mocked FOLIO service."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -123,7 +123,7 @@ MOCK_BRANCHES = [
 
 
 @pytest.mark.anyio
-@patch("app.routers.mapping.search_all_items", return_value=MOCK_CANDIDATES)
+@patch("app.routers.mapping.search_all_items", new_callable=AsyncMock, return_value=MOCK_CANDIDATES)
 @patch("app.routers.mapping.get_all_branches", return_value=MOCK_BRANCHES)
 async def test_post_candidates(mock_branches, mock_search, client: AsyncClient):
     resp = await client.post(

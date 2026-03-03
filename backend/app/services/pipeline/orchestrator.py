@@ -104,13 +104,28 @@ def _embedding_rerank(
     item_text: str,
     stage1_candidates: list[ScopedCandidate],
     top_k: int = 20,
+    mandatory_branches: list[str] | None = None,
 ) -> list[RankedCandidate]:
     """Re-rank Stage 1 candidates using embedding similarity scores.
 
     Blends keyword scores (60%) with embedding cosine similarity (40%).
     Falls back to keyword-only sorting if embeddings are unavailable.
+    Mandatory branch candidates are protected from being dropped by the top_k cutoff.
     """
     sorted_candidates = sorted(stage1_candidates, key=lambda c: c.score, reverse=True)[:top_k]
+
+    # Ensure mandatory branch candidates survive into the reranking pool
+    if mandatory_branches:
+        mandatory_set = set(mandatory_branches)
+        included_hashes = {c.iri_hash for c in sorted_candidates}
+        by_branch: dict[str, list[ScopedCandidate]] = {}
+        for c in stage1_candidates:
+            if c.branch in mandatory_set and c.iri_hash not in included_hashes:
+                by_branch.setdefault(c.branch, []).append(c)
+        for branch, extras in by_branch.items():
+            extras.sort(key=lambda c: c.score, reverse=True)
+            for c in extras[:5]:  # Reserve up to 5 per mandatory branch
+                sorted_candidates.append(c)
 
     # Try embedding re-ranking
     try:
@@ -192,7 +207,7 @@ async def _process_item(
         print(f"[item {item.index}] STAGE 1: {len(stage1_candidates)} candidates")
 
         # Stage 1.5: LLM-assisted candidate expansion
-        stage1b_new = await run_stage1b(item.text, prescan, stage1_candidates, llm_config, api_key=api_key)
+        stage1b_new = await run_stage1b(item.text, prescan, stage1_candidates, llm_config, api_key=api_key, mandatory_branches=mandatory_branches)
         stage1b_branches = list({c.branch for c in stage1b_new}) if stage1b_new else []
         if stage1b_new:
             stage1_candidates = stage1_candidates + stage1b_new
@@ -201,7 +216,7 @@ async def _process_item(
             print(f"[item {item.index}] STAGE 1.5: No expansion needed")
 
         # Stage 2: Embedding re-ranking (replaces disabled LLM ranking)
-        ranked = _embedding_rerank(item.text, stage1_candidates)
+        ranked = _embedding_rerank(item.text, stage1_candidates, mandatory_branches=mandatory_branches)
         print(f"[item {item.index}] STAGE 2: {len(ranked)} candidates (embedding re-rank)")
         for r in ranked[:3]:
             sc = {c.iri_hash: c for c in stage1_candidates}.get(r.iri_hash)

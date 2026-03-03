@@ -44,7 +44,7 @@ export function useMapping() {
   }, [setBatchLoading]);
 
   const loadCandidates = useCallback(
-    async (items: ParseItem[]) => {
+    async (items: ParseItem[], mandatoryBranches?: string[], llmConfig?: PipelineRequestConfig | null) => {
       // Cancel any in-flight batches from a previous run
       cancelBatchLoading();
 
@@ -54,7 +54,7 @@ export function useMapping() {
       try {
         // Batch 1: first item only — show mapping screen immediately
         const firstBatch = items.slice(0, 1);
-        const response = await fetchCandidates(firstBatch, 0, 10);
+        const response = await fetchCandidates(firstBatch, 0, 10, mandatoryBranches, llmConfig);
         startMapping(response, items.length);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load candidates');
@@ -80,7 +80,7 @@ export function useMapping() {
         const size = BATCH_SEQUENCE[Math.min(step, BATCH_SEQUENCE.length - 1)];
         const batch = remaining.slice(offset, offset + size);
         try {
-          const response = await fetchCandidates(batch, 0, 10);
+          const response = await fetchCandidates(batch, 0, 10, mandatoryBranches, llmConfig);
           if (controller.signal.aborted) break;
           appendMappingItems(response.items);
         } catch (err) {

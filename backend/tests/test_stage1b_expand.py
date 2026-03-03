@@ -9,6 +9,7 @@ import pytest
 from app.models.llm_models import LLMConfig, LLMProviderType
 from app.models.pipeline_models import PreScanResult, PreScanSegment, ScopedCandidate
 from app.services.pipeline.stage1b_expand import (
+    _build_expansion_prompt,
     _find_underrepresented_branches,
     _parse_llm_suggestions,
     run_stage1b,
@@ -91,6 +92,33 @@ def test_parse_llm_suggestions_filters_non_strings():
     assert result == ["Criminal Law", "DUI Law"]
 
 
+# --- Prompt building tests ---
+
+
+def test_build_expansion_prompt_without_labels():
+    prompt = _build_expansion_prompt("DUI Defense", "Area of Law")
+    assert "DUI Defense" in prompt
+    assert "Area of Law" in prompt
+    assert "top-level concepts" not in prompt
+
+
+def test_build_expansion_prompt_with_labels():
+    labels = ["Criminal Law", "Family Law", "Tax Law"]
+    prompt = _build_expansion_prompt("DUI Defense", "Area of Law", branch_labels=labels)
+    assert "DUI Defense" in prompt
+    assert "Area of Law" in prompt
+    assert "top-level concepts" in prompt
+    assert "Criminal Law" in prompt
+    assert "Family Law" in prompt
+    assert "Tax Law" in prompt
+    assert "Use these as guidance" in prompt
+
+
+def test_build_expansion_prompt_with_empty_labels():
+    prompt = _build_expansion_prompt("DUI Defense", "Area of Law", branch_labels=[])
+    assert "top-level concepts" not in prompt
+
+
 # --- Underrepresented branch detection ---
 
 
@@ -153,6 +181,59 @@ def test_find_underrepresented_adequate_coverage(prescan_with_area_of_law):
     ]
     result = _find_underrepresented_branches(prescan_with_area_of_law, candidates)
     assert "Area of Law" not in result
+
+
+def test_find_underrepresented_includes_mandatory_branches():
+    """Mandatory branches should be included in underrepresented check even if not in prescan."""
+    prescan = PreScanResult(
+        segments=[
+            PreScanSegment(text="Drug Offenses", branches=["Objectives"], reasoning="test"),
+        ],
+        raw_text="Drug Offenses",
+    )
+    candidates = [
+        ScopedCandidate(
+            iri_hash="R1",
+            label="DUI",
+            branch="Objectives",
+            score=85.0,
+            source_branches=["Objectives"],
+        ),
+    ]
+    # "Area of Law" is mandatory but NOT in prescan branches
+    result = _find_underrepresented_branches(
+        prescan, candidates, mandatory_branches=["Area of Law"]
+    )
+    assert "Area of Law" in result
+
+
+def test_find_underrepresented_mandatory_always_expands():
+    """Mandatory branches should ALWAYS be underrepresented, even with adequate keyword coverage.
+
+    This ensures LLM expansion fires for mandatory branches to bridge semantic gaps
+    (e.g., "Motor Vehicle Accidents" → "Personal Injury and Tort Law").
+    """
+    prescan = PreScanResult(
+        segments=[
+            PreScanSegment(text="Drug Offenses", branches=["Objectives"], reasoning="test"),
+        ],
+        raw_text="Drug Offenses",
+    )
+    candidates = [
+        ScopedCandidate(
+            iri_hash=f"R{i}",
+            label=f"Law {i}",
+            branch="Area of Law",
+            score=70.0,
+            source_branches=["Area of Law"],
+        )
+        for i in range(4)
+    ]
+    result = _find_underrepresented_branches(
+        prescan, candidates, mandatory_branches=["Area of Law"]
+    )
+    # Mandatory branches always get expanded, regardless of candidate count
+    assert "Area of Law" in result
 
 
 def test_find_underrepresented_no_prescan_branches():

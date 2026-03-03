@@ -22,11 +22,12 @@ from app.services.folio_service import (
     _compute_relevance_score,
     _content_words,
     _extract_iri_hash,
+    _get_branch_level_labels,
+    _resolve_branch_children,
     get_branch_for_class,
     get_folio,
 )
 from app.services.pipeline.stage1_filter import (
-    _resolve_branch_children,
     _search_within_branch,
 )
 
@@ -39,12 +40,20 @@ _MIN_CANDIDATES_THRESHOLD = 3
 _MAX_EXPAND_PER_BRANCH = 5
 
 
-def _build_expansion_prompt(item_text: str, branch_name: str) -> str:
+def _build_expansion_prompt(
+    item_text: str, branch_name: str, branch_labels: list[str] | None = None,
+) -> str:
     """Build prompt asking LLM to suggest concept labels for a branch."""
-    return (
+    prompt = (
         "You are a legal ontology expert. Given the input text and a FOLIO ontology branch, "
         "suggest the top 5 concept labels that would exist in that branch and semantically "
         "relate to the input.\n\n"
+    )
+    if branch_labels:
+        prompt += f"The top-level concepts in the '{branch_name}' branch include:\n"
+        prompt += ", ".join(branch_labels)
+        prompt += "\n\nUse these as guidance for the types of concepts in this branch.\n\n"
+    prompt += (
         "Think about:\n"
         "- What broader legal category does this input fall under?\n"
         "- What specific legal concepts in this branch would a lawyer associate with this input?\n"
@@ -55,6 +64,7 @@ def _build_expansion_prompt(item_text: str, branch_name: str) -> str:
         '["Concept Label 1", "Concept Label 2", "Concept Label 3", "Concept Label 4", "Concept Label 5"]\n\n'
         "No explanation, just the JSON array."
     )
+    return prompt
 
 
 def _parse_llm_suggestions(text: str) -> list[str]:
@@ -79,11 +89,12 @@ def _parse_llm_suggestions(text: str) -> list[str]:
 def _find_underrepresented_branches(
     prescan: PreScanResult,
     stage1_candidates: list[ScopedCandidate],
+    mandatory_branches: list[str] | None = None,
 ) -> list[str]:
     """Find prescan-tagged branches with poor Stage 1 coverage.
 
-    A branch is underrepresented if it was tagged by prescan but has fewer
-    than _MIN_CANDIDATES_THRESHOLD candidates from Stage 1.
+    A branch is underrepresented if it was tagged by prescan (or is mandatory)
+    but has fewer than _MIN_CANDIDATES_THRESHOLD candidates from Stage 1.
     """
     # Collect all branches tagged by prescan
     prescan_branches: set[str] = set()
@@ -91,16 +102,23 @@ def _find_underrepresented_branches(
         for branch in segment.branches:
             prescan_branches.add(branch)
 
+    # Also include mandatory branches so LLM expansion fires for them
+    if mandatory_branches:
+        prescan_branches.update(mandatory_branches)
+
     # Count Stage 1 candidates per branch
     branch_counts: dict[str, int] = {}
     for c in stage1_candidates:
         branch_counts[c.branch] = branch_counts.get(c.branch, 0) + 1
 
     # Find branches that need expansion
+    # Mandatory branches ALWAYS get expanded (even with 3+ keyword candidates)
+    # so the LLM can bridge semantic gaps like "Motor Vehicle Accidents" → "Personal Injury and Tort Law"
+    mandatory_set = set(mandatory_branches) if mandatory_branches else set()
     underrepresented = []
     for branch in sorted(prescan_branches):
         count = branch_counts.get(branch, 0)
-        if count < _MIN_CANDIDATES_THRESHOLD:
+        if count < _MIN_CANDIDATES_THRESHOLD or branch in mandatory_set:
             underrepresented.append(branch)
 
     return underrepresented
@@ -121,7 +139,8 @@ async def _llm_suggest_labels(
             model=llm_config.model,
         )
 
-        prompt = _build_expansion_prompt(item_text, branch_name)
+        branch_labels = list(_get_branch_level_labels(branch_name, max_depth=1))
+        prompt = _build_expansion_prompt(item_text, branch_name, branch_labels=branch_labels or None)
         response = await provider.complete(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
@@ -139,6 +158,7 @@ async def run_stage1b(
     stage1_candidates: list[ScopedCandidate],
     llm_config: LLMConfig,
     api_key: str | None = None,
+    mandatory_branches: list[str] | None = None,
 ) -> list[ScopedCandidate]:
     """Run Stage 1.5: LLM-assisted candidate expansion.
 
@@ -151,11 +171,12 @@ async def run_stage1b(
         prescan: Stage 0 output with segment/branch tags.
         stage1_candidates: Stage 1 output candidates.
         llm_config: LLM provider configuration.
+        mandatory_branches: Branches that must have coverage (included in underrepresented check).
 
     Returns:
         List of new ScopedCandidate to add (not including existing Stage 1 candidates).
     """
-    underrepresented = _find_underrepresented_branches(prescan, stage1_candidates)
+    underrepresented = _find_underrepresented_branches(prescan, stage1_candidates, mandatory_branches)
 
     if not underrepresented:
         logger.info("Stage 1.5: All prescan branches have adequate coverage, skipping expansion.")

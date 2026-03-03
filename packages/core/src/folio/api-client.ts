@@ -10,14 +10,20 @@ export async function fetchCandidates(
   items: ParseItem[],
   threshold = 0.3,
   maxPerBranch = 10,
+  mandatoryBranches?: string[],
+  llmConfig?: PipelineRequestConfig | null,
 ): Promise<MappingResponse> {
   const res = await fetch(`${BASE_URL}/candidates`, {
     method: 'POST',
-    headers: baseHeaders(),
+    headers: llmConfig?.api_key ? buildAuthHeaders(llmConfig.api_key) : baseHeaders(),
     body: JSON.stringify({
       items,
       threshold,
       max_per_branch: maxPerBranch,
+      mandatory_branches: mandatoryBranches?.length ? mandatoryBranches : undefined,
+      llm_config: llmConfig
+        ? { provider: llmConfig.provider, base_url: llmConfig.base_url, model: llmConfig.model }
+        : undefined,
     }),
   });
 

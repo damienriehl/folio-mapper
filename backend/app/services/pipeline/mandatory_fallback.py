@@ -21,11 +21,14 @@ from app.services.folio_service import (
     _compute_relevance_score,
     _content_words,
     _extract_iri_hash,
+    _get_branch_level_labels,
+    _resolve_branch_children,
+    _resolve_branch_level_hashes,
+    _see_also_within_branch,
     get_branch_for_class,
     get_folio,
 )
 from app.services.pipeline.stage1_filter import (
-    _resolve_branch_children,
     _search_within_branch,
 )
 
@@ -34,16 +37,26 @@ logger = logging.getLogger(__name__)
 _MAX_PER_BRANCH = 20
 
 
-def _build_llm_prompt(item_text: str, branch_name: str) -> str:
-    return (
-        f"You are a legal ontology expert. Given the input text and a FOLIO ontology branch, "
-        f"suggest the top 5 concept labels that would exist in that branch and relate to the input.\n\n"
+def _build_llm_prompt(
+    item_text: str, branch_name: str, branch_labels: list[str] | None = None,
+) -> str:
+    prompt = (
+        "You are a legal ontology expert. Given the input text and a FOLIO ontology branch, "
+        "suggest the top 5 concept labels that would exist in that branch and semantically "
+        "relate to the input.\n\n"
+    )
+    if branch_labels:
+        prompt += f"The top-level concepts in the '{branch_name}' branch include:\n"
+        prompt += ", ".join(branch_labels)
+        prompt += "\n\nUse these as guidance for the types of concepts in this branch.\n\n"
+    prompt += (
         f"Input text: {item_text}\n"
         f"FOLIO branch: {branch_name}\n\n"
-        f"Return ONLY a JSON array of strings, e.g.:\n"
-        f'["Concept Label 1", "Concept Label 2", "Concept Label 3", "Concept Label 4", "Concept Label 5"]\n\n'
-        f"No explanation, just the JSON array."
+        "Return ONLY a JSON array of strings, e.g.:\n"
+        '["Concept Label 1", "Concept Label 2", "Concept Label 3", "Concept Label 4", "Concept Label 5"]\n\n'
+        "No explanation, just the JSON array."
     )
+    return prompt
 
 
 def _parse_llm_suggestions(text: str) -> list[str]:
@@ -80,7 +93,8 @@ async def _llm_suggest_labels(
             model=llm_config.model,
         )
 
-        prompt = _build_llm_prompt(item_text, branch_name)
+        branch_labels = list(_get_branch_level_labels(branch_name, max_depth=1))
+        prompt = _build_llm_prompt(item_text, branch_name, branch_labels=branch_labels or None)
         response = await provider.complete(
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
@@ -142,6 +156,64 @@ async def run_mandatory_fallback(
         for iri_hash, owl_class, score in local_results:
             if iri_hash not in seen or score > seen[iri_hash][1]:
                 seen[iri_hash] = (owl_class, score)
+
+        # Step 1.5: OWL see_also traversal — find cross-branch references into this branch
+        sa_results = _see_also_within_branch(folio, item_text, branch_hashes, set(seen.keys()))
+        for iri_hash, owl_class, score in sa_results:
+            if iri_hash not in seen or score > seen[iri_hash][1]:
+                seen[iri_hash] = (owl_class, score)
+
+        # Step 1.75: Embedding search within this mandatory branch
+        try:
+            from app.services.embedding.service import get_embedding_index
+
+            embedding_index = get_embedding_index()
+            if embedding_index is not None:
+                emb_results = embedding_index.query(
+                    item_text, top_k=10, branch_filter={branch_name},
+                )
+                for emb_hash, emb_label, cosine_score in emb_results:
+                    if emb_hash in seen:
+                        continue
+                    clamped = max(0.0, min(1.0, cosine_score))
+                    scaled_score = round(clamped * 65.0, 1)
+                    if scaled_score < 20:
+                        continue
+                    owl_class = folio[emb_hash]
+                    if owl_class is not None:
+                        seen[emb_hash] = (owl_class, scaled_score)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning("Embedding search failed for mandatory fallback branch %s: %s", branch_name, e)
+
+        # Step 1.75b: Structural embedding search — L1+L2 concepts only
+        try:
+            from app.services.embedding.service import get_embedding_index
+
+            embedding_index = get_embedding_index()
+            if embedding_index is not None:
+                level_hashes = _resolve_branch_level_hashes(branch_name, max_depth=2)
+                if level_hashes:
+                    struct_results = embedding_index.query(
+                        item_text, top_k=10,
+                        branch_filter={branch_name},
+                        concept_filter=set(level_hashes),
+                    )
+                    for emb_hash, emb_label, cosine_score in struct_results:
+                        if emb_hash in seen:
+                            continue
+                        clamped = max(0.0, min(1.0, cosine_score))
+                        scaled_score = round(clamped * 65.0, 1)
+                        if scaled_score < 15:
+                            continue
+                        owl_class = folio[emb_hash]
+                        if owl_class is not None:
+                            seen[emb_hash] = (owl_class, scaled_score)
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning("Structural embedding search failed for mandatory fallback branch %s: %s", branch_name, e)
 
         # Step 2: LLM fallback if needed
         if len(seen) < _MAX_PER_BRANCH and llm_config is not None:

@@ -9,16 +9,18 @@ from __future__ import annotations
 
 import logging
 
-from folio import FOLIO, FOLIO_TYPE_IRIS, FOLIOTypes
+from folio import FOLIO
 
 from app.models.pipeline_models import PreScanResult, ScopedCandidate
-from app.services.branch_config import BRANCH_CONFIG
 from app.services.folio_service import (
     LEGAL_TERM_EXPANSIONS,
     _compute_relevance_score,
     _content_words,
     _extract_iri_hash,
     _generate_search_terms,
+    _resolve_branch_children,
+    _resolve_branch_level_hashes,
+    _see_also_within_branch,
     get_branch_for_class,
     get_folio,
     search_candidates,
@@ -26,49 +28,12 @@ from app.services.folio_service import (
 
 logger = logging.getLogger(__name__)
 
-# Embedding scores are scaled to this max to sit below keyword exact-match scores (88-99)
-_EMBEDDING_SCORE_MAX = 85.0
-
-# Map display names → FOLIOTypes enum names
-_DISPLAY_TO_ENUM_KEY: dict[str, str] = {
-    cfg["name"]: key for key, cfg in BRANCH_CONFIG.items()
-}
+# Embedding scores are scaled to this max to sit below auto-select threshold (80)
+# and below keyword exact-match scores (88-99)
+_EMBEDDING_SCORE_MAX = 65.0
 
 # Max candidates passed to Stage 2
 _MAX_TOTAL_CANDIDATES = 60
-
-
-def _resolve_branch_children(folio: FOLIO, branch_display_name: str) -> set[str] | None:
-    """Resolve a branch display name to the set of IRI hashes of its children.
-
-    Returns None if the branch cannot be resolved.
-    """
-    enum_key = _DISPLAY_TO_ENUM_KEY.get(branch_display_name)
-    if not enum_key:
-        logger.warning("Stage 1: Unknown branch display name: %s", branch_display_name)
-        return None
-
-    try:
-        ft = FOLIOTypes[enum_key]
-    except KeyError:
-        logger.warning("Stage 1: FOLIOTypes has no member: %s", enum_key)
-        return None
-
-    root_hash = FOLIO_TYPE_IRIS.get(ft)
-    if not root_hash:
-        logger.warning("Stage 1: No IRI hash for FOLIOTypes.%s", enum_key)
-        return None
-
-    try:
-        children = folio.get_children(root_hash, max_depth=4)
-    except Exception as e:
-        logger.warning("Stage 1: get_children failed for %s: %s", enum_key, e)
-        return None
-
-    # Build set of IRI hashes (include root + children)
-    child_hashes = {_extract_iri_hash(c.iri) for c in children}
-    child_hashes.add(root_hash)
-    return child_hashes
 
 
 def _search_within_branch(
@@ -277,9 +242,106 @@ def run_stage1(
                     if branch_name not in existing.source_branches:
                         existing.source_branches.append(branch_name)
 
+            # OWL see_also: find cross-branch references pointing into this mandatory branch
+            sa_results = _see_also_within_branch(folio, prescan.raw_text, branch_hashes, set(best.keys()))
+            for iri_hash, owl_class, score in sa_results:
+                if owl_class is None:
+                    continue
+                existing = best.get(iri_hash)
+                if existing is None:
+                    actual_branch = get_branch_for_class(folio, iri_hash)
+                    best[iri_hash] = ScopedCandidate(
+                        iri_hash=iri_hash,
+                        label=owl_class.label or iri_hash,
+                        definition=owl_class.definition,
+                        synonyms=owl_class.alternative_labels or [],
+                        branch=actual_branch,
+                        score=score,
+                        source_branches=[branch_name],
+                    )
+                else:
+                    if score > existing.score:
+                        existing.score = score
+
+            # Embedding search within this mandatory branch for semantic matches
+            emb_added = 0
+            try:
+                from app.services.embedding.service import get_embedding_index
+
+                embedding_index = get_embedding_index()
+                if embedding_index is not None:
+                    emb_results = embedding_index.query(
+                        prescan.raw_text, top_k=10, branch_filter={branch_name},
+                    )
+                    for emb_hash, emb_label, cosine_score in emb_results:
+                        if emb_hash in best:
+                            continue
+                        clamped = max(0.0, min(1.0, cosine_score))
+                        scaled_score = round(clamped * _EMBEDDING_SCORE_MAX, 1)
+                        if scaled_score < 20:
+                            continue
+                        owl_class = folio[emb_hash]
+                        if owl_class is None:
+                            continue
+                        actual_branch = get_branch_for_class(folio, emb_hash)
+                        best[emb_hash] = ScopedCandidate(
+                            iri_hash=emb_hash,
+                            label=owl_class.label or emb_hash,
+                            definition=owl_class.definition,
+                            synonyms=owl_class.alternative_labels or [],
+                            branch=actual_branch,
+                            score=scaled_score,
+                            source_branches=[branch_name],
+                        )
+                        emb_added += 1
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.warning("Embedding search failed for mandatory branch %s: %s", branch_name, e)
+
+            # Structural embedding search — L1+L2 concepts only for broader category matches
+            struct_added = 0
+            try:
+                from app.services.embedding.service import get_embedding_index
+
+                embedding_index = get_embedding_index()
+                if embedding_index is not None:
+                    level_hashes = _resolve_branch_level_hashes(branch_name, max_depth=2)
+                    if level_hashes:
+                        struct_results = embedding_index.query(
+                            prescan.raw_text, top_k=10,
+                            branch_filter={branch_name},
+                            concept_filter=set(level_hashes),
+                        )
+                        for emb_hash, emb_label, cosine_score in struct_results:
+                            if emb_hash in best:
+                                continue
+                            clamped = max(0.0, min(1.0, cosine_score))
+                            scaled_score = round(clamped * _EMBEDDING_SCORE_MAX, 1)
+                            if scaled_score < 15:
+                                continue
+                            owl_class = folio[emb_hash]
+                            if owl_class is None:
+                                continue
+                            actual_branch = get_branch_for_class(folio, emb_hash)
+                            best[emb_hash] = ScopedCandidate(
+                                iri_hash=emb_hash,
+                                label=owl_class.label or emb_hash,
+                                definition=owl_class.definition,
+                                synonyms=owl_class.alternative_labels or [],
+                                branch=actual_branch,
+                                score=scaled_score,
+                                source_branches=[branch_name],
+                            )
+                            struct_added += 1
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.warning("Structural embedding search failed for mandatory branch %s: %s", branch_name, e)
+
             logger.info(
-                "Stage 1: Mandatory branch '%s' searched with %d results",
-                branch_name, len(results),
+                "Stage 1: Mandatory branch '%s' searched with %d keyword + %d see_also + %d embedding + %d structural results",
+                branch_name, len(results), len(sa_results), emb_added, struct_added,
             )
 
     # Embedding-based candidate discovery: find semantic matches that keyword search missed

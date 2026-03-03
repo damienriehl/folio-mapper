@@ -32,12 +32,19 @@ router = APIRouter(prefix="/api/mapping", tags=["mapping"])
 
 @router.post("/candidates", response_model=MappingResponse)
 @limiter.limit("60/minute")
-async def get_candidates(request: Request, body: CandidateRequest) -> MappingResponse:
+async def get_candidates(
+    request: Request,
+    body: CandidateRequest,
+    api_key: str | None = Depends(extract_api_key),
+) -> MappingResponse:
     """Search FOLIO for candidate mappings for all items."""
-    item_results = search_all_items(
+    item_results = await search_all_items(
         items=body.items,
         threshold=body.threshold,
         max_per_branch=body.max_per_branch,
+        mandatory_branches=body.mandatory_branches,
+        llm_config=body.llm_config,
+        api_key=api_key,
     )
     branches = get_all_branches()
 

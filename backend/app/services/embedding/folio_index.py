@@ -155,6 +155,7 @@ class FOLIOEmbeddingIndex:
         text: str,
         top_k: int = 20,
         branch_filter: set[str] | None = None,
+        concept_filter: set[str] | None = None,
     ) -> list[tuple[str, str, float]]:
         """Query the index for similar concepts.
 
@@ -162,6 +163,7 @@ class FOLIOEmbeddingIndex:
             text: Input text to find similar concepts for.
             top_k: Maximum number of results.
             branch_filter: If provided, only return results from these branches.
+            concept_filter: If provided, only return results whose IRI hash is in the set.
 
         Returns:
             List of (iri_hash, label, score) tuples, sorted by score descending.
@@ -172,23 +174,29 @@ class FOLIOEmbeddingIndex:
 
         query_vec = self._provider.embed(text).reshape(1, -1)
 
-        if branch_filter:
+        if branch_filter or concept_filter is not None:
             # Filtered search: query a larger set then filter
-            search_k = min(top_k * 5, self._index.ntotal)
+            multiplier = 5
+            if concept_filter is not None:
+                multiplier = 50  # concept_filter is typically small, need wider search
+            search_k = min(top_k * multiplier, self._index.ntotal)
             scores, indices = self._index.search(query_vec, search_k)
 
             results = []
             for score, idx in zip(scores[0], indices[0]):
                 if idx < 0:
                     continue
-                if self._branches[idx] in branch_filter:
-                    results.append((
-                        self._iri_hashes[idx],
-                        self._labels[idx],
-                        float(score),
-                    ))
-                    if len(results) >= top_k:
-                        break
+                if branch_filter and self._branches[idx] not in branch_filter:
+                    continue
+                if concept_filter is not None and self._iri_hashes[idx] not in concept_filter:
+                    continue
+                results.append((
+                    self._iri_hashes[idx],
+                    self._labels[idx],
+                    float(score),
+                ))
+                if len(results) >= top_k:
+                    break
             return results
         else:
             search_k = min(top_k, self._index.ntotal)
@@ -204,6 +212,42 @@ class FOLIOEmbeddingIndex:
                     float(score),
                 ))
             return results
+
+    def query_all_branches(
+        self,
+        text: str,
+        top_k_per_branch: int = 5,
+        concept_filter: set[str] | None = None,
+    ) -> dict[str, list[tuple[str, str, float]]]:
+        """Single embed + single FAISS search, grouped by branch.
+
+        Args:
+            text: Input text to find similar concepts for.
+            top_k_per_branch: Maximum results per branch.
+            concept_filter: If provided, only return results whose IRI hash is in the set.
+
+        Returns:
+            Dict of branch_name → list of (iri_hash, label, score) tuples.
+        """
+        if self._index is None:
+            raise RuntimeError("Index not built. Call build() first.")
+
+        query_vec = self._provider.embed(text).reshape(1, -1)
+        search_k = min(top_k_per_branch * 50, self._index.ntotal)
+        scores, indices = self._index.search(query_vec, search_k)
+
+        results_by_branch: dict[str, list[tuple[str, str, float]]] = {}
+        for j, idx in enumerate(indices[0]):
+            if idx < 0:
+                continue
+            h = self._iri_hashes[idx]
+            if concept_filter is not None and h not in concept_filter:
+                continue
+            branch = self._branches[idx]
+            bucket = results_by_branch.setdefault(branch, [])
+            if len(bucket) < top_k_per_branch:
+                bucket.append((h, self._labels[idx], float(scores[0][j])))
+        return results_by_branch
 
     def score_candidates(
         self,

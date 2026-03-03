@@ -141,6 +141,107 @@ def _init_branch_roots() -> None:
                 logger.info("Discovered additional branch root: %s (%s)", label, iri_hash)
 
 
+# Map display names → FOLIOTypes enum names (for branch resolution)
+_DISPLAY_TO_ENUM_KEY: dict[str, str] = {
+    cfg["name"]: key for key, cfg in BRANCH_CONFIG.items()
+}
+
+
+def _resolve_branch_children(folio: FOLIO, branch_display_name: str) -> set[str] | None:
+    """Resolve a branch display name to the set of IRI hashes of its children.
+
+    Returns None if the branch cannot be resolved.
+    """
+    enum_key = _DISPLAY_TO_ENUM_KEY.get(branch_display_name)
+    if not enum_key:
+        logger.warning("Unknown branch display name: %s", branch_display_name)
+        return None
+
+    try:
+        ft = FOLIOTypes[enum_key]
+    except KeyError:
+        logger.warning("FOLIOTypes has no member: %s", enum_key)
+        return None
+
+    root_hash = FOLIO_TYPE_IRIS.get(ft)
+    if not root_hash:
+        logger.warning("No IRI hash for FOLIOTypes.%s", enum_key)
+        return None
+
+    try:
+        children = folio.get_children(root_hash, max_depth=4)
+    except Exception as e:
+        logger.warning("get_children failed for %s: %s", enum_key, e)
+        return None
+
+    # Build set of IRI hashes (include root + children)
+    child_hashes = {_extract_iri_hash(c.iri) for c in children}
+    child_hashes.add(root_hash)
+    return child_hashes
+
+
+@lru_cache(maxsize=64)
+def _resolve_branch_level_hashes(branch_display_name: str, max_depth: int = 2) -> frozenset[str] | None:
+    """Resolve branch to IRI hashes of L1+L2 concepts only. Cached.
+
+    Returns a small set of category-level concepts for structural embedding search.
+    """
+    folio = get_folio()
+    enum_key = _DISPLAY_TO_ENUM_KEY.get(branch_display_name)
+    if not enum_key:
+        return None
+
+    try:
+        ft = FOLIOTypes[enum_key]
+    except KeyError:
+        return None
+
+    root_hash = FOLIO_TYPE_IRIS.get(ft)
+    if not root_hash:
+        return None
+
+    try:
+        children = folio.get_children(root_hash, max_depth=max_depth)
+    except Exception:
+        return None
+
+    hashes = frozenset({_extract_iri_hash(c.iri) for c in children} | {root_hash})
+    return hashes
+
+
+@lru_cache(maxsize=64)
+def _get_branch_level_labels(branch_display_name: str, max_depth: int = 1) -> tuple[str, ...]:
+    """Get L1 concept labels for a branch. For LLM prompts. Cached."""
+    folio = get_folio()
+    enum_key = _DISPLAY_TO_ENUM_KEY.get(branch_display_name)
+    if not enum_key:
+        return ()
+
+    try:
+        ft = FOLIOTypes[enum_key]
+    except KeyError:
+        return ()
+
+    root_hash = FOLIO_TYPE_IRIS.get(ft)
+    if not root_hash:
+        return ()
+
+    try:
+        children = folio.get_children(root_hash, max_depth=max_depth)
+    except Exception:
+        return ()
+
+    return tuple(c.label for c in children if c.label)
+
+
+def _get_all_branch_names() -> list[str]:
+    """Get all branch display names (excluding excluded branches)."""
+    return [
+        cfg["name"] for cfg in BRANCH_CONFIG.values()
+        if cfg["name"] not in EXCLUDED_BRANCHES
+    ]
+
+
 def get_folio() -> FOLIO:
     """Get the cached FOLIO singleton. Loads from GitHub on first call."""
     global _folio_instance, _folio_loading, _folio_error
@@ -184,6 +285,9 @@ async def warmup_folio() -> FolioStatus:
         await loop.run_in_executor(None, get_folio)
     except Exception:
         pass  # Error captured in _folio_error
+    # Clear cached branch-level data so new OWL data is picked up
+    _resolve_branch_level_hashes.cache_clear()
+    _get_branch_level_labels.cache_clear()
     return get_folio_status()
 
 
@@ -284,6 +388,119 @@ def _get_all_parents(folio: FOLIO, iri_hash: str) -> list[HierarchyPathEntry]:
             ))
     parents.sort(key=lambda e: e.label)
     return parents
+
+
+def _see_also_within_branch(
+    folio: FOLIO,
+    item_text: str,
+    branch_hashes: set[str],
+    existing_hashes: set[str],
+    source_threshold: float = 50.0,
+    max_seeds: int = 10,
+    max_parent_depth: int = 2,
+) -> list[tuple[str, object, float]]:
+    """Find cross-branch see_also references pointing into a target branch.
+
+    Algorithm:
+    1. Unscoped fuzzy search to find seed concepts anywhere in the ontology
+    2. For each high-scoring seed, check see_also links (and parent see_also links)
+    3. Keep only targets that land in branch_hashes and aren't already found
+
+    Returns list of (iri_hash, owl_class, score) tuples.
+    Only called from mandatory-specific code paths — does NOT touch search_candidates().
+    """
+    content = _content_words(item_text)
+    if not content:
+        content = set(_tokenize(item_text))
+
+    # Step 1: Unscoped fuzzy search for seed concepts
+    raw_seeds: dict[str, object] = {}
+    for owl_class, _ in folio.search_by_label(item_text, include_alt_labels=True, limit=25):
+        h = _extract_iri_hash(owl_class.iri)
+        if h not in raw_seeds:
+            raw_seeds[h] = owl_class
+
+    for word in sorted(content, key=len, reverse=True):
+        if len(word) >= 3:
+            for owl_class, _ in folio.search_by_label(word, include_alt_labels=True, limit=15):
+                h = _extract_iri_hash(owl_class.iri)
+                if h not in raw_seeds:
+                    raw_seeds[h] = owl_class
+
+    # Step 2: Score seeds and keep top ones above threshold
+    scored_seeds: list[tuple[str, object, float]] = []
+    for iri_hash, owl_class in raw_seeds.items():
+        score = _compute_relevance_score(
+            content,
+            item_text,
+            owl_class.label or iri_hash,
+            owl_class.definition,
+            owl_class.alternative_labels or [],
+        )
+        if score >= source_threshold:
+            scored_seeds.append((iri_hash, owl_class, score))
+
+    scored_seeds.sort(key=lambda x: x[2], reverse=True)
+    scored_seeds = scored_seeds[:max_seeds]
+
+    # Step 3: Traverse see_also links from seeds and their parents
+    owl_thing = "http://www.w3.org/2002/07/owl#Thing"
+    found: dict[str, tuple[object, float]] = {}
+
+    for seed_hash, seed_class, seed_score in scored_seeds:
+        # Check see_also on seed itself (depth 0)
+        nodes_to_check: list[tuple[object, int]] = [(seed_class, 0)]
+
+        # Walk parents up to max_parent_depth
+        visited: set[str] = {seed_hash}
+        current_parents: list[tuple[str, int]] = []
+        if seed_class.sub_class_of:
+            for parent_iri in seed_class.sub_class_of:
+                if parent_iri == owl_thing:
+                    continue
+                ph = _extract_iri_hash(parent_iri)
+                if ph not in visited:
+                    current_parents.append((ph, 1))
+                    visited.add(ph)
+
+        for parent_hash, depth in current_parents:
+            if depth > max_parent_depth:
+                continue
+            parent_class = folio[parent_hash]
+            if parent_class is None:
+                continue
+            nodes_to_check.append((parent_class, depth))
+            # Enqueue grandparents
+            if depth < max_parent_depth and parent_class.sub_class_of:
+                for gp_iri in parent_class.sub_class_of:
+                    if gp_iri == owl_thing:
+                        continue
+                    gph = _extract_iri_hash(gp_iri)
+                    if gph not in visited:
+                        current_parents.append((gph, depth + 1))
+                        visited.add(gph)
+
+        # Check see_also on each node
+        for node_class, depth in nodes_to_check:
+            if not hasattr(node_class, 'see_also') or not node_class.see_also:
+                continue
+            for sa_iri in node_class.see_also:
+                sa_hash = _extract_iri_hash(sa_iri)
+                if sa_hash not in branch_hashes:
+                    continue
+                if sa_hash in existing_hashes:
+                    continue
+                sa_class = folio[sa_hash]
+                if sa_class is None:
+                    continue
+                # Score: source_score * 0.70 * (0.85 ^ depth)
+                sa_score = round(seed_score * 0.70 * (0.85 ** depth), 1)
+                if sa_hash not in found or sa_score > found[sa_hash][1]:
+                    found[sa_hash] = (sa_class, sa_score)
+
+    results = [(h, cls, score) for h, (cls, score) in found.items()]
+    results.sort(key=lambda x: x[2], reverse=True)
+    return results
 
 
 def _tokenize(text: str) -> list[str]:
@@ -718,12 +935,17 @@ def search_candidates(
     threshold: float = 0.3,
     max_per_branch: int = 10,
     use_bridging: bool = False,
+    mandatory_branches: list[str] | None = None,
 ) -> list[FolioCandidate]:
     """Search FOLIO for candidates matching the given term.
 
     Uses multi-strategy search (label, prefix, definition) across the full
     phrase, sub-phrases, and individual content words, then re-scores based
     on actual word overlap rather than raw fuzzy-match scores.
+
+    If mandatory_branches is provided, Phase 2.7 adds expanded recall for
+    those branches: re-includes low-threshold raw candidates, see_also
+    traversal, and branch-scoped embedding search.
     """
     folio = get_folio()
 
@@ -894,7 +1116,7 @@ def search_candidates(
                             continue
                         found_label_words = _content_words(found_class.label or "")
                         if pw in found_label_words:
-                            bridge_score = round(score * (0.85 ** depth), 1)
+                            bridge_score = round(score * (0.60 ** depth), 1)
                             if bridge_score >= min_score:
                                 bridged[fh] = max(bridged.get(fh, 0), bridge_score)
                 current = parent_class
@@ -903,6 +1125,111 @@ def search_candidates(
             bridged_class = folio[bh]
             if bridged_class:
                 scored.append((bh, bridged_class, bscore))
+
+    # Phase 2.7: Mandatory Branch Expansion
+    # Same scoring as non-mandatory, but with additional search strategies
+    # to ensure mandatory branches have adequate recall.
+    _MANDATORY_EMBEDDING_MAX = 65.0
+    mandatory_set = set(mandatory_branches) if mandatory_branches else set()
+    if mandatory_set:
+        scored_hashes = {h for h, _, _ in scored}
+        for branch_name in mandatory_set:
+            branch_hashes = _resolve_branch_children(folio, branch_name)
+            if branch_hashes is None:
+                continue
+            existing_in_branch = {h for h in scored_hashes if h in branch_hashes}
+
+            # 2.7a: Re-include raw candidates below normal threshold
+            for iri_hash, owl_class in raw.items():
+                if iri_hash in branch_hashes and iri_hash not in existing_in_branch:
+                    score = _compute_relevance_score(
+                        content_words,
+                        term,
+                        owl_class.label or iri_hash,
+                        owl_class.definition,
+                        owl_class.alternative_labels or [],
+                    )
+                    if score >= 10:  # Permissive threshold for mandatory
+                        scored.append((iri_hash, owl_class, score))
+                        existing_in_branch.add(iri_hash)
+                        scored_hashes.add(iri_hash)
+
+            # 2.7b: See_also traversal (cross-branch OWL references)
+            sa_results = _see_also_within_branch(folio, term, branch_hashes, existing_in_branch)
+            for iri_hash, owl_class, score in sa_results:
+                if iri_hash not in existing_in_branch:
+                    scored.append((iri_hash, owl_class, score))
+                    existing_in_branch.add(iri_hash)
+                    scored_hashes.add(iri_hash)
+
+            # 2.7c: Embedding search within branch (semantic matches)
+            try:
+                from app.services.embedding.service import get_embedding_index
+
+                embedding_index = get_embedding_index()
+                if embedding_index is not None:
+                    emb_results = embedding_index.query(term, top_k=15, branch_filter={branch_name})
+                    for emb_hash, _, cosine_score in emb_results:
+                        if emb_hash in existing_in_branch:
+                            continue
+                        clamped = max(0.0, min(1.0, cosine_score))
+                        scaled = round(clamped * _MANDATORY_EMBEDDING_MAX, 1)
+                        if scaled < 15:
+                            continue
+                        owl_class = folio[emb_hash]
+                        if owl_class:
+                            scored.append((emb_hash, owl_class, scaled))
+                            existing_in_branch.add(emb_hash)
+                            scored_hashes.add(emb_hash)
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.warning("Mandatory embedding search failed for branch %s: %s", branch_name, e)
+
+    # Phase 2.7d: Structural embedding search — broad category matches from L1+L2
+    # Queries embedding index against ONLY L1+L2 concepts for ALL branches.
+    # Mandatory branches get a score boost. No LLM needed.
+    _STRUCTURAL_MANDATORY_MAX = 65.0
+    _STRUCTURAL_NON_MANDATORY_MAX = 55.0
+    scored_dict = {h for h, _, _ in scored}
+    try:
+        from app.services.embedding.service import get_embedding_index
+
+        embedding_index = get_embedding_index()
+        if embedding_index is not None:
+            # Collect L1+L2 hashes for all branches
+            all_level_hashes: set[str] = set()
+            for bn in _get_all_branch_names():
+                level_hashes = _resolve_branch_level_hashes(bn, max_depth=2)
+                if level_hashes:
+                    all_level_hashes.update(level_hashes)
+
+            if all_level_hashes:
+                structural_results = embedding_index.query_all_branches(
+                    term, top_k_per_branch=5, concept_filter=all_level_hashes,
+                )
+
+                structural_added = 0
+                for struct_branch, hits in structural_results.items():
+                    for emb_hash, emb_label, cosine_score in hits:
+                        if emb_hash in scored_dict:
+                            continue
+                        clamped = max(0.0, min(1.0, cosine_score))
+                        scale = _STRUCTURAL_MANDATORY_MAX if struct_branch in mandatory_set else _STRUCTURAL_NON_MANDATORY_MAX
+                        scaled_score = round(clamped * scale, 1)
+                        if scaled_score < 15:
+                            continue
+                        owl_class = folio[emb_hash]
+                        if owl_class:
+                            scored.append((emb_hash, owl_class, scaled_score))
+                            scored_dict.add(emb_hash)
+                            structural_added += 1
+                if structural_added > 0:
+                    logger.info("search_candidates(%r): structural embedding added %d candidates", term, structural_added)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning("Structural embedding search failed: %s", e)
 
     # Sort by score descending
     scored.sort(key=lambda x: x[2], reverse=True)
@@ -915,8 +1242,9 @@ def search_candidates(
         branch_name = get_branch_for_class(folio, iri_hash)
         if branch_name in EXCLUDED_BRANCHES:
             continue
+        branch_limit = max_per_branch * 2 if branch_name in mandatory_set else max_per_branch
         count = branch_counts.get(branch_name, 0)
-        if count >= max_per_branch:
+        if count >= branch_limit:
             continue
         branch_counts[branch_name] = count + 1
 
@@ -937,6 +1265,8 @@ def search_candidates(
     # Phase 4: Embedding-based semantic search — add candidates that keyword search missed
     # These get their own reserved slots (up to 3 per branch) beyond the keyword cap,
     # so semantic matches like "DUI" → "Driving Under the Influence" aren't crowded out.
+    # Score ceiling (65) keeps embedding-only results below auto-select threshold (80).
+    _EMBEDDING_SCORE_MAX = 65.0
     try:
         from app.services.embedding.service import get_embedding_index
 
@@ -950,7 +1280,7 @@ def search_candidates(
                 if emb_hash in existing_hashes:
                     continue
                 clamped = max(0.0, min(1.0, cosine_score))
-                scaled_score = round(clamped * 85.0, 1)
+                scaled_score = round(clamped * _EMBEDDING_SCORE_MAX, 1)
                 if scaled_score < min_score:
                     continue
                 emb_class = folio[emb_hash]
@@ -960,7 +1290,8 @@ def search_candidates(
                 if branch_name in EXCLUDED_BRANCHES:
                     continue
                 emb_count = emb_branch_counts.get(branch_name, 0)
-                if emb_count >= 3:
+                emb_per_branch_cap = 6 if branch_name in mandatory_set else 3
+                if emb_count >= emb_per_branch_cap:
                     continue
                 emb_branch_counts[branch_name] = emb_count + 1
                 candidates.append(
@@ -988,16 +1319,33 @@ def search_candidates(
     return candidates
 
 
-def search_all_items(
+async def search_all_items(
     items: list[ParseItem],
     threshold: float = 0.3,
     max_per_branch: int = 10,
+    mandatory_branches: list[str] | None = None,
+    llm_config: "LLMConfig | None" = None,
+    api_key: str | None = None,
 ) -> list[ItemMappingResult]:
-    """Search FOLIO candidates for all input items."""
+    """Search FOLIO candidates for all input items.
+
+    When llm_config is provided and mandatory_branches are set, runs LLM-assisted
+    enhancement to find semantically related concepts that keyword search misses.
+    """
     results: list[ItemMappingResult] = []
 
     for item in items:
-        candidates = search_candidates(item.text, threshold, max_per_branch, use_bridging=True)
+        candidates = search_candidates(
+            item.text, threshold, max_per_branch,
+            use_bridging=True, mandatory_branches=mandatory_branches,
+        )
+
+        # Integrated LLM enhancement for mandatory branches
+        if mandatory_branches and llm_config:
+            llm_extra = await _llm_enhance_mandatory(
+                item.text, mandatory_branches, candidates, llm_config, api_key,
+            )
+            candidates.extend(llm_extra)
 
         # Group candidates by branch
         branch_groups_dict: dict[str, list[FolioCandidate]] = {}
@@ -1023,6 +1371,80 @@ def search_all_items(
         )
 
     return results
+
+
+async def _llm_enhance_mandatory(
+    item_text: str,
+    mandatory_branches: list[str],
+    existing_candidates: list[FolioCandidate],
+    llm_config: "LLMConfig",
+    api_key: str | None,
+) -> list[FolioCandidate]:
+    """LLM-assisted enhancement for mandatory branches — integrated into search pipeline.
+
+    Asks the LLM to suggest concept labels for each mandatory branch, then searches
+    FOLIO for those labels. This bridges semantic gaps where keyword/embedding search
+    fails (e.g., "Motor Vehicle Accidents" → "Personal Injury and Tort Law").
+    """
+    from app.services.pipeline.mandatory_fallback import _llm_suggest_labels
+    from app.services.pipeline.stage1_filter import _search_within_branch
+
+    folio = get_folio()
+    existing_hashes = {c.iri_hash for c in existing_candidates}
+    new_candidates: list[FolioCandidate] = []
+
+    for branch_name in mandatory_branches:
+        branch_hashes = _resolve_branch_children(folio, branch_name)
+        if branch_hashes is None:
+            continue
+
+        suggested_labels = await _llm_suggest_labels(
+            item_text, branch_name, llm_config, api_key,
+        )
+        if not suggested_labels:
+            continue
+
+        content_words_set = _content_words(item_text)
+        if not content_words_set:
+            content_words_set = set(_tokenize(item_text))
+
+        branch_new: dict[str, tuple[object, float]] = {}
+        for label in suggested_labels:
+            results = _search_within_branch(folio, label, branch_hashes, threshold=0.05)
+            for iri_hash, owl_class, search_score in results:
+                if iri_hash in existing_hashes:
+                    continue
+
+                rescore = _compute_relevance_score(
+                    content_words_set,
+                    item_text,
+                    owl_class.label or iri_hash,
+                    owl_class.definition,
+                    owl_class.alternative_labels or [],
+                )
+                score = max(search_score, rescore)
+
+                if iri_hash not in branch_new or score > branch_new[iri_hash][1]:
+                    branch_new[iri_hash] = (owl_class, score)
+
+        # Take top candidates per branch
+        sorted_new = sorted(branch_new.items(), key=lambda x: x[1][1], reverse=True)
+        for iri_hash, (owl_class, score) in sorted_new[:10]:
+            branch = get_branch_for_class(folio, iri_hash)
+            new_candidates.append(FolioCandidate(
+                label=owl_class.label or iri_hash,
+                iri=owl_class.iri,
+                iri_hash=iri_hash,
+                definition=owl_class.definition,
+                synonyms=owl_class.alternative_labels or [],
+                branch=branch,
+                branch_color=get_branch_color(branch),
+                hierarchy_path=_build_hierarchy_path(folio, iri_hash),
+                score=score,
+            ))
+            existing_hashes.add(iri_hash)
+
+    return new_candidates
 
 
 def get_all_branches() -> list[BranchInfo]:

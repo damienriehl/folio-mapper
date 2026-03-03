@@ -16,6 +16,7 @@ from app.models.pipeline_models import (
     MandatoryFallbackResponse,
 )
 from app.services.pipeline.mandatory_fallback import (
+    _build_llm_prompt,
     _parse_llm_suggestions,
     run_mandatory_fallback,
 )
@@ -226,6 +227,42 @@ async def test_run_mandatory_fallback_with_llm():
 
 
 @pytest.mark.anyio
+async def test_run_mandatory_fallback_with_see_also():
+    """Test fallback finds cross-branch candidates via see_also traversal."""
+    mock_folio = MagicMock()
+    owl_criminal = _mock_owl_class("Criminal Law", "http://example.org/CL", "Criminal law area")
+
+    with (
+        patch("app.services.pipeline.mandatory_fallback.get_folio", return_value=mock_folio),
+        patch(
+            "app.services.pipeline.mandatory_fallback._resolve_branch_children",
+            return_value={"RBranch_Root", "RCL"},
+        ),
+        patch(
+            "app.services.pipeline.mandatory_fallback._search_within_branch",
+            return_value=[],  # Keyword search finds nothing
+        ),
+        patch(
+            "app.services.pipeline.mandatory_fallback._see_also_within_branch",
+            return_value=[("RCL", owl_criminal, 45.0)],  # see_also finds Criminal Law
+        ),
+        patch("app.services.pipeline.mandatory_fallback._build_hierarchy_path", return_value=[{"label": "Area of Law", "iri_hash": "RAoL"}, {"label": "Criminal Law", "iri_hash": "RCL"}]),
+        patch("app.services.pipeline.mandatory_fallback.get_branch_for_class", return_value="Area of Law"),
+    ):
+        results = await run_mandatory_fallback(
+            item_text="Drug Offenses",
+            branches=["Area of Law"],
+            llm_config=None,
+        )
+
+    assert len(results) == 1
+    assert results[0].branch == "Area of Law"
+    assert len(results[0].candidates) == 1
+    assert results[0].candidates[0].label == "Criminal Law"
+    assert results[0].candidates[0].score == 45.0
+
+
+@pytest.mark.anyio
 async def test_run_mandatory_fallback_unresolvable_branch():
     """Test fallback when branch cannot be resolved."""
     mock_folio = MagicMock()
@@ -322,3 +359,81 @@ async def test_mandatory_fallback_endpoint_with_llm(client: AsyncClient):
     call_kwargs = mock_run.call_args
     assert call_kwargs.kwargs["llm_config"] is not None
     assert call_kwargs.kwargs["llm_config"].provider == LLMProviderType.OPENAI
+
+
+# --- Prompt building tests ---
+
+
+def test_build_llm_prompt_without_labels():
+    prompt = _build_llm_prompt("Workers Compensation", "Service")
+    assert "Workers Compensation" in prompt
+    assert "Service" in prompt
+    assert "top-level concepts" not in prompt
+
+
+def test_build_llm_prompt_with_labels():
+    labels = ["Dispute Service", "Litigation Practice", "Compliance Service"]
+    prompt = _build_llm_prompt("Workers Compensation", "Service", branch_labels=labels)
+    assert "Workers Compensation" in prompt
+    assert "Service" in prompt
+    assert "top-level concepts" in prompt
+    assert "Dispute Service" in prompt
+    assert "Litigation Practice" in prompt
+    assert "Compliance Service" in prompt
+    assert "Use these as guidance" in prompt
+
+
+def test_build_llm_prompt_with_empty_labels():
+    prompt = _build_llm_prompt("Test", "Service", branch_labels=[])
+    assert "top-level concepts" not in prompt
+
+
+# --- Structural embedding tests ---
+
+
+@pytest.mark.anyio
+async def test_run_mandatory_fallback_structural_embedding():
+    """Test fallback finds candidates via structural embedding search (L1+L2 only)."""
+    mock_folio = MagicMock()
+    owl_dispute = _mock_owl_class("Dispute Service", "http://example.org/DS", "Service for resolving disputes")
+
+    mock_index = MagicMock()
+    # First call: regular embedding search returns nothing relevant
+    # Second call: structural embedding search returns Dispute Service
+    mock_index.query.side_effect = [
+        [],  # Step 1.75: regular embedding
+        [("RDS", "Dispute Service", 0.82)],  # Step 1.75b: structural
+    ]
+    mock_folio.__getitem__ = lambda self, key: owl_dispute if key == "RDS" else None
+
+    with (
+        patch("app.services.pipeline.mandatory_fallback.get_folio", return_value=mock_folio),
+        patch(
+            "app.services.pipeline.mandatory_fallback._resolve_branch_children",
+            return_value={"RService_Root", "RDS"},
+        ),
+        patch(
+            "app.services.pipeline.mandatory_fallback._search_within_branch",
+            return_value=[],
+        ),
+        patch(
+            "app.services.pipeline.mandatory_fallback._see_also_within_branch",
+            return_value=[],
+        ),
+        patch("app.services.pipeline.mandatory_fallback._build_hierarchy_path", return_value=[]),
+        patch("app.services.pipeline.mandatory_fallback.get_branch_for_class", return_value="Service"),
+        patch(
+            "app.services.pipeline.mandatory_fallback._resolve_branch_level_hashes",
+            return_value=frozenset({"RService_Root", "RDS", "RLP"}),
+        ),
+        patch("app.services.embedding.service.get_embedding_index", return_value=mock_index),
+    ):
+        results = await run_mandatory_fallback(
+            item_text="Workers Compensation",
+            branches=["Service"],
+            llm_config=None,
+        )
+
+    assert len(results) == 1
+    assert results[0].branch == "Service"
+    assert any(c.label == "Dispute Service" for c in results[0].candidates)

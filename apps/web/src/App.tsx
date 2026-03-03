@@ -361,26 +361,37 @@ export function App() {
     if (!parseResult) return;
     setScreen('mapping');
 
-    // Auto-detect: use LLM pipeline if active provider has a valid connection
+    const mandatoryBranches = Object.entries(mappingState.inputBranchStates)
+      .filter(([, state]) => state === 'mandatory')
+      .map(([name]) => name);
+
+    // Build LLM config if active provider has a valid connection
     const activeConfig = llmState.configs[llmState.activeProvider];
-    if (activeConfig?.connectionStatus === 'valid') {
-      setIsPipelineRun(true);
-      const mandatoryBranches = Object.entries(mappingState.inputBranchStates)
-        .filter(([, state]) => state === 'mandatory')
-        .map(([name]) => name);
-      try {
-        await loadPipelineCandidates(parseResult.items, {
+    const llmConfig = activeConfig?.connectionStatus === 'valid'
+      ? {
           provider: llmState.activeProvider,
           api_key: activeConfig.apiKey || null,
           base_url: activeConfig.baseUrl || null,
           model: activeConfig.model || null,
-        }, mandatoryBranches);
+        }
+      : null;
+
+    if (llmConfig) {
+      // Full pipeline path (Stage 1.5 now always expands mandatory branches)
+      setIsPipelineRun(true);
+      try {
+        await loadPipelineCandidates(parseResult.items, llmConfig, mandatoryBranches);
       } catch (err) {
         console.error('Pipeline failed:', err);
       }
       setIsPipelineRun(false);
     } else {
-      await loadCandidates(parseResult.items);
+      // Regular search path — llmConfig is null, so no LLM enhancement
+      await loadCandidates(
+        parseResult.items,
+        mandatoryBranches.length > 0 ? mandatoryBranches : undefined,
+        llmConfig,
+      );
     }
   };
 
