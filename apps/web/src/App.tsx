@@ -80,6 +80,8 @@ export function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showLlmWarning, setShowLlmWarning] = useState(false);
+  const llmWarningDismissed = useRef(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isGeneratingSynthetic, setIsGeneratingSynthetic] = useState(false);
   const [syntheticError, setSyntheticError] = useState<string | null>(null);
@@ -359,6 +361,13 @@ export function App() {
 
   const handleContinue = async () => {
     if (!parseResult) return;
+
+    // Show warning if no LLM connected and user hasn't dismissed it yet
+    if (llmStatus !== 'connected' && !llmWarningDismissed.current) {
+      setShowLlmWarning(true);
+      return;
+    }
+
     setScreen('mapping');
 
     const mandatoryBranches = Object.entries(mappingState.inputBranchStates)
@@ -393,6 +402,17 @@ export function App() {
         llmConfig,
       );
     }
+  };
+
+  const handleContinueAnyway = () => {
+    llmWarningDismissed.current = true;
+    setShowLlmWarning(false);
+    handleContinue();
+  };
+
+  const handleConfigureLlm = () => {
+    setShowLlmWarning(false);
+    setShowSettings(true);
   };
 
   const handleEditFromMapping = () => {
@@ -736,12 +756,41 @@ export function App() {
       )}
 
       {screen === 'confirming' && parseResult && (
-        <ConfirmationScreen
-          result={parseResult}
-          onEdit={goToInput}
-          onContinue={handleContinue}
-          onTreatAsFlat={treatAsFlatList}
-        />
+        <>
+          <ConfirmationScreen
+            result={parseResult}
+            onEdit={goToInput}
+            onContinue={handleContinue}
+            onTreatAsFlat={treatAsFlatList}
+          />
+          {showLlmWarning && (
+            <div className="mt-4 w-full max-w-2xl mx-auto rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 text-amber-600" aria-hidden="true">&#9888;</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-900">No LLM Connected</p>
+                  <p className="mt-1 text-sm text-amber-700">
+                    Results will use keyword matching only and may be significantly less accurate.
+                  </p>
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      onClick={handleConfigureLlm}
+                      className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+                    >
+                      Configure LLM
+                    </button>
+                    <button
+                      onClick={handleContinueAnyway}
+                      className="rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+                    >
+                      Continue Anyway
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </AppShell>
   );
