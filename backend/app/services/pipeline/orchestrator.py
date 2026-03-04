@@ -137,18 +137,13 @@ def _embedding_rerank(
             embedding_scores = index.score_candidates(item_text, candidate_hashes)
 
             if embedding_scores:
-                # Normalize embedding scores to 0-100 range for blending
-                # Cosine similarities typically range 0.2-0.9 for relevant matches
-                max_emb = max(embedding_scores.values()) if embedding_scores else 1.0
-                min_emb = min(embedding_scores.values()) if embedding_scores else 0.0
-                emb_range = max_emb - min_emb if max_emb > min_emb else 1.0
-
                 ranked = []
                 for c in sorted_candidates:
                     emb_raw = embedding_scores.get(c.iri_hash)
                     if emb_raw is not None:
-                        # Scale to 0-100
-                        emb_scaled = ((emb_raw - min_emb) / emb_range) * 100.0
+                        # Absolute scaling: cosine similarity * 100
+                        # Preserves absolute meaning rather than min-max distortion
+                        emb_scaled = max(0.0, emb_raw) * 100.0
                         blended = c.score * _KEYWORD_WEIGHT + emb_scaled * _EMBEDDING_WEIGHT
                         ranked.append(RankedCandidate(
                             iri_hash=c.iri_hash,

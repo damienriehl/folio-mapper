@@ -228,7 +228,9 @@ async def run_stage1b(
                     owl_class.definition,
                     owl_class.alternative_labels or [],
                 )
-                best_score = max(search_score, rescore)
+                # Use rescore (original query vs concept) not search_score
+                # (LLM-suggested label vs concept), which inflates scores
+                best_score = rescore
 
                 if iri_hash not in branch_new or best_score > branch_new[iri_hash][1]:
                     branch_new[iri_hash] = (owl_class, best_score)

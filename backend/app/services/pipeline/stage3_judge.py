@@ -85,6 +85,9 @@ def _parse_judge_json(
                 original_score - 5,
                 min(original_score + 5, adjusted_score),
             )
+        elif verdict == "boosted":
+            # Cap boost to max +25 points from original
+            adjusted_score = min(adjusted_score, original_score + 25)
 
         results.append(JudgedCandidate(
             iri_hash=iri_hash,

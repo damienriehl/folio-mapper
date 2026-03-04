@@ -83,6 +83,9 @@ LEGAL_TERM_EXPANSIONS: dict[str, list[str]] = {
     "injury": ["liability", "claim"],
     "negligence": ["claim", "liability"],
     "malpractice": ["claim", "liability"],
+    # Contract & breach
+    "contract": ["law", "claim", "claims"],
+    "breach": ["claim", "claims"],
     # Practice areas
     "corporate": ["practice", "service", "law"],
     "employment": ["practice", "service", "law"],
