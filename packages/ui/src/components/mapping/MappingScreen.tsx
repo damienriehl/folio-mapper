@@ -190,7 +190,8 @@ export function MappingScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandAllSignal, setExpandAllSignal] = useState(0);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
-  const [allExpanded, setAllExpanded] = useState(true);
+  const [expandOneLevelSignal, setExpandOneLevelSignal] = useState(0);
+  const [collapseOneLevelSignal, setCollapseOneLevelSignal] = useState(0);
   const [notesNudge, setNotesNudge] = useState(false);
   const [graphTarget, setGraphTarget] = useState<{ iriHash: string; label: string } | null>(null);
 
@@ -426,27 +427,59 @@ export function MappingScreen({
                   </button>
                 )}
                 <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (allExpanded) {
-                      setCollapseAllSignal((n) => n + 1);
-                    } else {
-                      setExpandAllSignal((n) => n + 1);
-                    }
-                    setAllExpanded((v) => !v);
-                  }}
-                  className="flex items-center gap-1 rounded border border-gray-300 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {allExpanded ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4h16v4M4 16v4h16v-4" />
-                    )}
-                  </svg>
-                  {allExpanded ? 'Collapse All' : 'Expand All'}
-                </button>
+                {/* Expand / Collapse segmented button group */}
+                <div className="flex items-center">
+                  {/* Expand all (primary) */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandAllSignal((n) => n + 1)}
+                    className="flex items-center gap-1 rounded-l border border-gray-300 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    title="Expand all"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-7 7-7-7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 13l-7 7-7-7" />
+                    </svg>
+                    Expand
+                  </button>
+                  {/* Expand one level (secondary) */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandOneLevelSignal((n) => n + 1)}
+                    className="-ml-px flex items-center rounded-r border border-gray-300 bg-gray-50 px-1.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    title="Expand one level"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex items-center">
+                  {/* Collapse all */}
+                  <button
+                    type="button"
+                    onClick={() => setCollapseAllSignal((n) => n + 1)}
+                    className="flex items-center gap-1 rounded-l border border-gray-300 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    title="Collapse all"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5l7 7-7 7" />
+                    </svg>
+                    Collapse
+                  </button>
+                  {/* Collapse one level */}
+                  <button
+                    type="button"
+                    onClick={() => setCollapseOneLevelSignal((n) => n + 1)}
+                    className="-ml-px flex items-center rounded-r border border-gray-300 bg-gray-50 px-1.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    title="Collapse one level"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowBranchOptions(true)}
@@ -535,6 +568,8 @@ export function MappingScreen({
                 onSelectForDetail={(iriHash) => onSelectForDetail(iriHash)}
                 expandAllSignal={expandAllSignal}
                 collapseAllSignal={collapseAllSignal}
+                expandOneLevelSignal={expandOneLevelSignal}
+                collapseOneLevelSignal={collapseOneLevelSignal}
                 searchFilterHashes={searchFilterHashes}
                 isProcessing={isBatchLoading || isLoadingCandidates}
               />

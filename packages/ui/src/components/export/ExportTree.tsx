@@ -1,6 +1,12 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { ExportTreeBranch, ExportTreeConcept } from '@folio-mapper/core';
 import { ConfidenceBadge } from '../mapping/ConfidenceBadge';
+import {
+  collectAllCollapsibleKeys,
+  expandOneLevel,
+  collapseOneLevel,
+  collapseAll,
+} from '../../utils/tree-collapse';
 
 // --- Hierarchy tree data structure ---
 
@@ -61,6 +67,16 @@ export function ExportTree({
   const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set());
   const [expandAllSignal, setExpandAllSignal] = useState(0);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
+  const [expandOneLevelSignal, setExpandOneLevelSignal] = useState(0);
+  const [collapseOneLevelSignal, setCollapseOneLevelSignal] = useState(0);
+
+  const allCollapsible = useMemo(() => {
+    const branchData = branches.map((b) => ({
+      branch: b.branch,
+      tree: buildHierarchyTree(b.concepts),
+    }));
+    return collectAllCollapsibleKeys(branchData);
+  }, [branches]);
 
   useEffect(() => {
     if (expandAllSignal > 0) {
@@ -70,14 +86,24 @@ export function ExportTree({
 
   useEffect(() => {
     if (collapseAllSignal > 0) {
-      const allKeys = new Set<string>();
-      for (const b of branches) {
-        allKeys.add(b.branch);
-      }
-      setCollapsedNodes(allKeys);
+      setCollapsedNodes(collapseAll(allCollapsible));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapseAllSignal]);
+
+  useEffect(() => {
+    if (expandOneLevelSignal > 0) {
+      setCollapsedNodes((prev) => expandOneLevel(prev, allCollapsible));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandOneLevelSignal]);
+
+  useEffect(() => {
+    if (collapseOneLevelSignal > 0) {
+      setCollapsedNodes((prev) => collapseOneLevel(prev, allCollapsible));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseOneLevelSignal]);
 
   const toggleCollapse = useCallback((key: string) => {
     setCollapsedNodes((prev) => {
@@ -103,20 +129,54 @@ export function ExportTree({
     <div className="flex h-full flex-col">
       {/* Controls */}
       <div className="mb-2 flex gap-2 px-1">
-        <button
-          type="button"
-          onClick={() => setExpandAllSignal((s) => s + 1)}
-          className="rounded border border-gray-200 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
-        >
-          Expand All
-        </button>
-        <button
-          type="button"
-          onClick={() => setCollapseAllSignal((s) => s + 1)}
-          className="rounded border border-gray-200 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
-        >
-          Collapse All
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => setExpandAllSignal((s) => s + 1)}
+            className="flex items-center gap-1 rounded-l border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            title="Expand all"
+          >
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-7 7-7-7" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 13l-7 7-7-7" />
+            </svg>
+            Expand
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpandOneLevelSignal((s) => s + 1)}
+            className="-ml-px flex items-center rounded-r border border-gray-200 bg-gray-50 px-1.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            title="Expand one level"
+          >
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => setCollapseAllSignal((s) => s + 1)}
+            className="flex items-center gap-1 rounded-l border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            title="Collapse all"
+          >
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 5l7 7-7 7" />
+            </svg>
+            Collapse
+          </button>
+          <button
+            type="button"
+            onClick={() => setCollapseOneLevelSignal((s) => s + 1)}
+            className="-ml-px flex items-center rounded-r border border-gray-200 bg-gray-50 px-1.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+            title="Collapse one level"
+          >
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Tree */}

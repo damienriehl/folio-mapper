@@ -12,6 +12,8 @@ interface CandidatePanelProps {
   onSelectForDetail: (iriHash: string) => void;
   expandAllSignal?: number;
   collapseAllSignal?: number;
+  expandOneLevelSignal?: number;
+  collapseOneLevelSignal?: number;
   searchFilterHashes?: string[] | null;
   isProcessing?: boolean;
 }
@@ -27,6 +29,8 @@ export function CandidatePanel({
   onSelectForDetail,
   expandAllSignal,
   collapseAllSignal,
+  expandOneLevelSignal,
+  collapseOneLevelSignal,
   searchFilterHashes,
   isProcessing,
 }: CandidatePanelProps) {
@@ -44,6 +48,8 @@ export function CandidatePanel({
           onSelectForDetail={onSelectForDetail}
           expandAllSignal={expandAllSignal}
           collapseAllSignal={collapseAllSignal}
+          expandOneLevelSignal={expandOneLevelSignal}
+          collapseOneLevelSignal={collapseOneLevelSignal}
           searchFilterHashes={searchFilterHashes}
           isProcessing={isProcessing}
         />

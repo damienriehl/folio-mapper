@@ -1,6 +1,12 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { BranchGroup, BranchState, FolioCandidate } from '@folio-mapper/core';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import {
+  collectAllCollapsibleKeys,
+  expandOneLevel,
+  collapseOneLevel,
+  collapseAll,
+} from '../../utils/tree-collapse';
 
 // --- Hierarchy tree data structure ---
 
@@ -51,6 +57,8 @@ interface CandidateTreeProps {
   onSelectForDetail: (iriHash: string) => void;
   expandAllSignal?: number;
   collapseAllSignal?: number;
+  expandOneLevelSignal?: number;
+  collapseOneLevelSignal?: number;
   searchFilterHashes?: string[] | null;
   isProcessing?: boolean;
 }
@@ -66,6 +74,8 @@ export function CandidateTree({
   onSelectForDetail,
   expandAllSignal,
   collapseAllSignal,
+  expandOneLevelSignal,
+  collapseOneLevelSignal,
   searchFilterHashes,
   isProcessing,
 }: CandidateTreeProps) {
@@ -77,18 +87,7 @@ export function CandidateTree({
     }
   }, [expandAllSignal]);
 
-  useEffect(() => {
-    if (collapseAllSignal && collapseAllSignal > 0) {
-      const allKeys = new Set<string>();
-      for (const g of branchGroups) {
-        if (branchStates[g.branch] !== 'excluded') {
-          allKeys.add(g.branch);
-        }
-      }
-      setCollapsedNodes(allKeys);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapseAllSignal]);
+  // Collapse-all and one-level effects are below, after allCollapsible is computed
 
   const toggleCollapse = useCallback((key: string) => {
     setCollapsedNodes((prev) => {
@@ -118,6 +117,59 @@ export function CandidateTree({
     }
     return g.candidates.length > 0;
   });
+
+  // Build allCollapsible from visible groups and their hierarchy trees
+  const allCollapsible = useMemo(() => {
+    const showAll = topN >= 50;
+    const branchData = visibleGroups.map((group) => {
+      const isMandatory = branchStates[group.branch] === 'mandatory';
+      const sorted = [...group.candidates].sort((a, b) => b.score - a.score);
+      let visible: FolioCandidate[];
+      if (showAll) {
+        visible = sorted;
+      } else if (isMandatory) {
+        visible = sorted.slice(0, Math.max(topN, 3));
+      } else {
+        visible = threshold > 0 ? sorted.filter((c) => c.score >= threshold) : sorted;
+      }
+      if (!showAll) {
+        const visSet = new Set(visible.map((c) => c.iri_hash));
+        for (const c of sorted) {
+          if (selectedSet.has(c.iri_hash) && !visSet.has(c.iri_hash)) visible.push(c);
+        }
+      }
+      if (filterSet && !isMandatory) {
+        visible = visible.filter((c) => filterSet.has(c.iri_hash) || selectedSet.has(c.iri_hash));
+      }
+      return { branch: group.branch, tree: buildHierarchyTree(visible) };
+    });
+    return collectAllCollapsibleKeys(branchData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleGroups, topN, threshold, branchStates, selectedIriHashes, searchFilterHashes]);
+
+  // Collapse all — now collapses every node, not just branches
+  useEffect(() => {
+    if (collapseAllSignal && collapseAllSignal > 0) {
+      setCollapsedNodes(collapseAll(allCollapsible));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseAllSignal]);
+
+  // Expand one level
+  useEffect(() => {
+    if (expandOneLevelSignal && expandOneLevelSignal > 0) {
+      setCollapsedNodes((prev) => expandOneLevel(prev, allCollapsible));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandOneLevelSignal]);
+
+  // Collapse one level
+  useEffect(() => {
+    if (collapseOneLevelSignal && collapseOneLevelSignal > 0) {
+      setCollapsedNodes((prev) => collapseOneLevel(prev, allCollapsible));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseOneLevelSignal]);
 
   if (visibleGroups.length === 0) {
     if (isProcessing) {
