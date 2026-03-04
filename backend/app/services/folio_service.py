@@ -31,8 +31,24 @@ SEARCH_STOPWORDS = frozenset({
     "is", "are", "was", "were", "be", "been", "being",
     "not", "no", "has", "have", "had", "do", "does", "did",
     "this", "that", "it", "its", "their", "other", "such", "than",
+    "your", "yours", "own", "my", "mine", "our", "ours",
+    "her", "hers", "him", "his", "whom", "whose", "self",
     "law", "legal", "type", "types", "general",
 })
+
+# Map expansion suffixes to their dominant FOLIO branch (verified via data).
+# Used in Phase 1b to scope standalone suffix searches to the most relevant branch.
+BRANCH_SIGNAL_WORDS: dict[str, str] = {
+    "claim": "Objectives",
+    "claims": "Objectives",
+    "liability": "Objectives",
+    "negligence": "Objectives",
+    "malpractice": "Objectives",
+    "defense": "Objectives",
+    "defenses": "Objectives",
+    "practice": "Service",
+    "law": "Area of Law",
+}
 
 # Domain-aware expansions: common legal content words → FOLIO label suffixes.
 # When a content word matches a key, we also search compound phrases like
@@ -60,6 +76,13 @@ LEGAL_TERM_EXPANSIONS: dict[str, list[str]] = {
     "prosecution": ["service"],
     "enforcement": ["service", "action"],
     "investigation": ["service"],
+    # Error/fault/harm
+    "error": ["malpractice", "negligence"],
+    "fault": ["negligence", "liability"],
+    "harm": ["liability", "injury"],
+    "injury": ["liability", "claim"],
+    "negligence": ["claim", "liability"],
+    "malpractice": ["claim", "liability"],
     # Practice areas
     "corporate": ["practice", "service", "law"],
     "employment": ["practice", "service", "law"],
@@ -513,7 +536,7 @@ def _content_words(text: str) -> set[str]:
     return {w for w in _tokenize(text) if w not in SEARCH_STOPWORDS}
 
 
-def _word_overlap(query_words: set[str], target_words: set[str]) -> float:
+def _word_overlap(query_words: set[str], target_words: set[str], use_vectors: bool = False) -> float:
     """Bidirectional word overlap with prefix-match credit.
 
     Computes both forward (query→target) and reverse (target→query) overlap.
@@ -521,6 +544,9 @@ def _word_overlap(query_words: set[str], target_words: set[str]) -> float:
     (LLC / Corp)") match narrower targets (e.g. "Business Organizations Law")
     where only a fraction of query words match but a large fraction of the
     target's words are covered.
+
+    When use_vectors=True and spaCy is available, words with 0.0 character-based
+    match get a vector cosine fallback (capped at 0.5).
     """
     if not query_words or not target_words:
         return 0.0
@@ -547,6 +573,15 @@ def _word_overlap(query_words: set[str], target_words: set[str]) -> float:
                                 break
                         if pfx >= 4 and pfx / min(len(sw), len(dw)) >= 0.7:
                             best = max(best, 0.7)
+            # Vector fallback: when char-based gives 0.0, use spaCy cosine
+            if best == 0.0 and use_vectors and len(sw) >= 3:
+                from app.services.nlp import word_similarity
+
+                for dw in dest:
+                    if len(dw) >= 3:
+                        vec_sim = word_similarity(sw, dw)
+                        if vec_sim > 0.25:
+                            best = max(best, min(vec_sim, 0.5))
             matched += best
         return matched / len(source)
 
@@ -594,7 +629,7 @@ def _compute_relevance_score(
         and len(label_lower) / len(query_lower) > 0.3
     ):
         label_score = 88.0
-    overlap = _word_overlap(query_content, label_content)
+    overlap = _word_overlap(query_content, label_content, use_vectors=True)
     if overlap > 0:
         label_score = max(label_score, overlap * 88)
 
@@ -602,7 +637,7 @@ def _compute_relevance_score(
     syn_score = 0.0
     for syn in synonyms:
         syn_content = _content_words(syn)
-        s_overlap = _word_overlap(query_content, syn_content)
+        s_overlap = _word_overlap(query_content, syn_content, use_vectors=True)
         if s_overlap > 0:
             syn_score = max(syn_score, s_overlap * 82)
 
@@ -652,7 +687,31 @@ def _generate_search_terms(term: str) -> list[str]:
         suffixes = LEGAL_TERM_EXPANSIONS.get(w)
         if suffixes:
             for suffix in suffixes:
-                terms.append(f"{w} {suffix}")
+                terms.append(f"{w} {suffix}")  # compound: "error malpractice"
+
+    # spaCy similar-word expansion + cross-combination with LEGAL_TERM_EXPANSIONS
+    from app.services.nlp import is_available as nlp_available, similar_words
+
+    if nlp_available():
+        similar_map: dict[str, list[str]] = {}
+        for w in content:
+            sims = similar_words(w, top_n=3, threshold=0.5)
+            if sims:
+                sim_words = [sw for sw, _ in sims if sw not in SEARCH_STOPWORDS]
+                similar_map[w] = sim_words
+                for sw in sim_words:
+                    terms.append(sw)  # standalone: "surgery"
+
+        # Cross-combine: spaCy-derived word + other word's LEGAL_TERM_EXPANSIONS
+        for orig_word, sim_words_list in similar_map.items():
+            for other_word in content:
+                if other_word == orig_word:
+                    continue
+                suffixes = LEGAL_TERM_EXPANSIONS.get(other_word)
+                if suffixes:
+                    for sw in sim_words_list:
+                        for suffix in suffixes:
+                            terms.append(f"{sw} {suffix}")  # "surgery malpractice"
 
     # Deduplicate preserving order
     seen: set[str] = set()
@@ -995,6 +1054,26 @@ def search_candidates(
                 if h not in raw:
                     raw[h] = owl_class
 
+    # Phase 1b: Branch-signaled suffix search (ADDITIVE ONLY)
+    # Expansion suffixes like "claim" strongly predict which branch is relevant
+    # (90% of "claim" concepts are in Objectives). Search them as standalone
+    # terms and ADD results from the signaled branch to the raw pool.
+    # This does NOT affect results from other branches found in Phase 1.
+    for w in content_words:
+        suffixes = LEGAL_TERM_EXPANSIONS.get(w)
+        if not suffixes:
+            continue
+        for suffix in suffixes:
+            signal_branch = BRANCH_SIGNAL_WORDS.get(suffix)
+            if not signal_branch:
+                continue
+            for owl_class, _ in folio.search_by_label(suffix, include_alt_labels=True, limit=25):
+                h = _extract_iri_hash(owl_class.iri)
+                if h in raw:
+                    continue
+                if get_branch_for_class(folio, h) == signal_branch:
+                    raw[h] = owl_class
+
     logger.debug("search_candidates(%r): %d raw candidates from search", term, len(raw))
 
     # Phase 2: Re-score all candidates using word-overlap scoring
@@ -1022,6 +1101,22 @@ def search_candidates(
             for suffix in suffixes:
                 eq = f"{w} {suffix}"
                 expansion_queries.append((_content_words(eq), eq))
+
+    # Also re-score against spaCy cross-expansion terms (e.g. "surgery malpractice")
+    from app.services.nlp import is_available as nlp_available, similar_words
+    if nlp_available():
+        for w in content_words:
+            sims = similar_words(w, top_n=3, threshold=0.5)
+            sim_words = [sw for sw, _ in sims if sw not in SEARCH_STOPWORDS]
+            for other_w in content_words:
+                if other_w == w:
+                    continue
+                suffixes = LEGAL_TERM_EXPANSIONS.get(other_w)
+                if suffixes:
+                    for sw in sim_words:
+                        for suffix in suffixes:
+                            eq = f"{sw} {suffix}"
+                            expansion_queries.append((_content_words(eq), eq))
 
     if expansion_queries:
         best_scores: dict[str, float] = {h: s for h, _, s in scored}

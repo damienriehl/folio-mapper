@@ -229,3 +229,140 @@ def test_expansion_keys_are_valid():
         assert key == key.lower(), f"Key '{key}' is not lowercase"
         assert " " not in key, f"Key '{key}' contains spaces"
         assert key not in SEARCH_STOPWORDS, f"Key '{key}' is a stopword"
+
+
+# --- spaCy similar-word expansion tests ---
+
+
+def _has_lg_model():
+    try:
+        import spacy
+
+        spacy.load("en_core_web_lg")
+        return True
+    except (ImportError, OSError):
+        return False
+
+
+lg_required = pytest.mark.skipif(
+    not _has_lg_model(), reason="spaCy en_core_web_lg not installed"
+)
+
+
+@lg_required
+def test_spacy_expansion_includes_similar_word():
+    """'Surgical Error' should include 'surgery' via spaCy similar-word expansion."""
+    from app.services.nlp import warmup
+
+    warmup()
+    terms = _generate_search_terms("Surgical Error")
+    terms_lower = [t.lower() for t in terms]
+    assert "surgery" in terms_lower, f"Expected 'surgery' in {terms_lower}"
+
+
+@lg_required
+def test_spacy_cross_expansion_surgery_malpractice():
+    """'Surgical Error' should cross-combine to produce 'surgery malpractice'."""
+    from app.services.nlp import warmup
+
+    warmup()
+    terms = _generate_search_terms("Surgical Error")
+    terms_lower = [t.lower() for t in terms]
+    assert "surgery malpractice" in terms_lower, f"Expected 'surgery malpractice' in {terms_lower}"
+
+
+def test_spacy_graceful_degradation():
+    """Without spaCy, no spaCy terms should appear (only domain expansions)."""
+    from app.services import nlp
+
+    nlp.reset()  # Force unavailable
+    terms = _generate_search_terms("Surgical Error")
+    terms_lower = [t.lower() for t in terms]
+    # "surgery" should NOT appear without spaCy (no LEGAL_TERM_EXPANSIONS for "surgical")
+    assert "surgery" not in terms_lower
+    assert "surgery malpractice" not in terms_lower
+
+
+def test_spacy_no_duplicates():
+    """Generated terms should have no duplicates (case-insensitive)."""
+    terms = _generate_search_terms("Commercial Litigation")
+    terms_lower = [t.lower() for t in terms]
+    assert len(terms_lower) == len(set(terms_lower)), "Duplicate terms found"
+
+
+def test_standalone_suffixes_not_in_search_terms():
+    """Standalone expansion suffixes should NOT appear as search terms (too broad)."""
+    terms = _generate_search_terms("Surgical Error")
+    terms_lower = [t.lower() for t in terms]
+    # Compound forms should exist, but standalone should not
+    assert "error malpractice" in terms_lower
+    assert "malpractice" not in terms_lower, "Standalone 'malpractice' should not be a search term"
+    assert "negligence" not in terms_lower, "Standalone 'negligence' should not be a search term"
+
+
+def test_stopwords_filter_pronouns():
+    """Pronouns like 'your', 'my', 'his' should be in SEARCH_STOPWORDS."""
+    pronouns = ["your", "yours", "own", "my", "mine", "our", "ours",
+                 "her", "hers", "him", "his", "whom", "whose", "self"]
+    for p in pronouns:
+        assert p in SEARCH_STOPWORDS, f"'{p}' should be in SEARCH_STOPWORDS"
+
+
+def test_branch_signal_words_exist():
+    """BRANCH_SIGNAL_WORDS should map expansion suffixes to FOLIO branches."""
+    from app.services.folio_service import BRANCH_SIGNAL_WORDS
+
+    assert BRANCH_SIGNAL_WORDS["claim"] == "Objectives"
+    assert BRANCH_SIGNAL_WORDS["malpractice"] == "Objectives"
+    assert BRANCH_SIGNAL_WORDS["practice"] == "Service"
+    assert BRANCH_SIGNAL_WORDS["law"] == "Area of Law"
+
+
+def test_branch_signaled_suffix_search():
+    """Phase 1b should add branch-signaled suffix results to search_candidates."""
+    # "malpractice" suffix → only Objectives branch results should be added
+    malpractice_claim = _mock_owl_class(
+        "Medical Malpractice Claim",
+        "http://example.org/MPC",
+        "A claim for medical malpractice",
+    )
+    unrelated = _mock_owl_class(
+        "Malpractice Insurance",
+        "http://example.org/MI",
+        "Insurance for malpractice",
+    )
+
+    mock_folio = MagicMock()
+
+    # Only standalone "malpractice" returns results (simulates FOLIO behavior
+    # where compound "error malpractice" doesn't match real concept labels)
+    def mock_search_by_label(term, include_alt_labels=True, limit=25):
+        if term.lower().strip() == "malpractice":
+            return [(malpractice_claim, 80.0), (unrelated, 75.0)]
+        return []
+
+    mock_folio.search_by_label = mock_search_by_label
+    mock_folio.search_by_prefix = lambda t: []
+    mock_folio.search_by_definition = lambda t, limit=20: []
+    mock_folio.__getitem__ = lambda self, h: None
+
+    def mock_get_branch(folio, iri_hash):
+        if iri_hash == "MPC":
+            return "Objectives"
+        return "Other"
+
+    with (
+        patch("app.services.folio_service.get_folio", return_value=mock_folio),
+        patch("app.services.folio_service.get_branch_for_class", side_effect=mock_get_branch),
+        patch("app.services.folio_service._build_hierarchy_path", return_value=[]),
+        patch("app.services.folio_service.get_branch_color", return_value="#888"),
+    ):
+        from app.services.folio_service import search_candidates
+        candidates = search_candidates("Surgical Error", threshold=0.1)
+
+    labels = [c.label for c in candidates]
+    # Medical Malpractice Claim should be found via Phase 1b branch-signaled search
+    # (error → malpractice suffix → Objectives branch only)
+    assert "Medical Malpractice Claim" in labels, f"Expected 'Medical Malpractice Claim' in {labels}"
+    # Malpractice Insurance should NOT be found (wrong branch, filtered by Phase 1b)
+    assert "Malpractice Insurance" not in labels, f"'Malpractice Insurance' should be filtered out"
