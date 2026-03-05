@@ -12,7 +12,7 @@ from app.models.llm_models import (
 )
 from app.rate_limit import limiter
 from app.services.auth import extract_api_key
-from app.services.llm.registry import KNOWN_MODELS, get_provider
+from app.services.llm.registry import KNOWN_MODELS, get_provider, sort_and_enrich_models
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +62,17 @@ async def list_models(
     api_key: str | None = Depends(extract_api_key),
 ) -> list[ModelInfo]:
     """List available models for a given provider."""
-    provider = get_provider(
-        provider_type=req.provider,
-        api_key=api_key,
-        base_url=req.base_url,
-    )
-    return await provider.list_models()
+    try:
+        provider = get_provider(
+            provider_type=req.provider,
+            api_key=api_key,
+            base_url=req.base_url,
+        )
+        live_models = await provider.list_models()
+        if live_models:
+            return sort_and_enrich_models(live_models, req.provider)
+    except Exception:
+        logger.warning("Live model fetch failed for %s, falling back to known models", req.provider)
+
+    # Fallback to known models
+    return KNOWN_MODELS.get(req.provider, [])

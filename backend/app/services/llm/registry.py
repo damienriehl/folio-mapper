@@ -180,3 +180,42 @@ def get_provider(
         return CohereProvider(api_key=api_key, base_url=resolved_url, model=model)
     else:
         raise ValueError(f"Unknown provider type: {provider_type}")
+
+
+def sort_and_enrich_models(
+    live_models: list[ModelInfo],
+    provider_type: LLMProviderType,
+) -> list[ModelInfo]:
+    """Sort live models (known first by curated order, unknowns alphabetically) and enrich metadata."""
+    known = KNOWN_MODELS.get(provider_type, [])
+    known_by_id: dict[str, tuple[int, ModelInfo]] = {
+        m.id: (i, m) for i, m in enumerate(known)
+    }
+
+    # Deduplicate by model id (keep first occurrence)
+    seen: set[str] = set()
+    unique: list[ModelInfo] = []
+    for m in live_models:
+        if m.id not in seen:
+            seen.add(m.id)
+            unique.append(m)
+
+    def sort_key(m: ModelInfo) -> tuple[int, str]:
+        if m.id in known_by_id:
+            return (known_by_id[m.id][0], "")
+        return (len(known) + 1, m.id.lower())
+
+    unique.sort(key=sort_key)
+
+    # Enrich: backfill display name and context_window from known models
+    enriched: list[ModelInfo] = []
+    for m in unique:
+        if m.id in known_by_id:
+            _, known_m = known_by_id[m.id]
+            name = m.name if m.name != m.id else known_m.name
+            ctx = m.context_window if m.context_window is not None else known_m.context_window
+            enriched.append(ModelInfo(id=m.id, name=name, context_window=ctx))
+        else:
+            enriched.append(m)
+
+    return enriched

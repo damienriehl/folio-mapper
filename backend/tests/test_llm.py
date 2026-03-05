@@ -14,9 +14,11 @@ from app.services.llm.openai_compat import OpenAICompatProvider
 from app.services.llm.registry import (
     DEFAULT_BASE_URLS,
     DEFAULT_MODELS,
+    KNOWN_MODELS,
     PROVIDER_DISPLAY_NAMES,
     REQUIRES_API_KEY,
     get_provider,
+    sort_and_enrich_models,
 )
 
 
@@ -213,3 +215,129 @@ async def test_test_connection_invalid_provider(client: AsyncClient):
         json={"provider": "nonexistent"},
     )
     assert resp.status_code == 422  # validation error
+
+
+# --- sort_and_enrich_models unit tests ---
+
+
+def test_sort_and_enrich_models_order():
+    """Known models sort by curated index; unknowns sort alphabetically after."""
+    live = [
+        ModelInfo(id="unknown-z", name="Unknown Z"),
+        ModelInfo(id="gpt-5", name="GPT-5", context_window=1047576),
+        ModelInfo(id="unknown-a", name="Unknown A"),
+        ModelInfo(id="gpt-5.2", name="GPT-5.2", context_window=1047576),
+    ]
+    result = sort_and_enrich_models(live, LLMProviderType.OPENAI)
+    ids = [m.id for m in result]
+    # gpt-5.2 is index 0 in KNOWN_MODELS, gpt-5 is index 2, then unknowns alphabetically
+    assert ids == ["gpt-5.2", "gpt-5", "unknown-a", "unknown-z"]
+
+
+def test_sort_and_enrich_models_deduplicates():
+    """Duplicate model ids are removed (first occurrence kept)."""
+    live = [
+        ModelInfo(id="gpt-5", name="GPT-5", context_window=1047576),
+        ModelInfo(id="gpt-5", name="GPT-5 Duplicate", context_window=999),
+    ]
+    result = sort_and_enrich_models(live, LLMProviderType.OPENAI)
+    assert len(result) == 1
+    assert result[0].name == "GPT-5"
+
+
+def test_sort_and_enrich_models_enriches_name():
+    """When live API returns name == id, backfill display name from known models."""
+    live = [
+        ModelInfo(id="gpt-5.2", name="gpt-5.2"),  # name == id
+    ]
+    result = sort_and_enrich_models(live, LLMProviderType.OPENAI)
+    assert result[0].name == "GPT-5.2"  # enriched from KNOWN_MODELS
+
+
+def test_sort_and_enrich_models_enriches_context_window():
+    """When live API returns context_window=None, backfill from known models."""
+    live = [
+        ModelInfo(id="gpt-5.2", name="GPT-5.2", context_window=None),
+    ]
+    result = sort_and_enrich_models(live, LLMProviderType.OPENAI)
+    assert result[0].context_window == 1047576  # enriched from KNOWN_MODELS
+
+
+def test_sort_and_enrich_models_preserves_live_metadata():
+    """When live API returns good metadata, don't overwrite with known values."""
+    live = [
+        ModelInfo(id="gpt-5.2", name="GPT-5.2 (Preview)", context_window=999999),
+    ]
+    result = sort_and_enrich_models(live, LLMProviderType.OPENAI)
+    assert result[0].name == "GPT-5.2 (Preview)"
+    assert result[0].context_window == 999999
+
+
+# --- Fallback router tests ---
+
+
+@pytest.mark.anyio
+@patch("app.routers.llm.get_provider")
+async def test_list_models_fallback_on_failure(mock_get_provider, client: AsyncClient):
+    """When live fetch raises, return known models (200, not 500)."""
+    mock_get_provider.side_effect = Exception("Bad API key")
+
+    resp = await client.post(
+        "/api/llm/models",
+        json={"provider": "openai"},
+        headers={"Authorization": "Bearer bad-key"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    # Should return KNOWN_MODELS for openai
+    known_ids = {m.id for m in KNOWN_MODELS[LLMProviderType.OPENAI]}
+    returned_ids = {m["id"] for m in data}
+    assert returned_ids == known_ids
+
+
+@pytest.mark.anyio
+@patch("app.routers.llm.get_provider")
+async def test_list_models_fallback_on_empty(mock_get_provider, client: AsyncClient):
+    """When live fetch returns empty list, fall back to known models."""
+    mock_provider = AsyncMock()
+    mock_provider.list_models.return_value = []
+    mock_get_provider.return_value = mock_provider
+
+    resp = await client.post(
+        "/api/llm/models",
+        json={"provider": "openai"},
+        headers={"Authorization": "Bearer sk-test"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    known_ids = {m.id for m in KNOWN_MODELS[LLMProviderType.OPENAI]}
+    returned_ids = {m["id"] for m in data}
+    assert returned_ids == known_ids
+
+
+@pytest.mark.anyio
+@patch("app.routers.llm.get_provider")
+async def test_list_models_enriches_metadata(mock_get_provider, client: AsyncClient):
+    """Live models with name==id and context_window=None get enriched."""
+    mock_provider = AsyncMock()
+    mock_provider.list_models.return_value = [
+        ModelInfo(id="gpt-5.2", name="gpt-5.2", context_window=None),
+        ModelInfo(id="custom-model", name="custom-model", context_window=4096),
+    ]
+    mock_get_provider.return_value = mock_provider
+
+    resp = await client.post(
+        "/api/llm/models",
+        json={"provider": "openai"},
+        headers={"Authorization": "Bearer sk-test"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    # gpt-5.2 should be enriched
+    gpt = next(m for m in data if m["id"] == "gpt-5.2")
+    assert gpt["name"] == "GPT-5.2"
+    assert gpt["context_window"] == 1047576
+    # custom-model should be unchanged
+    custom = next(m for m in data if m["id"] == "custom-model")
+    assert custom["name"] == "custom-model"
+    assert custom["context_window"] == 4096
