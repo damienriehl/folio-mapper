@@ -24,6 +24,9 @@ embedding = [
     "faiss-cpu>=1.8,<2.0",
     "numpy>=1.26,<3.0",
 ]
+nlp = [
+    "spacy>=3.7,<4.0",
+]
 dev = [
     "pytest>=8.0.0,<9.0.0",
     "httpx>=0.27.0,<1.0.0",

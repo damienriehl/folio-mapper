@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -31,6 +32,12 @@ async def lifespan(app: FastAPI):
     token = get_or_create_token()
     if token:
         print(json.dumps({"local_token": token}), file=sys.stdout, flush=True)
+    # Warm FOLIO ontology + spaCy word vectors in background (non-blocking)
+    from app.services.folio_service import get_folio
+    from app.services.nlp import warmup as nlp_warmup
+
+    threading.Thread(target=get_folio, daemon=True).start()
+    threading.Thread(target=nlp_warmup, daemon=True).start()
     yield
 
 

@@ -4,7 +4,7 @@ import { useMappingStore } from '../store/mapping-store';
 
 /**
  * Fires warmupFolio() on mount (for the confirmation screen),
- * then polls status every 2s until loaded.
+ * then polls status every 2s until the store shows loaded.
  */
 export function useFolioWarmup() {
   const setFolioStatus = useMappingStore((s) => s.setFolioStatus);
@@ -17,12 +17,14 @@ export function useFolioWarmup() {
       .then(setFolioStatus)
       .catch(() => {});
 
-    // Poll status every 2s until loaded
+    // Poll status every 2s until the *store* shows loaded
+    // (don't stop based on API response alone — persist rehydration
+    // can overwrite the store back to loaded:false after we set it)
     pollRef.current = setInterval(async () => {
       try {
         const status = await fetchFolioStatus();
         setFolioStatus(status);
-        if (status.loaded && pollRef.current) {
+        if (status.loaded && useMappingStore.getState().folioStatus.loaded && pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
         }

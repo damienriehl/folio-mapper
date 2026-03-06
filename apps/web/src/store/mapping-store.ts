@@ -687,9 +687,8 @@ export const useMappingStore = create<MappingState>()(
           // Ensure topN/defaultTopN always have valid values
           defaultTopN: p.defaultTopN ?? current.defaultTopN ?? 5,
           topN: p.defaultTopN ?? current.defaultTopN ?? 5,
-          // Reset transient fields
+          // Reset transient fields (folioStatus left to warmup hook)
           selectedCandidateIri: null,
-          folioStatus: { loaded: false, concept_count: 0, loading: false, error: null },
           isLoadingCandidates: false,
           error: null,
           // On recovery, batch loading is no longer in progress
