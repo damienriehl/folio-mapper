@@ -27,6 +27,9 @@ Thumbs.db
 coverage/
 .pytest_cache/
 
+# Security
+*security-analysis*
+
 # Desktop build
 backend/build/
 backend/dist/
