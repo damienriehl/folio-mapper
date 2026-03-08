@@ -35,10 +35,14 @@ async def lifespan(app: FastAPI):
     # Warm FOLIO ontology + spaCy word vectors in background (non-blocking)
     from app.services.folio_service import get_folio
     from app.services.nlp import warmup as nlp_warmup
+    from app.services.owl_update_service import start_update_checker, stop_update_checker
 
     threading.Thread(target=get_folio, daemon=True).start()
     threading.Thread(target=nlp_warmup, daemon=True).start()
+    # Start OWL update checker (checks GitHub periodically for ontology updates)
+    start_update_checker()
     yield
+    stop_update_checker()
 
 
 app = FastAPI(title="FOLIO Mapper API", version="0.1.0", lifespan=lifespan)

@@ -70,3 +70,13 @@ class FolioStatus(BaseModel):
     concept_count: int = 0
     loading: bool = False
     error: str | None = None
+
+
+class OWLUpdateStatus(BaseModel):
+    update_status: str  # "current" | "checking" | "updating" | "updated" | "error"
+    last_check_time: str | None = None
+    last_update_time: str | None = None
+    concept_count: int = 0
+    owl_commit_sha: str | None = None
+    check_interval_seconds: int = 86400
+    error: str | None = None

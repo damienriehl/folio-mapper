@@ -10,6 +10,7 @@ from app.models.mapping_models import (
     FolioCandidate,
     FolioStatus,
     MappingResponse,
+    OWLUpdateStatus,
 )
 from app.models.pipeline_models import (
     MandatoryFallbackRequest,
@@ -24,6 +25,11 @@ from app.services.folio_service import (
     lookup_concept_detail,
     search_all_items,
     warmup_folio,
+)
+from app.services.owl_update_service import (
+    force_update,
+    get_update_status,
+    trigger_update_check,
 )
 from app.services.pipeline.mandatory_fallback import run_mandatory_fallback
 
@@ -132,3 +138,24 @@ async def mandatory_fallback(
         item_index=body.item_index,
         fallback_results=fallback_results,
     )
+
+
+@router.get("/owl-update/status", response_model=OWLUpdateStatus)
+@limiter.limit("60/minute")
+async def owl_update_status(request: Request) -> OWLUpdateStatus:
+    """Check OWL ontology update status."""
+    return get_update_status()
+
+
+@router.post("/owl-update/check", response_model=OWLUpdateStatus)
+@limiter.limit("5/minute")
+async def owl_update_check(request: Request) -> OWLUpdateStatus:
+    """Manually trigger an OWL update check."""
+    return trigger_update_check()
+
+
+@router.post("/owl-update/force", response_model=OWLUpdateStatus)
+@limiter.limit("2/minute")
+async def owl_update_force(request: Request) -> OWLUpdateStatus:
+    """Force re-download of the OWL ontology."""
+    return force_update()

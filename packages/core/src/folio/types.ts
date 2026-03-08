@@ -66,3 +66,13 @@ export interface MandatoryFallbackResponse {
   item_index: number;
   fallback_results: BranchFallbackResult[];
 }
+
+export interface OWLUpdateStatus {
+  update_status: 'current' | 'checking' | 'updating' | 'updated' | 'error';
+  last_check_time: string | null;
+  last_update_time: string | null;
+  concept_count: number;
+  owl_commit_sha: string | null;
+  check_interval_seconds: number;
+  error: string | null;
+}

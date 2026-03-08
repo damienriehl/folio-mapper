@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 type LLMStatus = 'connected' | 'disconnected' | 'none';
 type EmbeddingStatusType = 'ready' | 'building' | 'unavailable' | 'none';
+type FolioUpdateStatusType = 'current' | 'checking' | 'updating' | 'updated' | 'error' | 'none';
 
 interface HeaderProps {
   onOpenSettings?: () => void;
@@ -14,10 +15,12 @@ interface HeaderProps {
   llmProviderLabel?: string;
   embeddingStatus?: EmbeddingStatusType;
   embeddingDetail?: string;
+  folioUpdateStatus?: FolioUpdateStatusType;
+  folioUpdateDetail?: string;
   newProjectPopover?: ReactNode;
 }
 
-export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession, llmStatus, llmProviderLabel, embeddingStatus, embeddingDetail, newProjectPopover }: HeaderProps) {
+export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart, onOpenExport, hasActiveSession, llmStatus, llmProviderLabel, embeddingStatus, embeddingDetail, folioUpdateStatus, folioUpdateDetail, newProjectPopover }: HeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
       <h1 className="text-xl font-semibold text-gray-900">FOLIO Mapper</h1>
@@ -138,6 +141,37 @@ export function Header({ onOpenSettings, onSaveSession, onNewProject, onRestart,
           >
             <span className="h-2 w-2 rounded-full bg-gray-300" />
             Embeddings
+          </span>
+        )}
+        {/* FOLIO update status indicator */}
+        {(folioUpdateStatus === 'current' || folioUpdateStatus === 'updated') && (
+          <span
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-gray-400"
+            title={folioUpdateDetail || 'FOLIO ontology current'}
+            aria-label="FOLIO update status"
+          >
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+            {folioUpdateStatus === 'updated' ? 'FOLIO Updated' : 'FOLIO'}
+          </span>
+        )}
+        {(folioUpdateStatus === 'checking' || folioUpdateStatus === 'updating') && (
+          <span
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-gray-400"
+            title={folioUpdateStatus === 'checking' ? 'Checking for OWL updates...' : 'Updating FOLIO ontology...'}
+            aria-label="FOLIO update status"
+          >
+            <span className="h-2 w-2 animate-pulse rounded-full bg-blue-400" />
+            FOLIO
+          </span>
+        )}
+        {folioUpdateStatus === 'error' && (
+          <span
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-gray-400"
+            title={folioUpdateDetail || 'FOLIO update check failed'}
+            aria-label="FOLIO update status"
+          >
+            <span className="h-2 w-2 rounded-full bg-gray-300" />
+            FOLIO
           </span>
         )}
         {/* LLM status indicator */}

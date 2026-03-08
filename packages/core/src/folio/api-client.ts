@@ -1,5 +1,5 @@
 import type { ParseItem } from '../input/types';
-import type { BranchInfo, ConceptDetail, FolioCandidate, FolioStatus, MandatoryFallbackResponse, MappingResponse } from './types';
+import type { BranchInfo, ConceptDetail, FolioCandidate, FolioStatus, MandatoryFallbackResponse, MappingResponse, OWLUpdateStatus } from './types';
 import type { EntityGraphResponse } from './graph-types';
 import type { PipelineRequestConfig } from '../pipeline/api-client';
 import { baseHeaders, buildAuthHeaders } from '../auth';
@@ -140,6 +140,26 @@ export async function fetchMandatoryFallback(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Mandatory fallback failed' }));
     throw new Error(err.detail || `Mandatory fallback failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function fetchOWLUpdateStatus(): Promise<OWLUpdateStatus> {
+  const res = await fetch(`${BASE_URL}/owl-update/status`, { headers: baseHeaders() });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch OWL update status (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function triggerOWLUpdateCheck(): Promise<OWLUpdateStatus> {
+  const res = await fetch(`${BASE_URL}/owl-update/check`, { method: 'POST', headers: baseHeaders() });
+
+  if (!res.ok) {
+    throw new Error(`Failed to trigger OWL update check (${res.status})`);
   }
 
   return res.json();

@@ -317,6 +317,22 @@ async def warmup_folio() -> FolioStatus:
     return get_folio_status()
 
 
+def reload_folio(new_instance: FOLIO) -> None:
+    """Hot-swap the FOLIO singleton with a new instance. Thread-safe."""
+    global _folio_instance, _folio_loading, _folio_error
+    with _folio_lock:
+        _folio_instance = new_instance
+        _folio_error = None
+        _folio_loading = False
+    # Clear ALL derived caches
+    _branch_cache.clear()
+    _branch_root_iris.clear()
+    _init_branch_roots()
+    _resolve_branch_level_hashes.cache_clear()
+    _get_branch_level_labels.cache_clear()
+    logger.info("FOLIO instance hot-swapped: %d classes", len(new_instance.classes))
+
+
 def get_branch_for_class(folio: FOLIO, iri_hash: str) -> str:
     """Walk parent chain to find which branch a class belongs to. Cached."""
     if iri_hash in _branch_cache:

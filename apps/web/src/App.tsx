@@ -35,6 +35,18 @@ import { useExport } from './hooks/useExport';
 import { useSuggestionSubmit } from './hooks/useSuggestionSubmit';
 import { useLlamafile } from './hooks/useLlamafile';
 import { useEmbeddingStatus } from './hooks/useEmbeddingStatus';
+import { useOWLUpdateStatus } from './hooks/useOWLUpdateStatus';
+
+function _formatTimeAgo(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export function App() {
   const {
@@ -110,6 +122,41 @@ export function App() {
     }
     return embeddingRaw.error || 'Embedding index not available';
   })();
+
+  // Derive FOLIO OWL update status for header badge
+  const owlUpdateRaw = useOWLUpdateStatus();
+  const folioUpdateStatus = (() => {
+    if (!owlUpdateRaw) return 'none' as const;
+    return owlUpdateRaw.update_status;
+  })();
+  const folioUpdateDetail = (() => {
+    if (!owlUpdateRaw) return '';
+    if (owlUpdateRaw.update_status === 'current' || owlUpdateRaw.update_status === 'updated') {
+      const parts = [`${owlUpdateRaw.concept_count.toLocaleString()} concepts`];
+      if (owlUpdateRaw.last_check_time) {
+        const ago = _formatTimeAgo(owlUpdateRaw.last_check_time);
+        parts.push(`Last checked: ${ago}`);
+      }
+      return parts.join('. ');
+    }
+    if (owlUpdateRaw.update_status === 'error') {
+      return owlUpdateRaw.error || 'Update check failed';
+    }
+    return '';
+  })();
+
+  // Toast on OWL update completion
+  const [showOWLUpdateToast, setShowOWLUpdateToast] = useState(false);
+  const prevOWLStatus = useRef(owlUpdateRaw?.update_status);
+  useEffect(() => {
+    const current = owlUpdateRaw?.update_status;
+    if (prevOWLStatus.current !== 'updated' && current === 'updated') {
+      setShowOWLUpdateToast(true);
+      const timer = setTimeout(() => setShowOWLUpdateToast(false), 6000);
+      return () => clearTimeout(timer);
+    }
+    prevOWLStatus.current = current;
+  }, [owlUpdateRaw?.update_status]);
 
   // Toast banner on valid → invalid transition
   const [showDisconnectToast, setShowDisconnectToast] = useState(false);
@@ -491,6 +538,8 @@ export function App() {
           llmProviderLabel={llmProviderLabel}
           embeddingStatus={embeddingStatus}
           embeddingDetail={embeddingDetail}
+          folioUpdateStatus={folioUpdateStatus}
+          folioUpdateDetail={folioUpdateDetail}
           newProjectPopover={session.showNewProjectModal ? (
             <NewProjectModal
               onSaveAndNew={session.handleSaveAndNew}
@@ -506,6 +555,19 @@ export function App() {
             <button
               onClick={() => setShowDisconnectToast(false)}
               className="ml-2 text-amber-600 hover:text-amber-800"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {showOWLUpdateToast && (
+          <div className="flex items-center justify-center gap-2 bg-green-50 px-4 py-2 text-sm text-green-800 border-b border-green-200">
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+            FOLIO ontology updated — {owlUpdateRaw?.concept_count.toLocaleString()} concepts loaded
+            <button
+              onClick={() => setShowOWLUpdateToast(false)}
+              className="ml-2 text-green-600 hover:text-green-800"
               aria-label="Dismiss"
             >
               ×
@@ -659,7 +721,7 @@ export function App() {
   }
 
   return (
-    <AppShell onOpenSettings={() => setShowSettings(true)} llmStatus={llmStatus} llmProviderLabel={llmProviderLabel} embeddingStatus={embeddingStatus} embeddingDetail={embeddingDetail}>
+    <AppShell onOpenSettings={() => setShowSettings(true)} llmStatus={llmStatus} llmProviderLabel={llmProviderLabel} embeddingStatus={embeddingStatus} embeddingDetail={embeddingDetail} folioUpdateStatus={folioUpdateStatus} folioUpdateDetail={folioUpdateDetail}>
       {settingsModal}
 
       {recoveryData && (

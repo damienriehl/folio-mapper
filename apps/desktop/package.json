@@ -1,6 +1,6 @@
 {
   "name": "@folio-mapper/desktop",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "private": true,
   "description": "FOLIO Mapper desktop application",
   "author": "Damien Riehl and ALEA Institute",
