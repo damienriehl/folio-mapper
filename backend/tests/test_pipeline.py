@@ -690,6 +690,7 @@ async def test_orchestrator(llm_config):
     mock_owl_invest.definition = "An investigation activity"
     mock_owl_invest.alternative_labels = []
     mock_owl_invest.sub_class_of = []
+    mock_owl_invest.preferred_label = None
 
     mock_owl_enforce = MagicMock()
     mock_owl_enforce.iri = "https://folio.openlegalstandard.org/Renforce"
@@ -697,6 +698,7 @@ async def test_orchestrator(llm_config):
     mock_owl_enforce.definition = "Enforcement activity"
     mock_owl_enforce.alternative_labels = []
     mock_owl_enforce.sub_class_of = []
+    mock_owl_enforce.preferred_label = None
 
     mock_folio.__getitem__ = lambda self, key: {"Rinvest": mock_owl_invest, "Renforce": mock_owl_enforce}.get(key)
 
@@ -946,7 +948,7 @@ async def test_acceptance_agency_investigation(llm_config):
     assert call_count["n"] == 1
 
 
-def _make_owl(iri_hash: str, label: str, definition: str, alt_labels: list[str]) -> MagicMock:
+def _make_owl(iri_hash: str, label: str, definition: str, alt_labels: list[str], preferred_label: str | None = None) -> MagicMock:
     """Helper to create a mock OWLClass."""
     mock = MagicMock()
     mock.iri = f"https://folio.openlegalstandard.org/{iri_hash}"
@@ -954,4 +956,5 @@ def _make_owl(iri_hash: str, label: str, definition: str, alt_labels: list[str])
     mock.definition = definition
     mock.alternative_labels = alt_labels
     mock.sub_class_of = []
+    mock.preferred_label = preferred_label
     return mock

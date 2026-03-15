@@ -249,13 +249,14 @@ def test_find_underrepresented_no_prescan_branches():
 # --- Service integration tests ---
 
 
-def _mock_owl_class(label, iri, definition=None, alt_labels=None, sub_class_of=None):
+def _mock_owl_class(label, iri, definition=None, alt_labels=None, sub_class_of=None, preferred_label=None):
     owl = MagicMock()
     owl.label = label
     owl.iri = iri
     owl.definition = definition
     owl.alternative_labels = alt_labels or []
     owl.sub_class_of = sub_class_of or []
+    owl.preferred_label = preferred_label
     return owl
 
 

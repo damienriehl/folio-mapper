@@ -135,13 +135,14 @@ def test_parse_llm_suggestions_non_string_items():
 # --- Service tests (mocked FOLIO) ---
 
 
-def _mock_owl_class(label="Test Concept", iri="http://example.org/Test", definition=None, alt_labels=None, sub_class_of=None):
+def _mock_owl_class(label="Test Concept", iri="http://example.org/Test", definition=None, alt_labels=None, sub_class_of=None, preferred_label=None):
     owl = MagicMock()
     owl.label = label
     owl.iri = iri
     owl.definition = definition
     owl.alternative_labels = alt_labels or []
     owl.sub_class_of = sub_class_of or []
+    owl.preferred_label = preferred_label
     return owl
 
 

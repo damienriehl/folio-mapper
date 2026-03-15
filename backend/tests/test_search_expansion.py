@@ -98,7 +98,7 @@ def test_expansion_dedup_keeps_best_score():
 # --- Integration-style: search_candidates with mock FOLIO ---
 
 
-def _mock_owl_class(label, iri, definition=None, alt_labels=None, sub_class_of=None, parent_class_of=None):
+def _mock_owl_class(label, iri, definition=None, alt_labels=None, sub_class_of=None, parent_class_of=None, preferred_label=None):
     owl = MagicMock()
     owl.label = label
     owl.iri = iri
@@ -106,6 +106,7 @@ def _mock_owl_class(label, iri, definition=None, alt_labels=None, sub_class_of=N
     owl.alternative_labels = alt_labels or []
     owl.sub_class_of = sub_class_of or []
     owl.parent_class_of = parent_class_of or []
+    owl.preferred_label = preferred_label
     return owl
 
 

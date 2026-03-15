@@ -77,6 +77,7 @@ def _search_within_branch(
             owl_class.label or iri_hash,
             owl_class.definition,
             owl_class.alternative_labels or [],
+            preferred_label=owl_class.preferred_label,
         )
         if score >= min_score:
             scored.append((iri_hash, owl_class, score))
@@ -100,6 +101,7 @@ def _search_within_branch(
                     owl_class.label or iri_hash,
                     owl_class.definition,
                     owl_class.alternative_labels or [],
+                    preferred_label=owl_class.preferred_label,
                 )
                 if exp_score >= min_score and exp_score > best_scores.get(iri_hash, 0):
                     best_scores[iri_hash] = exp_score

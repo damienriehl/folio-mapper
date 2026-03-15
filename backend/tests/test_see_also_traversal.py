@@ -16,6 +16,7 @@ def _mock_owl_class(
     alt_labels=None,
     sub_class_of=None,
     see_also=None,
+    preferred_label=None,
 ):
     owl = MagicMock()
     owl.label = label
@@ -24,6 +25,7 @@ def _mock_owl_class(
     owl.alternative_labels = alt_labels or []
     owl.sub_class_of = sub_class_of or []
     owl.see_also = see_also or []
+    owl.preferred_label = preferred_label
     return owl
 
 
